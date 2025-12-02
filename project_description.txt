@@ -1,0 +1,184 @@
+================================================================================
+ONYX - ABB Robot Control System
+================================================================================
+
+PROJECT OVERVIEW
+----------------
+Onyx is a Django web application designed to control an ABB IRB 6700 industrial
+robot mounted on an IRT 710 track, via the IRC5 controller. The application will
+establish network communication with the IRC5 and trigger pre-programmed RAPID
+routines stored on the controller.
+
+HARDWARE CONFIGURATION
+----------------------
+- Robot: ABB IRB 6700
+- Track: ABB IRT 710 (7th axis)
+- Controller: ABB IRC5
+- Client: Mac (development machine)
+
+COMMUNICATION PROTOCOL
+----------------------
+The IRC5 controller supports several communication methods:
+1. Robot Web Services (RWS) - RESTful API over HTTP/HTTPS (preferred)
+2. PC SDK - Windows-only, not suitable for Mac
+3. Socket Messaging - Raw TCP/IP communication
+4. OPC UA - Industrial protocol (requires additional setup)
+
+We will use Robot Web Services (RWS) as it:
+- Works over standard HTTP (cross-platform)
+- Provides RESTful endpoints for robot control
+- Supports authentication
+- Can read/write I/O, start/stop programs, read robot state
+
+================================================================================
+TO-DO LIST: ESTABLISHING CONNECTION & TRIGGERING FIRST PROGRAM
+================================================================================
+
+PHASE 1: HARDWARE & NETWORK SETUP
+---------------------------------
+[ ] 1.1  Locate the IRC5 controller's service port (X6 on the main computer)
+         - This is an RJ45 Ethernet port on the controller cabinet
+         
+[ ] 1.2  Connect Mac to IRC5 via Ethernet
+         - Option A: Direct Ethernet cable from Mac to IRC5 service port
+         - Option B: Connect both to same network switch/router
+         - You may need a USB-C to Ethernet adapter for your Mac
+
+[ ] 1.3  Determine IRC5's IP address
+         - On the FlexPendant: Menu → Control Panel → Configuration → 
+           Communication → IP Settings
+         - Default service port IP is often 192.168.125.1
+         - Note the subnet mask (usually 255.255.255.0)
+
+[ ] 1.4  Configure Mac's network settings
+         - System Preferences → Network → Select Ethernet adapter
+         - Set to manual/static IP in same subnet as IRC5
+         - Example: If IRC5 is 192.168.125.1, set Mac to 192.168.125.10
+         - Subnet mask: 255.255.255.0
+         - Leave gateway/DNS blank for direct connection
+
+[ ] 1.5  Test basic connectivity
+         - Open Terminal and run: ping <IRC5_IP_ADDRESS>
+         - You should see responses if connected properly
+
+
+PHASE 2: IRC5 CONTROLLER CONFIGURATION
+--------------------------------------
+[ ] 2.1  Verify RobotWare version on IRC5
+         - On FlexPendant: Menu → System Info
+         - RWS requires RobotWare 5.x or 6.x
+         - Note the exact version for API compatibility
+
+[ ] 2.2  Check if Robot Web Services is enabled
+         - RWS is included in most RobotWare installations
+         - May need to be enabled in system configuration
+
+[ ] 2.3  Verify/Set controller to AUTO mode
+         - Physical key switch on controller cabinet
+         - Must be in AUTO mode for remote program execution
+
+[ ] 2.4  Check user credentials for RWS
+         - Default user: "Default User" with no password
+         - Or check with your ABB integrator for credentials
+         - Users configured in: Configuration → Controller → 
+           User Authorization System
+
+[ ] 2.5  Ensure RAPID programs are loaded
+         - Verify the programs you want to trigger are in the controller
+         - Note the exact module and procedure names
+
+
+PHASE 3: TEST CONNECTION VIA BROWSER
+------------------------------------
+[ ] 3.1  Open browser and navigate to IRC5's RWS endpoint
+         - URL: http://<IRC5_IP_ADDRESS>/rw
+         - Example: http://192.168.125.1/rw
+         - You should see XML response or login prompt
+
+[ ] 3.2  Test API endpoints manually
+         - Robot state: http://<IRC5_IP>/rw/rapid/execution
+         - I/O signals: http://<IRC5_IP>/rw/iosystem/signals
+         - If prompted, enter credentials from step 2.4
+
+
+PHASE 4: DJANGO APPLICATION DEVELOPMENT
+---------------------------------------
+[ ] 4.1  Install required Python packages
+         - requests (for HTTP communication)
+         - requests-digest (for digest authentication)
+         
+[ ] 4.2  Create Django app for robot control
+         - python manage.py startapp robot_control
+
+[ ] 4.3  Build IRC5 connection service class
+         - Handle authentication (digest auth)
+         - Implement connection testing
+         - Error handling for network issues
+
+[ ] 4.4  Implement core RWS API methods
+         - Get controller state
+         - Get execution state
+         - Get/Set operation mode
+         - Start/Stop RAPID execution
+
+[ ] 4.5  Create program trigger functionality
+         - Set program pointer to specific routine
+         - Start RAPID execution
+         - Monitor execution status
+
+[ ] 4.6  Build basic web interface
+         - Connection status display
+         - Program selection dropdown
+         - Execute button
+         - Status feedback
+
+
+PHASE 5: TESTING & SAFETY
+-------------------------
+[ ] 5.1  Test with robot in MOTORS OFF state first
+         - Verify commands are received correctly
+         - Check program pointer moves as expected
+
+[ ] 5.2  Test with robot in reduced speed mode
+         - Ensure emergency stop is accessible
+         - Have someone ready at the FlexPendant
+
+[ ] 5.3  Implement safety checks in application
+         - Verify AUTO mode before sending commands
+         - Check motors on/off state
+         - Confirm no active alarms
+
+
+================================================================================
+IMPORTANT SAFETY NOTES
+================================================================================
+- ALWAYS ensure the robot work area is clear before remote execution
+- ALWAYS have emergency stop accessible
+- NEVER bypass safety systems
+- Test new programs manually on FlexPendant before remote triggering
+- The IRC5 will reject commands if safety conditions aren't met
+
+
+================================================================================
+USEFUL RESOURCES
+================================================================================
+- ABB Robot Web Services documentation (Application Manual)
+- IRC5 Operating Manual
+- RAPID Reference Manual
+- ABB RobotStudio (Windows) - useful for simulation and testing
+
+
+================================================================================
+NOTES / OBSERVATIONS
+================================================================================
+(Add your findings here as you progress through the setup)
+
+IRC5 IP Address: _______________________
+Mac IP Address:  _______________________
+RobotWare Version: _____________________
+RWS Credentials: _______________________
+RAPID Programs Available:
+  - _______________________
+  - _______________________
+  - _______________________
+
