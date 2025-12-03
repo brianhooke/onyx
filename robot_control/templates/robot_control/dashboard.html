@@ -15,6 +15,11 @@
         .status-connected { background-color: #22c55e; }
         .status-disconnected { background-color: #ef4444; }
         .status-warning { background-color: #f59e0b; }
+        
+        /* Gauge animation */
+        [id^="gauge-"] {
+            transition: stroke-dashoffset 0.2s ease-out, opacity 0.2s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -146,6 +151,107 @@
             </div>
         </div>
 
+        <!-- Force/Torque Gauges -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Force / Torque Sensor</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Fx -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-24 h-24">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle id="gauge-fx" cx="50" cy="50" r="40" stroke="#3b82f6" stroke-width="8" fill="none"
+                                stroke-dasharray="251.2" stroke-dashoffset="125.6" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="value-fx" class="text-lg font-bold text-blue-400">0</span>
+                            <span class="text-xs text-gray-500">N</span>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-400 mt-1">Fx</span>
+                </div>
+                <!-- Fy -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-24 h-24">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle id="gauge-fy" cx="50" cy="50" r="40" stroke="#22c55e" stroke-width="8" fill="none"
+                                stroke-dasharray="251.2" stroke-dashoffset="125.6" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="value-fy" class="text-lg font-bold text-green-400">0</span>
+                            <span class="text-xs text-gray-500">N</span>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-400 mt-1">Fy</span>
+                </div>
+                <!-- Fz -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-24 h-24">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle id="gauge-fz" cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none"
+                                stroke-dasharray="251.2" stroke-dashoffset="125.6" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="value-fz" class="text-lg font-bold text-yellow-400">0</span>
+                            <span class="text-xs text-gray-500">N</span>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-400 mt-1">Fz</span>
+                </div>
+                <!-- Tx -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-24 h-24">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle id="gauge-tx" cx="50" cy="50" r="40" stroke="#ec4899" stroke-width="8" fill="none"
+                                stroke-dasharray="251.2" stroke-dashoffset="125.6" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="value-tx" class="text-lg font-bold text-pink-400">0</span>
+                            <span class="text-xs text-gray-500">Nm</span>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-400 mt-1">Tx</span>
+                </div>
+                <!-- Ty -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-24 h-24">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle id="gauge-ty" cx="50" cy="50" r="40" stroke="#8b5cf6" stroke-width="8" fill="none"
+                                stroke-dasharray="251.2" stroke-dashoffset="125.6" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="value-ty" class="text-lg font-bold text-violet-400">0</span>
+                            <span class="text-xs text-gray-500">Nm</span>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-400 mt-1">Ty</span>
+                </div>
+                <!-- Tz -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-24 h-24">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle id="gauge-tz" cx="50" cy="50" r="40" stroke="#06b6d4" stroke-width="8" fill="none"
+                                stroke-dasharray="251.2" stroke-dashoffset="125.6" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="value-tz" class="text-lg font-bold text-cyan-400">0</span>
+                            <span class="text-xs text-gray-500">Nm</span>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-400 mt-1">Tz</span>
+                </div>
+            </div>
+            <div class="mt-4 text-xs text-gray-500 text-center">
+                <span id="ft-status-indicator" class="inline-block w-2 h-2 rounded-full bg-yellow-500 mr-1 animate-pulse"></span>
+                <span id="ft-status-text">Simulated @ 4Hz (load ForceMonitor.mod for live data)</span>
+            </div>
+        </div>
+
         <!-- Program Info & Speed -->
         <div class="grid md:grid-cols-3 gap-6 mb-6">
             <div class="bg-gray-800 rounded-lg p-6">
@@ -237,6 +343,147 @@
         // Velocity calculation state
         let lastPosition = null;
         let lastPositionTime = null;
+
+        // Force/Torque simulation state
+        const ftState = {
+            fx: 0, fy: 0, fz: 0,
+            tx: 0, ty: 0, tz: 0,
+            // Target values for smooth animation
+            fxTarget: 0, fyTarget: 0, fzTarget: 0,
+            txTarget: 0, tyTarget: 0, tzTarget: 0,
+        };
+        const FORCE_MAX = 500;  // N - max force for gauge scale
+        const TORQUE_MAX = 50;  // Nm - max torque for gauge scale
+        const CIRCUMFERENCE = 251.2;  // 2 * PI * 40 (radius)
+
+        function updateGauge(id, value, maxValue) {
+            const gauge = document.getElementById(id);
+            if (!gauge) return;
+            
+            // Calculate stroke offset (0 = full, circumference = empty)
+            // We show from -max to +max, so normalize to 0-1 range
+            const normalized = (value + maxValue) / (2 * maxValue);
+            const clamped = Math.max(0, Math.min(1, normalized));
+            const offset = CIRCUMFERENCE * (1 - clamped);
+            gauge.style.strokeDashoffset = offset;
+            
+            // Change color intensity based on absolute value
+            const intensity = Math.abs(value) / maxValue;
+            gauge.style.opacity = 0.4 + (intensity * 0.6);
+        }
+
+        function simulateForceTorque() {
+            // Generate realistic force/torque patterns
+            const time = Date.now() / 1000;
+            
+            // Simulate varying loads with some noise
+            // Forces: typical range -200 to 200 N with occasional spikes
+            ftState.fxTarget = Math.sin(time * 0.7) * 80 + Math.sin(time * 2.3) * 40 + (Math.random() - 0.5) * 20;
+            ftState.fyTarget = Math.cos(time * 0.5) * 60 + Math.sin(time * 1.8) * 30 + (Math.random() - 0.5) * 15;
+            ftState.fzTarget = -50 + Math.sin(time * 0.3) * 100 + Math.cos(time * 1.2) * 50 + (Math.random() - 0.5) * 25;
+            
+            // Torques: typical range -20 to 20 Nm
+            ftState.txTarget = Math.sin(time * 0.9) * 15 + Math.cos(time * 2.1) * 8 + (Math.random() - 0.5) * 3;
+            ftState.tyTarget = Math.cos(time * 0.6) * 12 + Math.sin(time * 1.5) * 6 + (Math.random() - 0.5) * 2;
+            ftState.tzTarget = Math.sin(time * 1.1) * 10 + Math.cos(time * 0.8) * 5 + (Math.random() - 0.5) * 2;
+            
+            // Smooth interpolation towards targets
+            const smoothing = 0.3;
+            ftState.fx += (ftState.fxTarget - ftState.fx) * smoothing;
+            ftState.fy += (ftState.fyTarget - ftState.fy) * smoothing;
+            ftState.fz += (ftState.fzTarget - ftState.fz) * smoothing;
+            ftState.tx += (ftState.txTarget - ftState.tx) * smoothing;
+            ftState.ty += (ftState.tyTarget - ftState.ty) * smoothing;
+            ftState.tz += (ftState.tzTarget - ftState.tz) * smoothing;
+            
+            // Update gauges
+            updateGauge('gauge-fx', ftState.fx, FORCE_MAX);
+            updateGauge('gauge-fy', ftState.fy, FORCE_MAX);
+            updateGauge('gauge-fz', ftState.fz, FORCE_MAX);
+            updateGauge('gauge-tx', ftState.tx, TORQUE_MAX);
+            updateGauge('gauge-ty', ftState.ty, TORQUE_MAX);
+            updateGauge('gauge-tz', ftState.tz, TORQUE_MAX);
+            
+            // Update value displays
+            document.getElementById('value-fx').textContent = ftState.fx.toFixed(1);
+            document.getElementById('value-fy').textContent = ftState.fy.toFixed(1);
+            document.getElementById('value-fz').textContent = ftState.fz.toFixed(1);
+            document.getElementById('value-tx').textContent = ftState.tx.toFixed(2);
+            document.getElementById('value-ty').textContent = ftState.ty.toFixed(2);
+            document.getElementById('value-tz').textContent = ftState.tz.toFixed(2);
+        }
+
+        // Force/torque data source tracking
+        let ftUseSimulation = true;
+        let ftLastCheck = 0;
+        const FT_CHECK_INTERVAL = 5000; // Check for real data every 5 seconds
+
+        async function refreshForceTorque() {
+            const now = Date.now();
+            
+            // Periodically check if real data is available
+            if (now - ftLastCheck > FT_CHECK_INTERVAL) {
+                ftLastCheck = now;
+                try {
+                    const response = await fetch('/api/force-torque/');
+                    const data = await response.json();
+                    
+                    if (data.status === 'ok') {
+                        ftUseSimulation = false;
+                        document.getElementById('ft-status-indicator').className = 
+                            'inline-block w-2 h-2 rounded-full bg-green-500 mr-1 animate-pulse';
+                        document.getElementById('ft-status-text').textContent = 'Live @ 4Hz (ATI Sensor)';
+                    } else {
+                        ftUseSimulation = true;
+                        document.getElementById('ft-status-indicator').className = 
+                            'inline-block w-2 h-2 rounded-full bg-yellow-500 mr-1 animate-pulse';
+                        document.getElementById('ft-status-text').textContent = 
+                            'Simulated @ 4Hz (load ForceMonitor.mod for live data)';
+                    }
+                } catch (e) {
+                    ftUseSimulation = true;
+                }
+            }
+            
+            if (ftUseSimulation) {
+                simulateForceTorque();
+            } else {
+                // Fetch real data
+                try {
+                    const response = await fetch('/api/force-torque/');
+                    const data = await response.json();
+                    
+                    if (data.status === 'ok') {
+                        updateForceTorqueDisplay(data.fx, data.fy, data.fz, data.tx, data.ty, data.tz);
+                    } else {
+                        simulateForceTorque();
+                    }
+                } catch (e) {
+                    simulateForceTorque();
+                }
+            }
+        }
+
+        function updateForceTorqueDisplay(fx, fy, fz, tx, ty, tz) {
+            // Update gauges
+            updateGauge('gauge-fx', fx, FORCE_MAX);
+            updateGauge('gauge-fy', fy, FORCE_MAX);
+            updateGauge('gauge-fz', fz, FORCE_MAX);
+            updateGauge('gauge-tx', tx, TORQUE_MAX);
+            updateGauge('gauge-ty', ty, TORQUE_MAX);
+            updateGauge('gauge-tz', tz, TORQUE_MAX);
+            
+            // Update value displays
+            document.getElementById('value-fx').textContent = fx.toFixed(1);
+            document.getElementById('value-fy').textContent = fy.toFixed(1);
+            document.getElementById('value-fz').textContent = fz.toFixed(1);
+            document.getElementById('value-tx').textContent = tx.toFixed(2);
+            document.getElementById('value-ty').textContent = ty.toFixed(2);
+            document.getElementById('value-tz').textContent = tz.toFixed(2);
+        }
+
+        // Start force/torque updates at 4Hz (250ms)
+        setInterval(refreshForceTorque, 250);
 
         async function refreshStatus() {
             try {

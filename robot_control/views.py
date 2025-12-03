@@ -79,6 +79,18 @@ def api_events(request):
 
 
 @require_http_methods(["GET"])
+def api_force_torque(request):
+    """Get force/torque sensor values (requires ForceMonitor.mod on controller)."""
+    client = IRC5Client()
+    
+    try:
+        data = client.get_force_torque()
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
 def api_tasks(request):
     """Get list of RAPID tasks."""
     client = IRC5Client()

@@ -8,6 +8,7 @@ urlpatterns = [
     path('api/status/', views.api_status, name='api_status'),
     path('api/position/', views.api_position, name='api_position'),
     path('api/events/', views.api_events, name='api_events'),
+    path('api/force-torque/', views.api_force_torque, name='api_force_torque'),
     path('api/tasks/', views.api_tasks, name='api_tasks'),
     path('api/modules/<str:task>/', views.api_modules, name='api_modules'),
     path('api/start/', views.api_start, name='api_start'),

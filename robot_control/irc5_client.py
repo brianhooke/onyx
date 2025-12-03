@@ -323,6 +323,47 @@ class IRC5Client:
             return None
     
     # =========================================================================
+    # Force/Torque Sensor (requires ForceMonitor.mod loaded)
+    # =========================================================================
+    
+    def get_rapid_variable(self, module, variable, task='T_ROB1'):
+        """Read a RAPID variable value."""
+        try:
+            response = self._get(f"/rw/rapid/symbol/data/RAPID/{task}/{module}/{variable}")
+            return self._parse_xml_value(response.text, 'value')
+        except:
+            return None
+    
+    def get_force_torque(self):
+        """
+        Get force/torque sensor values from ForceMonitor module.
+        Returns dict with fx, fy, fz (N) and tx, ty, tz (Nm), or None if not available.
+        """
+        try:
+            fx = self.get_rapid_variable('ForceMonitor', 'fm_fx')
+            fy = self.get_rapid_variable('ForceMonitor', 'fm_fy')
+            fz = self.get_rapid_variable('ForceMonitor', 'fm_fz')
+            tx = self.get_rapid_variable('ForceMonitor', 'fm_tx')
+            ty = self.get_rapid_variable('ForceMonitor', 'fm_ty')
+            tz = self.get_rapid_variable('ForceMonitor', 'fm_tz')
+            status = self.get_rapid_variable('ForceMonitor', 'fm_status')
+            
+            if status and float(status) == 1:
+                return {
+                    'fx': float(fx) if fx else 0,
+                    'fy': float(fy) if fy else 0,
+                    'fz': float(fz) if fz else 0,
+                    'tx': float(tx) if tx else 0,
+                    'ty': float(ty) if ty else 0,
+                    'tz': float(tz) if tz else 0,
+                    'status': 'ok'
+                }
+            else:
+                return {'status': 'not_running'}
+        except Exception as e:
+            return {'status': 'error', 'error': str(e)}
+    
+    # =========================================================================
     # Event Log / Alarms
     # =========================================================================
     
