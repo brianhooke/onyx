@@ -37,7 +37,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'robot_control',
 ]
+
+# IRC5 Controller Settings
+IRC5_HOST = '192.168.125.1'
+IRC5_USERNAME = 'Default User'
+IRC5_PASSWORD = 'robotics'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

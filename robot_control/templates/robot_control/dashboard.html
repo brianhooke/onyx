@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onyx - Robot Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-connected { background-color: #22c55e; }
+        .status-disconnected { background-color: #ef4444; }
+        .status-warning { background-color: #f59e0b; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Onyx</h1>
+            <p class="text-gray-400">ABB IRB 6700 Robot Control System</p>
+        </div>
+
+        <!-- Connection Status Card -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold">Controller Status</h2>
+                <button onclick="refreshStatus()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">
+                    Refresh
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-gray-700 rounded p-4">
+                    <div class="text-gray-400 text-sm mb-1">Connection</div>
+                    <div class="flex items-center gap-2">
+                        <span id="connection-indicator" class="status-indicator status-disconnected"></span>
+                        <span id="connection-status" class="font-medium">Checking...</span>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-700 rounded p-4">
+                    <div class="text-gray-400 text-sm mb-1">Controller State</div>
+                    <div id="controller-state" class="font-medium">-</div>
+                </div>
+                
+                <div class="bg-gray-700 rounded p-4">
+                    <div class="text-gray-400 text-sm mb-1">Operation Mode</div>
+                    <div id="operation-mode" class="font-medium">-</div>
+                </div>
+                
+                <div class="bg-gray-700 rounded p-4">
+                    <div class="text-gray-400 text-sm mb-1">Execution State</div>
+                    <div id="execution-state" class="font-medium">-</div>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-sm text-gray-400">
+                <span>RobotWare: </span>
+                <span id="robotware-version">-</span>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Program Control</h2>
+            
+            <div class="flex flex-wrap gap-4">
+                <button onclick="startExecution()" id="btn-start"
+                    class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded font-medium">
+                    ▶ Start
+                </button>
+                
+                <button onclick="stopExecution()" id="btn-stop"
+                    class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded font-medium">
+                    ■ Stop
+                </button>
+                
+                <button onclick="resetPP()" id="btn-reset"
+                    class="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded font-medium">
+                    ↺ Reset PP
+                </button>
+            </div>
+            
+            <div id="control-message" class="mt-4 text-sm hidden"></div>
+        </div>
+
+        <!-- Tasks & Modules -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">RAPID Tasks</h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Task</label>
+                    <select id="task-select" onchange="loadModules()" 
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Module</label>
+                    <select id="module-select" 
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <option value="">Select a task first</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Refresh status on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStatus();
+            loadTasks();
+        });
+
+        // Auto-refresh every 2 seconds
+        setInterval(refreshStatus, 2000);
+
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status/');
+                const data = await response.json();
+                
+                const indicator = document.getElementById('connection-indicator');
+                const status = document.getElementById('connection-status');
+                
+                if (data.connected) {
+                    indicator.className = 'status-indicator status-connected';
+                    status.textContent = 'Connected';
+                    
+                    document.getElementById('controller-state').textContent = data.controller_state || '-';
+                    document.getElementById('operation-mode').textContent = data.operation_mode || '-';
+                    document.getElementById('execution-state').textContent = data.execution_state || '-';
+                    document.getElementById('robotware-version').textContent = data.robotware_version || '-';
+                    
+                    // Enable/disable buttons based on state
+                    const isAuto = data.operation_mode === 'AUTO';
+                    document.getElementById('btn-start').disabled = !isAuto;
+                    document.getElementById('btn-stop').disabled = !isAuto;
+                    document.getElementById('btn-reset').disabled = !isAuto;
+                } else {
+                    indicator.className = 'status-indicator status-disconnected';
+                    status.textContent = 'Disconnected';
+                    document.getElementById('controller-state').textContent = '-';
+                    document.getElementById('operation-mode').textContent = '-';
+                    document.getElementById('execution-state').textContent = '-';
+                }
+            } catch (error) {
+                console.error('Status refresh failed:', error);
+            }
+        }
+
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/tasks/');
+                const data = await response.json();
+                
+                const select = document.getElementById('task-select');
+                select.innerHTML = '';
+                
+                if (data.tasks && data.tasks.length > 0) {
+                    data.tasks.forEach(task => {
+                        const option = document.createElement('option');
+                        option.value = task;
+                        option.textContent = task;
+                        select.appendChild(option);
+                    });
+                    loadModules();
+                } else {
+                    select.innerHTML = '<option value="">No tasks found</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+            }
+        }
+
+        async function loadModules() {
+            const task = document.getElementById('task-select').value;
+            const select = document.getElementById('module-select');
+            
+            if (!task) {
+                select.innerHTML = '<option value="">Select a task first</option>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/modules/${task}/`);
+                const data = await response.json();
+                
+                select.innerHTML = '';
+                
+                if (data.modules && data.modules.length > 0) {
+                    data.modules.forEach(module => {
+                        const option = document.createElement('option');
+                        option.value = module;
+                        option.textContent = module;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">No modules found</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load modules:', error);
+            }
+        }
+
+        async function startExecution() {
+            showMessage('Starting program...', 'info');
+            try {
+                const response = await fetch('/api/start/', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Program started', 'success');
+                } else {
+                    showMessage(data.error || 'Failed to start', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+            refreshStatus();
+        }
+
+        async function stopExecution() {
+            showMessage('Stopping program...', 'info');
+            try {
+                const response = await fetch('/api/stop/', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Program stopped', 'success');
+                } else {
+                    showMessage(data.error || 'Failed to stop', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+            refreshStatus();
+        }
+
+        async function resetPP() {
+            const task = document.getElementById('task-select').value || 'T_ROB1';
+            showMessage('Resetting program pointer...', 'info');
+            
+            try {
+                const response = await fetch('/api/reset-pp/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Program pointer reset', 'success');
+                } else {
+                    showMessage(data.error || 'Failed to reset', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        function showMessage(text, type) {
+            const el = document.getElementById('control-message');
+            el.textContent = text;
+            el.className = 'mt-4 text-sm p-3 rounded';
+            
+            if (type === 'success') {
+                el.className += ' bg-green-900 text-green-200';
+            } else if (type === 'error') {
+                el.className += ' bg-red-900 text-red-200';
+            } else {
+                el.className += ' bg-blue-900 text-blue-200';
+            }
+        }
+    </script>
+</body>
+</html>
