@@ -2,12 +2,33 @@
 IRC5 Robot Web Services Client
 
 Handles communication with ABB IRC5 controller via Robot Web Services (RWS) API.
+Uses a singleton session to avoid exhausting IRC5's connection limit (70 max).
 """
 
 import requests
 from requests.auth import HTTPDigestAuth
 from django.conf import settings
 import xml.etree.ElementTree as ET
+import threading
+
+
+# Global singleton session to reuse connections
+_session = None
+_session_lock = threading.Lock()
+
+
+def get_shared_session(host, username, password):
+    """Get or create a shared session for IRC5 communication."""
+    global _session
+    with _session_lock:
+        if _session is None:
+            _session = requests.Session()
+            _session.auth = HTTPDigestAuth(username, password)
+            _session.headers.update({
+                'Accept': 'application/xhtml+xml;v=2.0',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            })
+        return _session
 
 
 class IRC5Client:
@@ -18,12 +39,8 @@ class IRC5Client:
         self.username = username or settings.IRC5_USERNAME
         self.password = password or settings.IRC5_PASSWORD
         self.base_url = f"http://{self.host}"
-        self.session = requests.Session()
-        self.session.auth = HTTPDigestAuth(self.username, self.password)
-        self.session.headers.update({
-            'Accept': 'application/xhtml+xml;v=2.0',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        })
+        # Use shared session to avoid connection exhaustion
+        self.session = get_shared_session(self.host, self.username, self.password)
     
     def _get(self, endpoint):
         """Make GET request to RWS endpoint."""
@@ -106,7 +123,21 @@ class IRC5Client:
         response = self._get("/rw/rapid/execution")
         return self._parse_xml_value(response.text, 'ctrlexecstate')
     
-    def start_execution(self, cycle='forever', mode='continue', task='T_ROB1'):
+    def _request_mastership(self):
+        """Request RAPID mastership."""
+        try:
+            self._post("/rw/mastership/rapid?action=request")
+        except:
+            pass  # May already have mastership
+    
+    def _release_mastership(self):
+        """Release RAPID mastership."""
+        try:
+            self._post("/rw/mastership/rapid?action=release")
+        except:
+            pass
+    
+    def start_execution(self, cycle='once', mode='continue', task='T_ROB1'):
         """
         Start RAPID program execution.
         
@@ -116,7 +147,7 @@ class IRC5Client:
             task: Task name (default T_ROB1)
         """
         # Request mastership first
-        self._post(f"/rw/rapid/execution?action=requestmastership")
+        self._request_mastership()
         
         # Start execution
         data = {
@@ -130,22 +161,22 @@ class IRC5Client:
         response = self._post("/rw/rapid/execution?action=start", data=data)
         
         # Release mastership
-        self._post(f"/rw/rapid/execution?action=releasemastership")
+        self._release_mastership()
         
         return response.status_code == 204
     
     def stop_execution(self):
         """Stop RAPID program execution."""
-        self._post("/rw/rapid/execution?action=requestmastership")
+        self._request_mastership()
         response = self._post("/rw/rapid/execution?action=stop")
-        self._post("/rw/rapid/execution?action=releasemastership")
+        self._release_mastership()
         return response.status_code == 204
     
     def reset_program_pointer(self, task='T_ROB1'):
         """Reset program pointer to main entry point."""
-        self._post("/rw/rapid/execution?action=requestmastership")
+        self._request_mastership()
         response = self._post(f"/rw/rapid/tasks/{task}?action=resetpp")
-        self._post("/rw/rapid/execution?action=releasemastership")
+        self._release_mastership()
         return response.status_code == 204
     
     # =========================================================================
@@ -215,3 +246,105 @@ class IRC5Client:
         data = {'lvalue': str(value)}
         response = self._post(f"/rw/iosystem/signals/{signal_name}?action=set", data=data)
         return response.status_code == 204
+    
+    # =========================================================================
+    # Robot Position & Mechanical Units
+    # =========================================================================
+    
+    def get_robot_position(self, mechunit='ROB_1'):
+        """
+        Get current robot TCP position.
+        
+        Args:
+            mechunit: Mechanical unit name (default ROB_1)
+        
+        Returns:
+            dict with x, y, z, q1, q2, q3, q4 (position and quaternion)
+        """
+        try:
+            response = self._get(f"/rw/motionsystem/mechunits/{mechunit}/robtarget")
+            return {
+                'x': self._parse_xml_value(response.text, 'x'),
+                'y': self._parse_xml_value(response.text, 'y'),
+                'z': self._parse_xml_value(response.text, 'z'),
+                'q1': self._parse_xml_value(response.text, 'q1'),
+                'q2': self._parse_xml_value(response.text, 'q2'),
+                'q3': self._parse_xml_value(response.text, 'q3'),
+                'q4': self._parse_xml_value(response.text, 'q4'),
+            }
+        except:
+            return None
+    
+    def get_joint_positions(self, mechunit='ROB_1'):
+        """Get current joint angles in degrees."""
+        try:
+            response = self._get(f"/rw/motionsystem/mechunits/{mechunit}/jointtarget")
+            return {
+                'j1': self._parse_xml_value(response.text, 'rax_1'),
+                'j2': self._parse_xml_value(response.text, 'rax_2'),
+                'j3': self._parse_xml_value(response.text, 'rax_3'),
+                'j4': self._parse_xml_value(response.text, 'rax_4'),
+                'j5': self._parse_xml_value(response.text, 'rax_5'),
+                'j6': self._parse_xml_value(response.text, 'rax_6'),
+            }
+        except:
+            return None
+    
+    def get_track_position(self):
+        """Get current track position in mm."""
+        try:
+            response = self._get("/rw/motionsystem/mechunits/TRACK_1/jointtarget")
+            return self._parse_xml_value(response.text, 'rax_1')
+        except:
+            return None
+    
+    def get_speed_ratio(self):
+        """Get current speed override percentage."""
+        try:
+            response = self._get("/rw/panel/speedratio")
+            return self._parse_xml_value(response.text, 'speedratio')
+        except:
+            return None
+    
+    # =========================================================================
+    # Program Pointer & Execution Info
+    # =========================================================================
+    
+    def get_program_pointer(self, task='T_ROB1'):
+        """Get current program pointer location."""
+        try:
+            response = self._get(f"/rw/rapid/tasks/{task}/pcp")
+            return {
+                'module': self._parse_xml_value(response.text, 'modulename'),
+                'routine': self._parse_xml_value(response.text, 'routinename'),
+                'line': self._parse_xml_value(response.text, 'range'),
+            }
+        except:
+            return None
+    
+    # =========================================================================
+    # Event Log / Alarms
+    # =========================================================================
+    
+    def get_event_log(self, num_entries=5):
+        """Get recent event log entries."""
+        try:
+            response = self._get(f"/rw/elog/0?lang=en&num={num_entries}")
+            events = []
+            root = ET.fromstring(response.text)
+            for elem in root.iter():
+                if elem.get('class') == 'elog-message-li':
+                    event = {}
+                    for child in elem.iter():
+                        cls = child.get('class')
+                        if cls == 'msgtype':
+                            event['type'] = child.text
+                        elif cls == 'tstamp':
+                            event['timestamp'] = child.text
+                        elif cls == 'title':
+                            event['title'] = child.text
+                    if event:
+                        events.append(event)
+            return events
+        except:
+            return []

@@ -89,6 +89,107 @@
             <div id="control-message" class="mt-4 text-sm hidden"></div>
         </div>
 
+        <!-- Robot Position -->
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <!-- TCP Position -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">TCP Position (World)</h2>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="text-gray-400 text-xs mb-1">X</div>
+                        <div id="tcp-x" class="font-mono text-lg">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="text-gray-400 text-xs mb-1">Y</div>
+                        <div id="tcp-y" class="font-mono text-lg">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="text-gray-400 text-xs mb-1">Z</div>
+                        <div id="tcp-z" class="font-mono text-lg">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Joint Positions -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Joint Angles (°)</h2>
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div class="bg-gray-700 rounded p-2">
+                        <div class="text-gray-400 text-xs">J1</div>
+                        <div id="joint-1" class="font-mono text-sm">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <div class="text-gray-400 text-xs">J2</div>
+                        <div id="joint-2" class="font-mono text-sm">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <div class="text-gray-400 text-xs">J3</div>
+                        <div id="joint-3" class="font-mono text-sm">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <div class="text-gray-400 text-xs">J4</div>
+                        <div id="joint-4" class="font-mono text-sm">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <div class="text-gray-400 text-xs">J5</div>
+                        <div id="joint-5" class="font-mono text-sm">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <div class="text-gray-400 text-xs">J6</div>
+                        <div id="joint-6" class="font-mono text-sm">-</div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 col-span-2">
+                        <div class="text-gray-400 text-xs">Track</div>
+                        <div id="joint-track" class="font-mono text-sm">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Program Info & Speed -->
+        <div class="grid md:grid-cols-3 gap-6 mb-6">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Program Pointer</h2>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Module:</span>
+                        <span id="pp-module" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Routine:</span>
+                        <span id="pp-routine" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Line:</span>
+                        <span id="pp-line" class="font-mono">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Current Speed</h2>
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                        <div class="text-gray-400 text-xs mb-1">TCP</div>
+                        <div id="tcp-speed" class="text-2xl font-bold text-blue-400">-</div>
+                        <div class="text-gray-500 text-xs">m/s</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400 text-xs mb-1">Track</div>
+                        <div id="track-speed" class="text-2xl font-bold text-green-400">-</div>
+                        <div class="text-gray-500 text-xs">m/s</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Recent Events</h2>
+                <div id="event-log" class="space-y-2 text-sm max-h-32 overflow-y-auto">
+                    <div class="text-gray-500">Loading...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Tasks & Modules -->
         <div class="bg-gray-800 rounded-lg p-6">
             <h2 class="text-xl font-semibold mb-4">RAPID Tasks</h2>
@@ -117,15 +218,29 @@
         // Refresh status on page load
         document.addEventListener('DOMContentLoaded', () => {
             refreshStatus();
+            refreshPosition();
+            refreshEvents();
             loadTasks();
         });
 
-        // Auto-refresh every 2 seconds
-        setInterval(refreshStatus, 2000);
+        // Auto-refresh every 5 seconds (IRC5 has 70 connection limit)
+        setInterval(refreshStatus, 5000);
+        setInterval(refreshPosition, 3000);
+        setInterval(refreshEvents, 10000);
+
+        function formatNum(val, decimals = 1) {
+            if (val === null || val === undefined) return '-';
+            const num = parseFloat(val);
+            return isNaN(num) ? '-' : num.toFixed(decimals);
+        }
+
+        // Velocity calculation state
+        let lastPosition = null;
+        let lastPositionTime = null;
 
         async function refreshStatus() {
             try {
-                const response = await fetch('/api/status/');
+                const response = await fetch('/api/status/?extended=true');
                 const data = await response.json();
                 
                 const indicator = document.getElementById('connection-indicator');
@@ -140,11 +255,17 @@
                     document.getElementById('execution-state').textContent = data.execution_state || '-';
                     document.getElementById('robotware-version').textContent = data.robotware_version || '-';
                     
-                    // Enable/disable buttons based on state
-                    const isAuto = data.operation_mode === 'AUTO';
-                    document.getElementById('btn-start').disabled = !isAuto;
-                    document.getElementById('btn-stop').disabled = !isAuto;
-                    document.getElementById('btn-reset').disabled = !isAuto;
+                    // Program pointer
+                    if (data.program_pointer) {
+                        document.getElementById('pp-module').textContent = data.program_pointer.module || '-';
+                        document.getElementById('pp-routine').textContent = data.program_pointer.routine || '-';
+                        document.getElementById('pp-line').textContent = data.program_pointer.line || '-';
+                    }
+                    
+                    // Enable buttons - works in both AUTO and MANUAL (with deadman held)
+                    document.getElementById('btn-start').disabled = false;
+                    document.getElementById('btn-stop').disabled = false;
+                    document.getElementById('btn-reset').disabled = false;
                 } else {
                     indicator.className = 'status-indicator status-disconnected';
                     status.textContent = 'Disconnected';
@@ -154,6 +275,84 @@
                 }
             } catch (error) {
                 console.error('Status refresh failed:', error);
+            }
+        }
+
+        async function refreshPosition() {
+            try {
+                const response = await fetch('/api/position/');
+                const data = await response.json();
+                const now = Date.now();
+                
+                if (data.tcp) {
+                    const x = parseFloat(data.tcp.x);
+                    const y = parseFloat(data.tcp.y);
+                    const z = parseFloat(data.tcp.z);
+                    
+                    document.getElementById('tcp-x').textContent = formatNum(x);
+                    document.getElementById('tcp-y').textContent = formatNum(y);
+                    document.getElementById('tcp-z').textContent = formatNum(z);
+                    
+                    // Get track position
+                    const trackPos = data.track ? parseFloat(data.track) : 0;
+                    
+                    // Calculate velocities
+                    if (lastPosition && lastPositionTime) {
+                        const dt = (now - lastPositionTime) / 1000; // seconds
+                        if (dt > 0) {
+                            // TCP velocity
+                            const dx = x - lastPosition.x;
+                            const dy = y - lastPosition.y;
+                            const dz = z - lastPosition.z;
+                            const tcpSpeed = Math.sqrt(dx*dx + dy*dy + dz*dz) / dt / 1000; // m/s
+                            document.getElementById('tcp-speed').textContent = tcpSpeed.toFixed(3);
+                            
+                            // Track velocity
+                            const dTrack = Math.abs(trackPos - lastPosition.track);
+                            const trackSpeed = dTrack / dt / 1000; // m/s
+                            document.getElementById('track-speed').textContent = trackSpeed.toFixed(3);
+                        }
+                    }
+                    
+                    // Store current position for next calculation
+                    lastPosition = { x, y, z, track: trackPos };
+                    lastPositionTime = now;
+                }
+                
+                if (data.joints) {
+                    document.getElementById('joint-1').textContent = formatNum(data.joints.j1);
+                    document.getElementById('joint-2').textContent = formatNum(data.joints.j2);
+                    document.getElementById('joint-3').textContent = formatNum(data.joints.j3);
+                    document.getElementById('joint-4').textContent = formatNum(data.joints.j4);
+                    document.getElementById('joint-5').textContent = formatNum(data.joints.j5);
+                    document.getElementById('joint-6').textContent = formatNum(data.joints.j6);
+                }
+                
+                if (data.track) {
+                    document.getElementById('joint-track').textContent = formatNum(data.track) + ' mm';
+                }
+            } catch (error) {
+                console.error('Position refresh failed:', error);
+            }
+        }
+
+        async function refreshEvents() {
+            try {
+                const response = await fetch('/api/events/?num=5');
+                const data = await response.json();
+                
+                const container = document.getElementById('event-log');
+                if (data.events && data.events.length > 0) {
+                    container.innerHTML = data.events.map(e => {
+                        const typeClass = e.type === '1' ? 'text-red-400' : 
+                                         e.type === '2' ? 'text-yellow-400' : 'text-gray-400';
+                        return `<div class="${typeClass} truncate">${e.title || 'Unknown event'}</div>`;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<div class="text-gray-500">No recent events</div>';
+                }
+            } catch (error) {
+                console.error('Events refresh failed:', error);
             }
         }
 
