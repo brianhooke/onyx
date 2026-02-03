@@ -290,26 +290,26 @@
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Start Force (N)</label>
                             <input type="number" name="polisher_start_force" value="{{ defaults.polisher_start_force }}"
-                                min="50" max="300"
+                                min="0" max="300"
                                 class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
-                                title="Initial contact force when engaging surface">
-                            <span class="block text-red-400 text-[10px]">50-300</span>
+                                title="Initial contact force when engaging surface (0=off)">
+                            <span class="block text-red-400 text-[10px]">0=off, 50-300</span>
                         </div>
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Motion Force (N)</label>
                             <input type="number" name="polisher_motion_force" value="{{ defaults.polisher_motion_force }}"
-                                min="50" max="300"
+                                min="0" max="300"
                                 class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
-                                title="Target force maintained during travel">
-                            <span class="block text-red-400 text-[10px]">50-300</span>
+                                title="Target force maintained during travel (0=off)">
+                            <span class="block text-red-400 text-[10px]">0=off, 50-300</span>
                         </div>
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Force Δ (N)</label>
                             <input type="number" name="polisher_force_change" value="{{ defaults.polisher_force_change }}"
-                                min="10" max="150"
+                                min="0" max="150"
                                 class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
-                                title="Max force variation allowed during motion">
-                            <span class="block text-red-400 text-[10px]">10-150</span>
+                                title="Max force variation allowed during motion (0=off)">
+                            <span class="block text-red-400 text-[10px]">0=off, 10-150</span>
                         </div>
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Z Range (mm)</label>

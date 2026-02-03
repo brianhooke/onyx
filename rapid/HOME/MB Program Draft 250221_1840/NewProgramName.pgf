@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<Program>
+	<Module>MainModule.mod</Module>
+	<Module>Tools.mod</Module>
+	<Module>Toolstations.mod</Module>
+	<Module>RobotTargets.mod</Module>
+	<Module>ErrorHandling.mod</Module>
+	<Module>ToolPaths.mod</Module>
+	<Module>Brian.mod</Module>
+</Program>

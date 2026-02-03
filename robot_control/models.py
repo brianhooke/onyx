@@ -53,9 +53,9 @@ class ToolPathParameters(models.Model):
     # Polisher force/speed parameters
     polisher_z_offset = models.IntegerField(default=0, help_text="Polisher Z offset (mm)")
     polisher_workzone = models.CharField(default='bed', max_length=20, help_text="Polisher workzone: panel or bed")
-    polisher_start_force = models.IntegerField(default=140, help_text="Polisher start force (N)")
-    polisher_motion_force = models.IntegerField(default=130, help_text="Polisher motion force (N)")
-    polisher_force_change = models.IntegerField(default=75, help_text="Polisher force change (N)")
+    polisher_start_force = models.IntegerField(default=300, help_text="Polisher start force (N)")
+    polisher_motion_force = models.IntegerField(default=300, help_text="Polisher motion force (N)")
+    polisher_force_change = models.IntegerField(default=100, help_text="Polisher force change (N)")
     polisher_approach_speed = models.IntegerField(default=20, help_text="Polisher approach speed (mm/s)")
     polisher_retract_speed = models.IntegerField(default=50, help_text="Polisher retract speed (mm/s)")
     polisher_pos_supv_dist = models.IntegerField(default=100, help_text="Polisher position supervision distance (mm)")

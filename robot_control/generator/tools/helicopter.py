@@ -6,7 +6,10 @@ Key differences from HeliTrowelLR:
 1. X coordinates are negated (Bed1Wyong coordinate system)
 2. extax formula: Bed1Wyong.uframe.trans.x + trans.x + offset
 3. NO ConfL\Off (this causes joint limit errors)
+4. Track position clamped to limits - arm extends to reach beyond
 """
+
+from .utils import get_track_limits
 
 
 def generate_py2heli(params: dict) -> str:
@@ -52,6 +55,9 @@ def generate_py2heli(params: dict) -> str:
     # HeliBladeWidth constant (from baseline)
     blade_width = 600
     
+    # Track limits (shared utility)
+    track_min, track_max = get_track_limits(params)
+    
     # Build the procedure - Cross-hatch pattern
     # Phase 1: X passes (sweep X, step Y)
     # Phase 2: Y passes (sweep Y, step X)
@@ -87,6 +93,9 @@ def generate_py2heli(params: dict) -> str:
         VAR num EndY:=0;
         VAR bool bDone:=FALSE;
         VAR speeddata vTravel:=[{travel_speed},15,2000,15];
+        VAR num TrackMin:={track_min};
+        VAR num TrackMax:={track_max};
+        VAR num CalcTrack:=0;
         
         ! Initialize runtime values
         WorkZ:=FormHeight+{total_z_offset};
@@ -137,18 +146,24 @@ def generate_py2heli(params: dict) -> str:
         pStart.robconf:=[0,0,0,0];
         
         IF CurrentY<1800 THEN
-            pStart.extax:=[Bed1Wyong.uframe.trans.x+pStart.trans.x+1000+{blade_width}/2,9E+09,9E+09,9E+09,9E+09,9E+09];
+            CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x+1000+{blade_width}/2;
         ELSE
-            pStart.extax:=[Bed1Wyong.uframe.trans.x+pStart.trans.x+{blade_width}/2,9E+09,9E+09,9E+09,9E+09,9E+09];
+            CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x+{blade_width}/2;
         ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pStart.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         
         pEnd:=pStart;
         pEnd.trans.x:=-1*(MaxX+100);
         IF CurrentY<1800 THEN
-            pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x+pEnd.trans.x+1000-{blade_width}/2;
+            CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x+1000-{blade_width}/2;
         ELSE
-            pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{blade_width}/2;
+            CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{blade_width}/2;
         ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pEnd.extax.eax_a:=CalcTrack;
         
         ! Move to start position (safe height)
         pStart.trans.z:=SafeZ;
@@ -189,12 +204,22 @@ def generate_py2heli(params: dict) -> str:
             pEnd.trans.y:=CurrentY;
             
             IF CurrentY<1800 THEN
-                pStart.extax.eax_a:=Bed1Wyong.uframe.trans.x+pStart.trans.x+1000+{blade_width}/2;
-                pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x+pEnd.trans.x+1000-{blade_width}/2;
+                CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x+1000+{blade_width}/2;
             ELSE
-                pStart.extax.eax_a:=Bed1Wyong.uframe.trans.x+pStart.trans.x+{blade_width}/2;
-                pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{blade_width}/2;
+                CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x+{blade_width}/2;
             ENDIF
+            IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+            IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+            pStart.extax.eax_a:=CalcTrack;
+            
+            IF CurrentY<1800 THEN
+                CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x+1000-{blade_width}/2;
+            ELSE
+                CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{blade_width}/2;
+            ENDIF
+            IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+            IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+            pEnd.extax.eax_a:=CalcTrack;
             
             IF SweepDir=1 THEN
                 TPWrite "P1: Sweep to pEnd (far X)";
@@ -217,18 +242,24 @@ def generate_py2heli(params: dict) -> str:
                 IF SweepDir=1 THEN
                     pEnd.trans.y:=CurrentY;
                     IF CurrentY<1800 THEN
-                        pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x+pEnd.trans.x+1000-{blade_width}/2;
+                        CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x+1000-{blade_width}/2;
                     ELSE
-                        pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{blade_width}/2;
+                        CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{blade_width}/2;
                     ENDIF
+                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                    pEnd.extax.eax_a:=CalcTrack;
                     MoveL pEnd,vTravel,fine,tHeli\\WObj:=Bed1Wyong;
                 ELSE
                     pStart.trans.y:=CurrentY;
                     IF CurrentY<1800 THEN
-                        pStart.extax.eax_a:=Bed1Wyong.uframe.trans.x+pStart.trans.x+1000+{blade_width}/2;
+                        CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x+1000+{blade_width}/2;
                     ELSE
-                        pStart.extax.eax_a:=Bed1Wyong.uframe.trans.x+pStart.trans.x+{blade_width}/2;
+                        CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x+{blade_width}/2;
                     ENDIF
+                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                    pStart.extax.eax_a:=CalcTrack;
                     MoveL pStart,vTravel,fine,tHeli\\WObj:=Bed1Wyong;
                 ENDIF
                 
@@ -317,7 +348,10 @@ def generate_py2heli(params: dict) -> str:
                 ! Step to next X column
                 TPWrite "P2: Step to X=" \\Num:=NextX;
                 pEnd.trans.x:=-1*NextX;
-                pEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x-NextX;
+                CalcTrack:=Bed1Wyong.uframe.trans.x-NextX;
+                IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                pEnd.extax.eax_a:=CalcTrack;
                 TPWrite "P2: Moving to next X column...";
                 MoveL pEnd,vTravel,fine,tHeli\\WObj:=Bed1Wyong;
                 TPWrite "P2: Step complete";

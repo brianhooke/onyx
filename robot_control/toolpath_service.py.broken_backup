@@ -1,0 +1,751 @@
+"""
+Toolpath Generation Service
+
+Generates RAPID modules based on user-defined parameters and uploads to IRC5.
+Refactored from RAPID/python/rapid_generator.py for Django integration.
+"""
+
+import os
+import re
+import shutil
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+
+class ToolpathGenerator:
+    """Generates RAPID toolpath modules with user-defined parameters."""
+    
+    # Default parameter values
+    DEFAULT_PARAMS = {
+        # Bed workzone
+        'bed_length_x': 12000,
+        'bed_width_y': 3200,
+        'bed_datum_x': 1100,
+        'bed_datum_y': 600,
+        # Panel workzone
+        'panel_datum_x': 1100,
+        'panel_datum_y': 600,
+        'panel_x': 5900,
+        'panel_y': 2200,
+        'panel_z': 150,
+        # Vacuum
+        'vacuum_z_offset': 0,
+        'vacuum_speed': 100,
+        'vacuum_pattern': 'serpentine',
+        'vacuum_workzone': 'panel',
+        'vacuum_force': 50,
+        'vacuum_z_min': -20,
+        'vacuum_z_max': 50,
+        'vacuum_force_enabled': False,
+        # Tool steps
+        'polisher_step': 450,
+        'vacuum_step': 450,
+        'pan_step': 600,
+        'helicopter_step': 600,
+        # Pan
+        'pan_travel_speed': 100,
+        'pan_blade_speed': 70,
+        'pan_z_offset': 250,
+        'pan_pattern': 'serpentine',
+        # Helicopter
+        'heli_travel_speed': 40,
+        'heli_blade_speed': 70,
+        'heli_blade_angle': 0,
+        'heli_force': 200,
+        'heli_z_offset': 0,
+        'heli_workzone': 'panel',
+        'heli_pattern': 'serpentine',
+        # Polisher
+        'polisher_z_offset': 0,
+        'polisher_workzone': 'bed',
+        'polisher_start_force': 140,
+        'polisher_motion_force': 130,
+        'polisher_force_change': 75,
+        'polisher_approach_speed': 20,
+        'polisher_retract_speed': 50,
+        'polisher_pos_supv_dist': 100,
+        # Screed
+        'screed_z_offset': 0,
+        'vib_screed_speed': 100,
+        'screed_angle_offset': 0,
+        'screed_panel_offset': 200,
+        # Global
+        'z_offset': 0,
+        # Serpentine
+        'serpentine_offset_x': 100,
+        'serpentine_offset_y': 100,
+        'serpentine_direction': 1,
+        'serpentine_start_bottom': False,
+    }
+    
+    # Files to copy without modification
+    STATIC_FILES = [
+        "Brian.mod",
+        "ErrorHandling.mod",
+        "MainModule.mod",
+        "RobotTargets.mod",
+        "Tools.mod",
+        "Toolstations.mod",
+        "WebController.mod",
+    ]
+    
+    # Files that need parameter substitution
+    DYNAMIC_FILES = [
+        "ToolPaths.mod",
+        "FCtesting.mod",
+    ]
+    
+    def __init__(self, params=None):
+        """Initialize with parameters (uses defaults for any not specified)."""
+        self.params = {**self.DEFAULT_PARAMS}
+        if params:
+            self.params.update(params)
+        
+        self.generation_timestamp = datetime.now().strftime("%d-%b_%-I:%M%p").lower()
+        
+        # Paths
+        self.rapid_root = Path(__file__).parent.parent / "RAPID"
+        # Use clean PROGMOD as source (not PROGMOD_python which has old generated code)
+        self.source_progmod = self.rapid_root / "RAPID" / "TASK1" / "PROGMOD"
+    
+    def generate(self, output_dir=None):
+        """
+        Generate modified RAPID modules.
+        
+        Args:
+            output_dir: Directory to write output files. If None, uses temp directory.
+        
+        Returns:
+            dict with 'output_dir' and 'files' list
+        """
+        # Create output directory
+        if output_dir is None:
+            output_dir = Path(tempfile.mkdtemp(prefix="rapid_gen_"))
+        else:
+            output_dir = Path(output_dir)
+            if output_dir.exists():
+                shutil.rmtree(output_dir)
+            output_dir.mkdir(parents=True)
+        
+        generated_files = []
+        
+        # Copy static files
+        for filename in self.STATIC_FILES:
+            src = self.source_progmod / filename
+            dst = output_dir / filename
+            if src.exists():
+                shutil.copy2(src, dst)
+                generated_files.append(filename)
+        
+        # Process dynamic files
+        for filename in self.DYNAMIC_FILES:
+            src = self.source_progmod / filename
+            dst = output_dir / filename
+            
+            if not src.exists():
+                continue
+            
+            with open(src, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            if filename == "ToolPaths.mod":
+                content = self._process_toolpaths(content)
+            elif filename == "FCtesting.mod":
+                content = self._process_fctesting(content)
+            
+            with open(dst, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            generated_files.append(filename)
+        
+        return {
+            'output_dir': str(output_dir),
+            'files': generated_files,
+            'params': self.params,
+            'timestamp': self.generation_timestamp
+        }
+    
+    def _process_toolpaths(self, content: str) -> str:
+        """Process ToolPaths.mod with parameter substitutions."""
+        p = self.params
+        
+        # Update the main menu prompt (match either original or previously modified)
+        # CASE 2 contains the submenu logic, so Py_timestamp must be option 2
+        content = re.sub(
+            r'TPReadNum iTask,"[^"]*";',
+            f'TPReadNum iTask,"1:Home,2:Py_{self.generation_timestamp},3:Pack,4:Sync";',
+            content
+        )
+        
+        # Update submenu - only include existing procedures (1-6) plus our generated ones (7-11)
+        # Original: 1:Plot, 2:Screed, 3:Polish, 4:Vac, 5:Heli, 6:Pan
+        # Added: 7:Datum, 8:PyHeli, 9:PyVac, 10:PyPolish, 11:PyPan
+        content = re.sub(
+            r'TPReadNum iTaskno,"[^"]*";',
+            'TPReadNum iTaskno,"1Plt,2Scr,3Pol,4Vac,5Hel,6Pan,7Dat,8PH,9PV,10PP,11PN";',
+            content
+        )
+        
+        # Clean PROGMOD only has CASE 1-6 in submenu. Add CASE 7-11 before the first DEFAULT in submenu.
+        content = re.sub(
+            r'(ENDIF\s*\n\s*\n\s*\n            DEFAULT:)',
+            r'''ENDIF
+
+            CASE 7:
+                Datum;
+            CASE 8:
+                PyHeli;
+            CASE 9:
+                PyVac;
+            CASE 10:
+                PyPolish;
+            CASE 11:
+                PyPan;
+            DEFAULT:''',
+            content,
+            count=1
+        )
+        
+        # Parameter substitutions
+        content = re.sub(r'FormXLength:=\d+;', f'FormXLength:={p["panel_x"]};', content)
+        content = re.sub(r'FormYlength:=\d+;', f'FormYlength:={p["panel_y"]};', content)
+        content = re.sub(r'CONST num FormHeight:=\d+;', f'CONST num FormHeight:={p["panel_z"]};', content)
+        content = re.sub(
+            r'CONST num HeliOverlapMin:=\d+;',
+            f'CONST num HeliOverlapMin:={p["helicopter_step"]};\n    CONST num PanOverlapMin:={p["pan_step"]};',
+            content
+        )
+        
+        # Update HeliPanLR to use PanOverlapMin
+        content = self._replace_in_procedure(content, 'HeliPanLR', 'HeliOverlapMin', 'PanOverlapMin')
+        
+        content = re.sub(r'VAR speeddata vVS:=\[\d+,', f'VAR speeddata vVS:=[{p["vib_screed_speed"]},', content)
+        content = re.sub(r'(Screed[^;]*),0;', f'\\1,{p["screed_angle_offset"]};', content)
+        content = re.sub(r'VAR num PanZOffset:=\d+;', f'VAR num PanZOffset:={p["z_offset"]};', content)
+        content = re.sub(r'VAR num DummyZOffs:=\d+;', f'VAR num DummyZOffs:={p["z_offset"]};', content)
+        content = re.sub(r'VAR num PlotterZ:=-?\d+;', f'VAR num PlotterZ:={p["z_offset"]};', content)
+        
+        # Add Datum procedure (uses z_offset)
+        datum_proc = self._generate_datum_proc()
+        content = content.replace('ENDMODULE', datum_proc + 'ENDMODULE')
+        
+        # Add PyHeli procedure (serpentine with cross-hatch)
+        pyheli_proc = self._generate_pyheli_proc()
+        content = content.replace('ENDMODULE', pyheli_proc + 'ENDMODULE')
+        
+        # Add PyVac procedure
+        pyvac_proc = self._generate_pyvac_proc()
+        content = content.replace('ENDMODULE', pyvac_proc + 'ENDMODULE')
+        
+        # Add PyPolish procedure
+        pypolish_proc = self._generate_pypolish_proc()
+        content = content.replace('ENDMODULE', pypolish_proc + 'ENDMODULE')
+        
+        # Add PyVibScreed procedure
+        pyvibscreed_proc = self._generate_pyvibscreed_proc()
+        content = content.replace('ENDMODULE', pyvibscreed_proc + 'ENDMODULE')
+        
+        # Add PyPan procedure
+        pypan_proc = self._generate_pypan_proc()
+        content = content.replace('ENDMODULE', pypan_proc + 'ENDMODULE')
+        
+        return content
+    
+    def _process_fctesting(self, content: str) -> str:
+        """Process FCtesting.mod with parameter substitutions."""
+        p = self.params
+        
+        content = re.sub(
+            r'VAR num PolishOverlap:=\d+;',
+            f'VAR num PolishOverlap:={p["polisher_step"]};',
+            content
+        )
+        
+        # PolishTest already exists in source FCtesting.mod - no need to add
+        
+        return content
+    
+    def _replace_in_procedure(self, content: str, proc_name: str, old_var: str, new_var: str) -> str:
+        """Replace a variable name within a specific procedure."""
+        proc_pattern = rf'(PROC {proc_name}\([^)]*\).*?ENDPROC)'
+        
+        def replace_in_match(match):
+            proc_content = match.group(1)
+            proc_content = proc_content.replace(old_var, new_var)
+            return proc_content
+        
+        content = re.sub(proc_pattern, replace_in_match, content, flags=re.DOTALL)
+        return content
+    
+    def _generate_datum_proc(self) -> str:
+        """Generate the Datum procedure."""
+        p = self.params
+        return f'''
+    PROC Datum()
+        ! Datum - draws small circle at Bed1Wyong origin (0,0)
+        ! Generated by Onyx Toolpath Generator
+        VAR robtarget pDatumCenter;
+        VAR robtarget pDatumCircle;
+        VAR num DatumZ:={p["z_offset"]};
+        VAR num DatumRadius:=100;
+        VAR num SafeZ:=500;
+        VAR num i;
+        
+        TPWrite "Datum: ToolNum=" \\Num:=ToolNum;
+        IF ToolNum<>4 THEN
+            TPWrite "No plotter! Will pickup plotter.";
+            Stop;
+            Home;
+            Plotter_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tPlotter\\WObj:=wobj0);
+            IF CurrentPos.trans.z<600 THEN
+                MoveL Offs(CurrentPos,0,0,(600-CurrentPos.trans.z)),v500,z5,tPlotter;
+            ENDIF
+        ENDIF
+        
+        ConfL\\Off;
+        ConfJ\\Off;
+        
+        pDatumCenter:=[[0,0,DatumZ],[0,0,1,0],[0,0,0,0],[0,9E+09,9E+09,9E+09,9E+09,9E+09]];
+        pDatumCenter.rot:=OrientZYX(-90,0,180);
+        pDatumCenter.extax.eax_a:=6500;
+        
+        TPWrite "Datum: Drawing circle at origin";
+        TPWrite "Press Play to continue";
+        Stop;
+        
+        pDatumCircle:=pDatumCenter;
+        pDatumCircle.trans.z:=SafeZ;
+        MoveJ pDatumCircle,v500,z5,tPlotter\\WObj:=Bed1Wyong;
+        
+        pDatumCircle.trans.x:=DatumRadius;
+        pDatumCircle.trans.z:=DatumZ;
+        MoveJ pDatumCircle,v500,z5,tPlotter\\WObj:=Bed1Wyong;
+        
+        FOR i FROM 1 TO 8 DO
+            pDatumCircle.trans.x:=DatumRadius*Cos(i*45);
+            pDatumCircle.trans.y:=DatumRadius*Sin(i*45);
+            MoveJ pDatumCircle,v100,fine,tPlotter\\WObj:=Bed1Wyong;
+        ENDFOR
+        
+        pDatumCircle.trans.x:=0;
+        pDatumCircle.trans.y:=0;
+        pDatumCircle.trans.z:=DatumZ;
+        MoveJ pDatumCircle,v100,fine,tPlotter\\WObj:=Bed1Wyong;
+        
+        TPWrite "Plotter at datum center (0,0)";
+        TPWrite "Press Play to return tool";
+        Stop;
+        
+        pDatumCircle.trans.z:=SafeZ;
+        MoveJ pDatumCircle,v500,z5,tPlotter\\WObj:=Bed1Wyong;
+        
+        ConfL\\On;
+        ConfJ\\On;
+        
+        Plotter_Dropoff;
+        Home;
+        
+        TPWrite "Datum Complete";
+    ERROR
+        RAISE;
+    ENDPROC
+
+'''
+    
+    def _generate_pyheli_proc(self) -> str:
+        """Generate the PyHeli procedure with serpentine pattern."""
+        p = self.params
+        
+        # Calculate workspace bounds based on workzone selection
+        workzone = p.get("heli_workzone", "panel")
+        
+        if workzone == "bed":
+            # Bed workzone
+            workspace_min_x = p["bed_datum_x"]
+            workspace_max_x = p["bed_datum_x"] + p["bed_length_x"]
+            workspace_min_y = p["bed_datum_y"]
+            workspace_max_y = p["bed_datum_y"] + p["bed_width_y"]
+            heli_z = p["z_offset"] + p["heli_z_offset"]
+        else:
+            # Panel workzone (default)
+            workspace_min_x = p["panel_datum_x"]
+            workspace_max_x = p["panel_datum_x"] + p["panel_x"]
+            workspace_min_y = p["panel_datum_y"]
+            workspace_max_y = p["panel_datum_y"] + p["panel_y"]
+            heli_z = p["panel_z"] + p["z_offset"] + p["heli_z_offset"]
+        
+        # Apply serpentine offsets
+        offset_x = p.get("serpentine_offset_x", 100)
+        offset_y = p.get("serpentine_offset_y", 100)
+        work_min_x = workspace_min_x + offset_x
+        work_max_x = workspace_max_x - offset_x
+        work_min_y = workspace_min_y + offset_y
+        work_max_y = workspace_max_y - offset_y
+        
+        # Determine start position and direction
+        # Default: start at far Y (away from robot) and step back towards robot
+        initial_direction = p.get("serpentine_direction", 1)
+        start_bottom = p.get("serpentine_start_bottom", False)
+        
+        if start_bottom:
+            start_y = work_min_y
+            end_y = work_max_y
+            y_step_dir = 1
+        else:
+            # Start at far Y, step towards robot
+            start_y = work_max_y
+            end_y = work_min_y
+            y_step_dir = -1
+        
+        safe_z = 500
+        heli_force = p["heli_force"]
+        use_force_control = heli_force > 0
+        
+        # Generate force control or regular movement code based on heli_force
+        # Force ramping: 10% -> 100% over 5 seconds at start of travel
+        if use_force_control:
+            force_mode_comment = f"Force Control ENABLED: {heli_force}N (ramping 10%->100% over 5s)"
+            sweep_move = f"FCPressL pHeliEnd,vHeliTravel,CurrentForce,fine,tHeli\\WObj:=Bed1Wyong;"
+            step_move = f"FCPressL pHeliEnd,vHeliTravel,CurrentForce,fine,tHeli\\WObj:=Bed1Wyong;"
+            # Calibrate BEFORE blades spin to avoid noise
+            force_calib = """! Calibrate force sensor while stationary (before blade spin)
+        TPWrite "Calibrating force sensor...";
+        FCCalib HeliLoad140rpm;
+        TPWrite "Force sensor calibrated";"""
+            # Start force control after lowering
+            force_start = f"""! Start force control at 10% of target
+        CurrentForce:=HeliForce*0.1;
+        FCPress1LStart Offs(pHeliPos,0,0,25),v50,\\Fz:=CurrentForce,15,\\ForceChange:=50\\PosSupvDist:=100,z5,tHeli\\WObj:=Bed1Wyong;
+        
+        ! Start ramp timer - will ramp to 100% over 5 seconds during first sweep
+        ClkReset RampClock;
+        ClkStart RampClock;
+        bRamping:=TRUE;
+        TPWrite "Force ramping: 10% -> 100% over 5s";"""
+            force_end = f"FCPressEnd Offs(pHeliEnd,0,0,50),v100,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;"
+            force_var = f"""VAR num HeliForce:={heli_force};
+        VAR num CurrentForce:={heli_force};
+        VAR clock RampClock;
+        VAR bool bRamping:=FALSE;"""
+            # Force ramp check to insert in sweep loop - updates CurrentForce for next FCPressL
+            force_ramp_check = f"""! Update force ramp if still ramping (applied on next move)
+            IF bRamping THEN
+                IF ClkRead(RampClock)>=5 THEN
+                    CurrentForce:=HeliForce;
+                    bRamping:=FALSE;
+                    TPWrite "Force ramp complete: " \\Num:=CurrentForce;
+                ELSE
+                    CurrentForce:=HeliForce*(0.1+0.9*ClkRead(RampClock)/5);
+                ENDIF
+            ENDIF"""
+        else:
+            force_mode_comment = "Force Control DISABLED (dummy run)"
+            sweep_move = "MoveL pHeliEnd,vHeliTravel,fine,tHeli\\WObj:=Bed1Wyong;"
+            step_move = "MoveL pHeliEnd,vHeliTravel,fine,tHeli\\WObj:=Bed1Wyong;"
+            force_start = "! No force control - dummy run"
+            force_end = "! No force control end needed"
+            force_var = "! Force control disabled"
+            force_ramp_check = "! No force ramping in dummy mode"
+            force_calib = "! No force calibration needed"
+        
+        force_status = f"ON {heli_force}N" if use_force_control else "OFF (dummy)"
+        
+        return f'''
+    PROC PyHeli()
+        ! PyHeli - Helicopter serpentine pattern
+        ! Workzone: {workzone}
+        ! {force_mode_comment}
+        ! Generated by Onyx Toolpath Generator
+        
+        VAR robtarget pHeliPos;
+        VAR robtarget pHeliEnd;
+        VAR num HeliZ:={heli_z};
+        VAR num SafeZ:={safe_z};
+        
+        ! Workspace bounds (with offsets applied)
+        VAR num WorkMinX:={work_min_x};
+        VAR num WorkMaxX:={work_max_x};
+        VAR num WorkMinY:={work_min_y};
+        VAR num WorkMaxY:={work_max_y};
+        
+        ! Pattern parameters
+        VAR num StepSize:={p["helicopter_step"]};
+        VAR num SweepDir:=1;
+        VAR num StepDir:={y_step_dir};
+        VAR num CurrentY:={start_y};
+        VAR num CurrentX:={work_min_x};
+        VAR num NextY;
+        VAR num NextX;
+        VAR num StartX;
+        VAR num EndX;
+        VAR num StartY;
+        VAR num EndY;
+        
+        ! Speed and blade parameters
+        VAR num HeliSpeed:={p["heli_blade_speed"]};
+        VAR num HeliAngle:={p["heli_blade_angle"]};
+        VAR speeddata vHeliTravel:=[{p["heli_travel_speed"]},15,2000,15];
+        VAR num NumPasses;
+        {force_var}
+        
+        NumPasses:=Trunc(Abs(WorkMaxY-WorkMinY)/StepSize)+1;
+        
+        TPWrite "PyHeli: Serpentine Pattern";
+        TPWrite "Work Area ({work_max_x},{start_y}) to ({work_min_x},{end_y})";
+        TPWrite "Passes=" \\Num:=NumPasses;
+        TPWrite "Step=" \\Num:=StepSize;
+        TPWrite "Force={force_status}";
+        
+        IF ToolNum<>2 THEN
+            TPWrite "PyHeli: ToolNum<>2, need pickup";
+        """Generate PyPan procedure for pan troweling with blade angle reset."""
+        p = self.params
+        
+        # Pan always uses Panel workzone
+        workspace_min_x = p['panel_datum_x']
+        workspace_max_x = p['panel_datum_x'] + p['panel_x']
+        workspace_min_y = p['panel_datum_y']
+        workspace_max_y = p['panel_datum_y'] + p['panel_y']
+        
+        # Apply serpentine offsets
+        work_min_x = workspace_min_x + p['serpentine_offset_x']
+        work_max_x = workspace_max_x - p['serpentine_offset_x']
+        work_min_y = workspace_min_y + p['serpentine_offset_y']
+        work_max_y = workspace_max_y - p['serpentine_offset_y']
+        
+        # Pan Z is panel_z + z_offset + pan_z_offset
+        pan_z = p['panel_z'] + p['z_offset'] + p['pan_z_offset']
+        
+        # Determine start position and direction (same logic as PyHeli)
+        initial_direction = p.get("serpentine_direction", 1)
+        start_bottom = p.get("serpentine_start_bottom", True)
+        
+        if start_bottom:
+            start_y = work_min_y
+            end_y = work_max_y
+            y_step_dir = 1
+        else:
+            start_y = work_max_y
+            end_y = work_min_y
+            y_step_dir = -1
+        
+        return f'''
+    PROC PyPan()
+        ! Python-generated Pan procedure
+        ! Serpentine pattern over Panel workzone
+        
+        VAR robtarget pPanPos;
+        VAR robtarget pPanEnd;
+        VAR robtarget CurrentPos;
+        VAR jointtarget CurrentJoints;
+        
+        ! Workspace bounds (Panel)
+        CONST num WorkMinX:={work_min_x};
+        CONST num WorkMaxX:={work_max_x};
+        CONST num WorkMinY:={work_min_y};
+        CONST num WorkMaxY:={work_max_y};
+        CONST num PanZ:={pan_z};
+        CONST num SafeZ:={pan_z + 300};
+        
+        ! Pattern parameters
+        VAR num StepSize:={p["pan_step"]};
+        VAR num SweepDir:=1;
+        VAR num StepDir:={y_step_dir};
+        VAR num CurrentY:={start_y};
+        VAR num CurrentX:={work_min_x};
+        VAR num NextY;
+        VAR num NextX;
+        VAR num StartX;
+        VAR num EndX;
+        VAR num StartY;
+        VAR num EndY;
+        
+        ! Speed and blade parameters
+        VAR num PanSpeed:={p["pan_blade_speed"]};
+        VAR num PanAngle:=0;  ! Pan always uses 0 blade angle
+        VAR speeddata vPanTravel:=[{p["pan_travel_speed"]},30,2000,15];
+        VAR speeddata vPanApproach:=[100,30,2000,15];
+        VAR num NumPasses;
+        
+        NumPasses:=Trunc(Abs(WorkMaxY-WorkMinY)/StepSize)+1;
+        
+        TPWrite "PyPan: Serpentine Pattern";
+        TPWrite "Work Area ({work_max_x},{start_y}) to ({work_min_x},{end_y})";
+        TPWrite "Passes=" \\Num:=NumPasses;
+        TPWrite "Step=" \\Num:=StepSize;
+        
+        IF ToolNum<>2 THEN
+            TPWrite "PyPan: ToolNum<>2, need pickup";
+            Stop;
+            Home;
+            Heli_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);
+            IF CurrentPos.trans.z<SafeZ THEN
+                MoveL Offs(CurrentPos,0,0,(SafeZ-CurrentPos.trans.z)),vPanApproach,z5,tHeli\\WObj:=Bed1Wyong;
+            ENDIF
+        ENDIF
+        
+        ! Set start/end based on sweep direction
+        IF SweepDir=1 THEN
+            StartX:=WorkMinX;
+            EndX:=WorkMaxX;
+        ELSE
+            StartX:=WorkMaxX;
+            EndX:=WorkMinX;
+        ENDIF
+        
+        ! Set initial position with fixed orientation
+        pPanPos:=[[0,0,PanZ],OrientZYX(0,0,180),[0,0,0,0],[0,9E+09,9E+09,9E+09,9E+09,9E+09]];
+        
+        ! Move to row start above surface
+        pPanPos.trans.x:=-StartX;
+        pPanPos.trans.y:=CurrentY;
+        pPanPos.trans.z:=SafeZ;
+        pPanPos.extax.eax_a:=Bed1Wyong.uframe.trans.x-StartX;
+        MoveJ pPanPos,vPanApproach,z5,tHeli\\WObj:=Bed1Wyong;
+        
+        TPWrite "Press Play to start";
+        Stop;
+        
+        ! Disable configuration tracking for serpentine movements
+        ConfL\\Off;
+        ConfJ\\Off;
+        
+        ! Lower to working height
+        pPanPos.trans.z:=PanZ;
+        MoveL pPanPos,v50,fine,tHeli\\WObj:=Bed1Wyong;
+        
+        ! Start blade rotation
+        HeliBladeSpeed PanSpeed,"FWD";
+        WaitTime\\InPos,3;
+        
+        ! Set up end position for first sweep
+        pPanEnd:=pPanPos;
+        pPanEnd.trans.x:=-EndX;
+        pPanEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x-EndX;
+        
+        ! ========== PASS 1: X-direction sweeps (stepping in Y) ===========
+        WHILE TRUE DO
+            ! === SWEEP X (full length) ===
+            MoveL pPanEnd,vPanTravel,z5,tHeli\\WObj:=Bed1Wyong;
+            
+            ! Calculate next row
+            NextY:=CurrentY+(StepDir*StepSize);
+            
+            ! Check if pass complete
+            IF (StepDir=1 AND NextY>WorkMaxY) OR (StepDir=-1 AND NextY<WorkMinY) THEN
+                EXIT;
+            ENDIF
+            
+            ! Clamp to bounds
+            IF NextY>WorkMaxY THEN
+                NextY:=WorkMaxY;
+            ELSEIF NextY<WorkMinY THEN
+                NextY:=WorkMinY;
+            ENDIF
+            
+            ! Step to next Y row
+            pPanEnd.trans.y:=NextY;
+            MoveL pPanEnd,vPanTravel,z5,tHeli\\WObj:=Bed1Wyong;
+            CurrentY:=NextY;
+            
+            ! Flip sweep direction
+            SweepDir:=-SweepDir;
+            IF SweepDir=1 THEN
+                StartX:=WorkMinX;
+                EndX:=WorkMaxX;
+            ELSE
+                StartX:=WorkMaxX;
+                EndX:=WorkMinX;
+            ENDIF
+            
+            ! Set up end position for next sweep
+            pPanEnd.trans.x:=-EndX;
+            pPanEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x-EndX;
+        ENDWHILE
+        
+        ! ========== PASS 2: Y-direction sweeps (stepping in X) ==========
+        
+        ! Reset for Y-direction passes - start from current position
+        CurrentX:=Abs(pPanEnd.trans.x);
+        
+        ! Determine step direction based on where Pass 1 ended
+        ! At high X, step toward low X; at low X, step toward high X
+        IF CurrentX>((WorkMinX+WorkMaxX)/2) THEN
+            StepDir:=-1;
+        ELSE
+            StepDir:=1;
+        ENDIF
+        
+        SweepDir:=1;
+        StartY:=WorkMaxY;
+        EndY:=WorkMinY;
+        
+        ! Set up for Y sweep and move to start position
+        pPanEnd.trans.y:=EndY;
+        MoveL pPanEnd,vPanTravel,z5,tHeli\\WObj:=Bed1Wyong;
+        
+        WHILE TRUE DO
+            ! Calculate next column
+            NextX:=CurrentX+(StepDir*StepSize);
+            
+            ! Check if pass complete
+            IF (StepDir=1 AND NextX>WorkMaxX) OR (StepDir=-1 AND NextX<WorkMinX) THEN
+                EXIT;
+            ENDIF
+            
+            ! Clamp to bounds
+            IF NextX>WorkMaxX THEN
+                NextX:=WorkMaxX;
+            ELSEIF NextX<WorkMinX THEN
+                NextX:=WorkMinX;
+            ENDIF
+            
+            ! Step to next X column
+            pPanEnd.trans.x:=-NextX;
+            pPanEnd.extax.eax_a:=Bed1Wyong.uframe.trans.x-NextX;
+            MoveL pPanEnd,vPanTravel,z5,tHeli\\WObj:=Bed1Wyong;
+            CurrentX:=NextX;
+            
+            ! Flip sweep direction
+            SweepDir:=-SweepDir;
+            IF SweepDir=1 THEN
+                StartY:=WorkMinY;
+                EndY:=WorkMaxY;
+            ELSE
+                StartY:=WorkMaxY;
+                EndY:=WorkMinY;
+            ENDIF
+            
+            ! Set up end position for next sweep
+            pPanEnd.trans.y:=EndY;
+            
+            ! === SWEEP Y (full length) ===
+            MoveL pPanEnd,vPanTravel,z5,tHeli\\WObj:=Bed1Wyong;
+        ENDWHILE
+        
+        ! === LIFT OFF BED ===
+        pPanPos.trans.z:=SafeZ;
+        MoveL pPanPos,v100,z5,tHeli\\WObj:=Bed1Wyong;
+        
+        ! === STOP BLADE ROTATION ===
+        HeliBladeSpeed 0,"FWD";
+        WaitTime\\InPos,3;
+        
+        ConfL\\On;
+        ConfJ\\On;
+        
+        ! === PACKAWAY ===
+        Heli_Dropoff;
+        Home;
+        
+        TPWrite "PyPan Complete";
+    ENDPROC
+
+'''

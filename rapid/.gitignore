@@ -1,0 +1,15 @@
+# RobotStudio/RAPID specific
+*.bak
+*.tmp
+*~
+
+# UAS security files (encrypted, don't version control)
+CS/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+*.swp

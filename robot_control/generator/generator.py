@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from .tools.helicopter import generate_py2heli
+from .tools.polisher import generate_py2polish
 
 
 # Paths
@@ -81,9 +82,9 @@ class ToolpathGenerator:
         'heli_pattern': 'serpentine',
         'polisher_z_offset': 0,
         'polisher_workzone': 'bed',
-        'polisher_start_force': 140,
-        'polisher_motion_force': 130,
-        'polisher_force_change': 75,
+        'polisher_start_force': 300,
+        'polisher_motion_force': 300,
+        'polisher_force_change': 100,
         'polisher_approach_speed': 20,
         'polisher_retract_speed': 50,
         'polisher_pos_supv_dist': 100,
@@ -154,6 +155,7 @@ class ToolpathGenerator:
         
         # Generate tool procedures
         py2heli_proc = generate_py2heli(self.params)
+        py2polish_proc = generate_py2polish(self.params)
         
         # Generate the main Py2 menu procedure
         py2main_proc = self._generate_py2main()
@@ -194,6 +196,8 @@ class ToolpathGenerator:
 {py2main_proc}
 
 {py2heli_proc}
+
+{py2polish_proc}
     
     ! ========== END PY2 GENERATED PROCEDURES ==========
 
@@ -220,11 +224,13 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli";
+        TPReadNum iChoice,"1:Heli,2:Polish";
         
         TEST iChoice
         CASE 1:
             Py2Heli;
+        CASE 2:
+            Py2Polish;
         DEFAULT:
             TPWrite "Invalid choice";
         ENDTEST

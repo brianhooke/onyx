@@ -1,0 +1,64 @@
+#
+# Generated backup file, do not edit.
+#
+# Originally at: /hd0a/TEMP/backup.065106
+# 2026-01-20  04:51:38
+#
+>>SYSTEM_ID:
+6700-550483
+
+>>PRODUCTS_ID:
+RobotWare Version: 6.15.05.00
+FlexPendantSxTPU4Software Version: 1.5.0 
+TrackMotion Version: 6.15.03.00
+
+  661-2 Force Control Base
+  English
+  623-1 Multitasking
+  616-1 PC Interface
+  997-1 PROFIsafe F-Device
+  888-3 PROFINET Device
+  1125-2 SafeMove Pro
+  996-1 Safety Module
+  RobotWare Base
+  Axis Calibration
+  Pendelum Calibration
+  Motor Commutation
+  Service Info System
+  Drive System IRB 460/640/660/760/4600/66xx/6700
+  ADU-790A in position X3
+  IRB 6700-150/3.20
+  FlexPendant SxTPU4 Software
+  Robot Orientation Inline
+  IRT 710 Robot
+  Direction of Travel Mirrored
+
+>>HOME:
+All public files and directories
+
+>>SYSPAR:
+SYS.cfg
+PROC.cfg
+MMC.cfg
+EIO.cfg
+SIO.cfg
+MOC.cfg
+
+
+>>TASK1: (T_ROB1,NewProgramName,)
+PROGMOD/Tools.mod @ 
+SYSMOD/user.sys @ 
+PROGMOD/MainModule.mod @ 
+PROGMOD/WebController.mod @ 
+PROGMOD/RobotTargets.mod @ 
+PROGMOD/ToolPaths.mod @ 
+PROGMOD/Toolstations.mod @ 
+PROGMOD/FCtesting.mod @ 
+PROGMOD/ErrorHandling.mod @ 
+PROGMOD/Brian.mod @ 
+
+>>TASK2: (SC_CBC,,)
+SYSMOD/user.sys @ 
+
+
+>>EOF:
