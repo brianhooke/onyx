@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onyx - Toolpath Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        .input-group input {
+            transition: border-color 0.15s ease-in-out;
+        }
+        .input-group input:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-4 mb-2">
+                <a href="/" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </a>
+                <h1 class="text-3xl font-bold text-white">Toolpath Generator</h1>
+            </div>
+            <p class="text-gray-400">Generate RAPID modules and push to IRC5</p>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span id="conn-indicator" class="w-3 h-3 rounded-full bg-gray-500"></span>
+                <span id="conn-status" class="text-gray-300">Checking IRC5 connection...</span>
+            </div>
+            <button onclick="checkConnection()" class="text-sm text-blue-400 hover:text-blue-300">
+                Refresh
+            </button>
+        </div>
+
+        <!-- Parameter Form -->
+        <form id="toolpath-form" class="space-y-3">
+            <!-- Global Parameters -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-300 mb-3">Global Parameters</h3>
+                
+                <!-- Z Offset - applies to all workzones -->
+                <div class="mb-4 pb-3 border-b border-gray-700">
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Offset <span class="text-blue-400">(all workzones)</span></label>
+                            <input type="number" name="z_offset" value="{{ defaults.z_offset }}"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Bed Workzone -->
+                <div class="mb-4 pb-3 border-b border-gray-700">
+                    <span class="text-gray-400 text-xs font-medium block mb-2">Bed Workzone</span>
+                    <div class="grid grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Bed Length X</label>
+                            <input type="number" name="bed_length_x" value="{{ defaults.bed_length_x }}" 
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Bed Width Y</label>
+                            <input type="number" name="bed_width_y" value="{{ defaults.bed_width_y }}"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Bed Datum X</label>
+                            <input type="number" name="bed_datum_x" value="{{ defaults.bed_datum_x }}"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Bed Datum Y</label>
+                            <input type="number" name="bed_datum_y" value="{{ defaults.bed_datum_y }}"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Panel Workzone -->
+                <div>
+                    <span class="text-gray-400 text-xs font-medium block mb-2">Panel Workzone <span class="text-blue-400">(panel workzone only)</span></span>
+                    <div class="grid grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Panel Datum X</label>
+                            <input type="number" name="panel_datum_x" value="{{ defaults.panel_datum_x }}"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Panel Datum Y</label>
+                            <input type="number" name="panel_datum_y" value="{{ defaults.panel_datum_y }}"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Panel X</label>
+                            <input type="number" name="panel_x" value="{{ defaults.panel_x }}" 
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Panel Y</label>
+                            <input type="number" name="panel_y" value="{{ defaults.panel_y }}"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Panel Z <span class="text-yellow-500">(fixed)</span></label>
+                            <input type="number" name="panel_z" value="150" readonly
+                                class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-400 text-sm cursor-not-allowed"
+                                title="FormHeight constant in RAPID - formwork thickness">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool Patterns -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-300 mb-3">Tool Patterns</h3>
+                
+                <!-- Serpentine Pattern -->
+                <div class="border border-gray-700 rounded p-3 space-y-3">
+                    <span class="text-gray-400 text-sm font-medium">Serpentine</span>
+                    
+                    <!-- Serpentine Global Settings -->
+                    <div class="flex items-center gap-3 pl-4 flex-wrap">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Offset X (mm)</label>
+                            <input type="number" name="serpentine_offset_x" value="{{ defaults.serpentine_offset_x }}"
+                                min="0" max="500"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0-500</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Offset Y (mm)</label>
+                            <input type="number" name="serpentine_offset_y" value="{{ defaults.serpentine_offset_y }}"
+                                min="0" max="500"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0-500</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Direction</label>
+                            <select name="serpentine_direction"
+                                class="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <option value="1" {% if defaults.serpentine_direction == 1 %}selected{% endif %}>Left→Right</option>
+                                <option value="-1" {% if defaults.serpentine_direction == -1 %}selected{% endif %}>Right→Left</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Start</label>
+                            <select name="serpentine_start_bottom"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <option value="0" {% if not defaults.serpentine_start_bottom %}selected{% endif %}>Top</option>
+                                <option value="1" {% if defaults.serpentine_start_bottom %}selected{% endif %}>Bottom</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Tool Steps -->
+                    <div class="border-t border-gray-700 pt-2 mt-2">
+                        <span class="text-gray-500 text-xs mb-2 block">Step Size per Tool</span>
+                        <div class="flex items-center gap-4 pl-4 flex-wrap">
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Vacuum</label>
+                                <input type="number" name="vacuum_step" value="{{ defaults.vacuum_step }}"
+                                    min="50" max="1000"
+                                    class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <span class="block text-red-400 text-[10px]">50-1000</span>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Polisher</label>
+                                <input type="number" name="polisher_step" value="{{ defaults.polisher_step }}"
+                                    min="50" max="1000"
+                                    class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <span class="block text-red-400 text-[10px]">50-1000</span>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Pan</label>
+                                <input type="number" name="pan_step" value="{{ defaults.pan_step }}"
+                                    min="50" max="1000"
+                                    class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <span class="block text-red-400 text-[10px]">50-1000</span>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Helicopter</label>
+                                <input type="number" name="helicopter_step" value="{{ defaults.helicopter_step }}"
+                                    min="50" max="1000"
+                                    class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <span class="block text-red-400 text-[10px]">50-1000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool-Specific Parameters -->
+            <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+                <h3 class="text-sm font-medium text-gray-300 mb-3">Tool Parameters</h3>
+                
+                <!-- Vacuum -->
+                <div class="flex items-center gap-4">
+                    <div class="w-24">
+                        <span class="text-gray-400 text-sm">Vacuum</span>
+                        <span class="block text-green-400 text-[9px] start-point" data-tool="vacuum">Start: --</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Workzone</label>
+                            <select name="vacuum_workzone"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="panel" {% if defaults.vacuum_workzone == 'panel' %}selected{% endif %}>Panel</option>
+                                <option value="bed" {% if defaults.vacuum_workzone == 'bed' %}selected{% endif %}>Bed</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Pattern</label>
+                            <select name="vacuum_pattern"
+                                class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="serpentine" selected>Serpentine</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
+                            <input type="number" name="vacuum_z_offset" value="{{ defaults.vacuum_z_offset }}"
+                                min="-100" max="100"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-100 to 100 mm</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Speed (mm/s)</label>
+                            <input type="number" name="vacuum_speed" value="{{ defaults.vacuum_speed }}"
+                                min="10" max="500"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">10-500</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Force (N)</label>
+                            <input type="number" name="vacuum_force" value="{{ defaults.vacuum_force }}"
+                                min="10" max="150"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">10-150</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Min (mm)</label>
+                            <input type="number" name="vacuum_z_min" value="{{ defaults.vacuum_z_min }}"
+                                min="-50" max="0"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-50 to 0</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Max (mm)</label>
+                            <input type="number" name="vacuum_z_max" value="{{ defaults.vacuum_z_max }}"
+                                min="0" max="100"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0-100</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Polisher -->
+                <div class="flex items-center gap-4">
+                    <div class="w-24">
+                        <span class="text-gray-400 text-sm">Polisher</span>
+                        <span class="block text-green-400 text-[9px] start-point" data-tool="polisher">Start: --</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Workzone</label>
+                            <select name="polisher_workzone"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="bed" {% if defaults.polisher_workzone == 'bed' %}selected{% endif %}>Bed</option>
+                                <option value="panel" {% if defaults.polisher_workzone == 'panel' %}selected{% endif %}>Panel</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
+                            <input type="number" name="polisher_z_offset" value="{{ defaults.polisher_z_offset }}"
+                                min="-100" max="100"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-100 to 100 mm</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Start Force (N)</label>
+                            <input type="number" name="polisher_start_force" value="{{ defaults.polisher_start_force }}"
+                                min="50" max="300"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+                                title="Initial contact force when engaging surface">
+                            <span class="block text-red-400 text-[10px]">50-300</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Motion Force (N)</label>
+                            <input type="number" name="polisher_motion_force" value="{{ defaults.polisher_motion_force }}"
+                                min="50" max="300"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+                                title="Target force maintained during travel">
+                            <span class="block text-red-400 text-[10px]">50-300</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Force Δ (N)</label>
+                            <input type="number" name="polisher_force_change" value="{{ defaults.polisher_force_change }}"
+                                min="10" max="150"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+                                title="Max force variation allowed during motion">
+                            <span class="block text-red-400 text-[10px]">10-150</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Range (mm)</label>
+                            <input type="number" name="polisher_pos_supv_dist" value="{{ defaults.polisher_pos_supv_dist }}"
+                                min="20" max="200"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+                                title="Position supervision distance - max Z deviation allowed">
+                            <span class="block text-red-400 text-[10px]">20-200</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Approach (mm/s)</label>
+                            <input type="number" name="polisher_approach_speed" value="{{ defaults.polisher_approach_speed }}"
+                                min="5" max="100"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+                                title="Speed when lowering to contact surface">
+                            <span class="block text-red-400 text-[10px]">5-100</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Retract (mm/s)</label>
+                            <input type="number" name="polisher_retract_speed" value="{{ defaults.polisher_retract_speed }}"
+                                min="10" max="200"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+                                title="Speed when lifting off surface">
+                            <span class="block text-red-400 text-[10px]">10-200</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plotter -->
+                <div class="flex items-center gap-4">
+                    <span class="text-gray-400 text-sm w-24">Plotter</span>
+                    <div class="flex gap-3">
+                        <span class="text-gray-600 text-xs italic py-1.5">No parameters</span>
+                    </div>
+                </div>
+
+                <!-- Vib Screed -->
+                <div class="flex items-center gap-4">
+                    <div class="w-24">
+                        <span class="text-gray-400 text-sm">Vib Screed</span>
+                        <span class="block text-green-400 text-[9px] start-point" data-tool="screed">Start: --</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Workzone</label>
+                            <span class="block bg-gray-600 border border-gray-500 rounded px-2 py-1.5 text-gray-300 text-sm w-20">Panel</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
+                            <input type="number" name="screed_z_offset" value="{{ defaults.screed_z_offset }}"
+                                min="-100" max="100"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-100 to 100 mm</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Speed (mm/s)</label>
+                            <input type="number" name="vib_screed_speed" value="{{ defaults.vib_screed_speed }}"
+                                min="10" max="500"
+                                class="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">10-500</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Angle (°)</label>
+                            <input type="number" name="screed_angle_offset" value="{{ defaults.screed_angle_offset }}"
+                                min="-15" max="15"
+                                class="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-15 to 15</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Panel Offset</label>
+                            <input type="number" name="screed_panel_offset" value="{{ defaults.screed_panel_offset }}"
+                                min="0" max="500"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0-500 mm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pan -->
+                <div class="flex items-center gap-4">
+                    <div class="w-24">
+                        <span class="text-gray-400 text-sm">Pan</span>
+                        <span class="block text-green-400 text-[9px] start-point" data-tool="pan">Start: --</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Workzone</label>
+                            <span class="block bg-gray-600 border border-gray-500 rounded px-2 py-1.5 text-gray-300 text-sm w-20">Panel</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Pattern</label>
+                            <select name="pan_pattern"
+                                class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="serpentine" {% if defaults.pan_pattern == 'serpentine' %}selected{% endif %}>Serpentine</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
+                            <input type="number" name="pan_z_offset" value="{{ defaults.pan_z_offset }}"
+                                min="-200" max="200"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-200 to 200 mm</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Travel Speed</label>
+                            <select name="pan_travel_speed"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="30">30</option>
+                                <option value="40">40</option>
+                                <option value="50">50</option>
+                                <option value="60">60</option>
+                                <option value="80">80</option>
+                                <option value="100" selected>100</option>
+                                <option value="150">150</option>
+                                <option value="200">200</option>
+                                <option value="500">500</option>
+                            </select>
+                            <span class="block text-red-400 text-[10px]">mm/s</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Blade Speed</label>
+                            <input type="number" name="pan_blade_speed" value="{{ defaults.pan_blade_speed }}"
+                                min="40" max="140"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">40-140 RPM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Helicopter -->
+                <div class="flex items-center gap-4">
+                    <div class="w-24">
+                        <span class="text-gray-400 text-sm">Helicopter</span>
+                        <span class="block text-green-400 text-[9px] start-point" data-tool="heli">Start: --</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Workzone</label>
+                            <select name="heli_workzone"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="panel" {% if defaults.heli_workzone == 'panel' %}selected{% endif %}>Panel</option>
+                                <option value="bed" {% if defaults.heli_workzone == 'bed' %}selected{% endif %}>Bed</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Pattern <span class="text-yellow-500">(fixed)</span></label>
+                            <input type="text" name="heli_pattern" value="cross-hatch" readonly
+                                class="w-28 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-400 text-sm cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
+                            <input type="number" name="heli_z_offset" value="{{ defaults.heli_z_offset }}"
+                                min="-50" max="400"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">-50 to 400 mm</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Travel Speed</label>
+                            <select name="heli_travel_speed"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="30">30</option>
+                                <option value="40" selected>40</option>
+                                <option value="50">50</option>
+                                <option value="60">60</option>
+                                <option value="80">80</option>
+                                <option value="100">100</option>
+                                <option value="150">150</option>
+                                <option value="200">200</option>
+                                <option value="500">500</option>
+                            </select>
+                            <span class="block text-red-400 text-[10px]">mm/s</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Blade Speed</label>
+                            <select name="heli_blade_speed"
+                                class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="70" selected>70</option>
+                                <option value="100">100</option>
+                                <option value="140">140</option>
+                            </select>
+                            <span class="block text-red-400 text-[10px]">RPM</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Blade Angle</label>
+                            <input type="number" name="heli_blade_angle" value="{{ defaults.heli_blade_angle }}"
+                                min="0" max="12"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0-12°</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Force (N)</label>
+                            <input type="number" name="heli_force" value="{{ defaults.heli_force }}"
+                                min="0" max="500"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0=off, 100-500</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="upload-checkbox" name="upload_to_irc5" checked
+                            class="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                        <label for="upload-checkbox" class="text-gray-300">Upload to IRC5 after generation</label>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" id="save-btn"
+                            class="px-6 py-2 bg-gray-600 rounded font-medium flex items-center gap-2 cursor-not-allowed opacity-50"
+                            disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                            </svg>
+                            Save
+                        </button>
+                        <button type="submit" id="generate-btn"
+                            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded font-medium flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Generate & Push
+                        </button>
+                        <button type="button" id="upload-original-btn"
+                            class="px-6 py-2 bg-amber-600 hover:bg-amber-700 rounded font-medium flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                            </svg>
+                            Andrew's Old Programs
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Robot 3D Visualization -->
+        <div class="mt-6 bg-gray-800 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-medium text-gray-300">Work Cell 3D Visualization</h3>
+                <span class="text-xs text-gray-500">Drag to rotate • Scroll to zoom</span>
+            </div>
+            <div id="robot-3d-container" class="relative bg-gray-900 rounded-lg overflow-hidden" style="height: 400px;">
+                <!-- Three.js canvas will be inserted here -->
+            </div>
+            <!-- Joint Angles from Robot (live data) -->
+            <div class="mt-3 bg-gray-700/50 rounded p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-gray-400 font-medium">Live Joint Angles</span>
+                    <span id="joint-status" class="text-xs text-green-400">● Connected</span>
+                </div>
+                <div class="grid grid-cols-8 gap-2 text-xs">
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-blue-400 font-bold">J1</div>
+                        <div class="text-gray-500 text-[10px]">Base</div>
+                        <div id="live-j1" class="text-white font-mono">-</div>
+                        <input type="number" id="override-j1" placeholder="°" step="0.1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-blue-400 font-bold">J2</div>
+                        <div class="text-gray-500 text-[10px]">Shoulder</div>
+                        <div id="live-j2" class="text-white font-mono">-</div>
+                        <input type="number" id="override-j2" placeholder="°" step="0.1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-blue-400 font-bold">J3</div>
+                        <div class="text-gray-500 text-[10px]">Elbow</div>
+                        <div id="live-j3" class="text-white font-mono">-</div>
+                        <input type="number" id="override-j3" placeholder="°" step="0.1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-blue-400 font-bold">J4</div>
+                        <div class="text-gray-500 text-[10px]">Wrist 1</div>
+                        <div id="live-j4" class="text-white font-mono">-</div>
+                        <input type="number" id="override-j4" placeholder="°" step="0.1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-indigo-400 font-bold">J5</div>
+                        <div class="text-gray-500 text-[10px]">Wrist 2</div>
+                        <div id="live-j5" class="text-white font-mono">-</div>
+                        <input type="number" id="override-j5" placeholder="°" step="0.1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-indigo-400 font-bold">J6</div>
+                        <div class="text-gray-500 text-[10px]">Wrist 3</div>
+                        <div id="live-j6" class="text-white font-mono">-</div>
+                        <input type="number" id="override-j6" placeholder="°" step="0.1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-amber-400 font-bold">Track</div>
+                        <div class="text-gray-500 text-[10px]">Ext Axis</div>
+                        <div id="live-track" class="text-white font-mono">-</div>
+                        <input type="number" id="override-track" placeholder="mm" step="1"
+                            class="mt-1 w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-white text-[10px] text-center font-mono">
+                    </div>
+                    <div class="bg-gray-700 rounded p-2 text-center">
+                        <div class="text-amber-400 font-bold">Tool</div>
+                        <div class="text-gray-500 text-[10px]">Blade</div>
+                        <div id="blade-rpm" class="text-white font-mono">70 RPM</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Panel -->
+        <div id="result-panel" class="hidden mt-6 bg-gray-800 rounded-lg p-6">
+            <h2 class="text-lg font-semibold mb-4" id="result-title">Result</h2>
+            <div id="result-content"></div>
+        </div>
+
+        <!-- Generated Files Info -->
+        <div class="mt-6 bg-gray-800/50 rounded-lg p-4 text-sm text-gray-400">
+            <h3 class="font-medium text-gray-300 mb-2">Files Generated:</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <span class="font-mono">ToolPaths.mod</span>
+                <span class="font-mono">FCtesting.mod</span>
+                <span class="font-mono">Brian.mod</span>
+                <span class="font-mono">ErrorHandling.mod</span>
+                <span class="font-mono">MainModule.mod</span>
+                <span class="font-mono">RobotTargets.mod</span>
+                <span class="font-mono">Tools.mod</span>
+                <span class="font-mono">Toolstations.mod</span>
+                <span class="font-mono">WebController.mod</span>
+            </div>
+            <p class="mt-2 text-gray-500">Files are uploaded to: <code>$HOME/RAPID/TASK1/PROGMOD/</code></p>
+        </div>
+    </div>
+
+    <script>
+        // Load params from DB and check IRC5 connection on load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadParamsFromDB();
+            checkConnection();
+            setupValidation();
+            setupSaveButton();
+        });
+        
+        // Validation rules
+        function validateParams() {
+            const errors = [];
+            
+            // Required numeric fields must be > 0
+            const requiredFields = ['panel_x', 'panel_y', 'panel_datum_x', 'panel_datum_y'];
+            for (const field of requiredFields) {
+                const input = document.querySelector(`input[name="${field}"]`);
+                if (input) {
+                    const val = parseFloat(input.value);
+                    if (isNaN(val) || val <= 0) {
+                        errors.push(`${field} must be > 0`);
+                    }
+                }
+            }
+            
+            // Panel must fit in bed
+            const panelX = parseFloat(document.querySelector('input[name="panel_x"]')?.value || 0);
+            const panelY = parseFloat(document.querySelector('input[name="panel_y"]')?.value || 0);
+            const bedX = parseFloat(document.querySelector('input[name="bed_length_x"]')?.value || 12000);
+            const bedY = parseFloat(document.querySelector('input[name="bed_width_y"]')?.value || 3200);
+            
+            if (panelX > bedX) errors.push('panel_x exceeds bed length');
+            if (panelY > bedY) errors.push('panel_y exceeds bed width');
+            
+            return errors;
+        }
+        
+        function updateSaveButton() {
+            const saveBtn = document.getElementById('save-btn');
+            const errors = validateParams();
+            
+            if (errors.length === 0) {
+                // Valid - green and enabled
+                saveBtn.disabled = false;
+                saveBtn.className = 'px-6 py-2 bg-green-600 hover:bg-green-700 rounded font-medium flex items-center gap-2 cursor-pointer';
+            } else {
+                // Invalid - grey and disabled
+                saveBtn.disabled = true;
+                saveBtn.className = 'px-6 py-2 bg-gray-600 rounded font-medium flex items-center gap-2 cursor-not-allowed opacity-50';
+            }
+        }
+        
+        function setupValidation() {
+            // Listen to all form inputs
+            const form = document.getElementById('toolpath-form');
+            form.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('input', updateSaveButton);
+                input.addEventListener('change', updateSaveButton);
+            });
+            // Initial check
+            setTimeout(updateSaveButton, 500);
+        }
+        
+        function setupSaveButton() {
+            const saveBtn = document.getElementById('save-btn');
+            saveBtn.addEventListener('click', async () => {
+                const errors = validateParams();
+                if (errors.length > 0) {
+                    alert('Validation errors:\n' + errors.join('\n'));
+                    return;
+                }
+                
+                const form = document.getElementById('toolpath-form');
+                const formData = new FormData(form);
+                const params = {};
+                formData.forEach((value, key) => {
+                    params[key] = value;
+                });
+                
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = `
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                `;
+                
+                try {
+                    await saveParamsToDB(params);
+                    saveBtn.innerHTML = `
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Saved!
+                    `;
+                    saveBtn.className = 'px-6 py-2 bg-green-600 rounded font-medium flex items-center gap-2';
+                    
+                    setTimeout(() => {
+                        saveBtn.innerHTML = `
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                            </svg>
+                            Save
+                        `;
+                        updateSaveButton();
+                    }, 1500);
+                } catch (error) {
+                    saveBtn.innerHTML = `
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        Error
+                    `;
+                    saveBtn.className = 'px-6 py-2 bg-red-600 rounded font-medium flex items-center gap-2';
+                    setTimeout(() => {
+                        saveBtn.innerHTML = `
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                            </svg>
+                            Save
+                        `;
+                        updateSaveButton();
+                    }, 2000);
+                }
+            });
+        }
+
+        async function loadParamsFromDB() {
+            try {
+                const response = await fetch('/api/toolpath/params/');
+                const data = await response.json();
+                
+                if (data.success && data.params) {
+                    for (const [key, value] of Object.entries(data.params)) {
+                        const input = document.querySelector(`input[name="${key}"]`);
+                        const select = document.querySelector(`select[name="${key}"]`);
+                        if (input) {
+                            input.value = value;
+                        } else if (select) {
+                            select.value = value;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load params from DB:', error);
+            }
+        }
+
+        async function saveParamsToDB(params) {
+            try {
+                await fetch('/api/toolpath/params/save/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+            } catch (error) {
+                console.error('Failed to save params to DB:', error);
+            }
+        }
+
+        async function checkConnection() {
+            const indicator = document.getElementById('conn-indicator');
+            const status = document.getElementById('conn-status');
+            
+            try {
+                const response = await fetch('/api/status/');
+                const data = await response.json();
+                
+                if (data.connected) {
+                    indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                    status.textContent = `IRC5 Connected (${data.operation_mode || 'unknown mode'})`;
+                } else {
+                    indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                    status.textContent = 'IRC5 Disconnected';
+                }
+            } catch (error) {
+                indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                status.textContent = 'Connection check failed';
+            }
+        }
+
+        async function reloadProgram() {
+            const btn = document.getElementById('reload-btn');
+            const status = document.getElementById('reload-status');
+            
+            btn.disabled = true;
+            btn.textContent = 'Reloading...';
+            status.textContent = '';
+            status.className = 'ml-2 text-sm';
+            
+            try {
+                const response = await fetch('/api/reload-program/', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    status.textContent = '✓ Program reloaded!';
+                    status.className = 'ml-2 text-sm text-green-400';
+                    btn.textContent = 'Reloaded';
+                    btn.className = 'px-3 py-1.5 bg-green-600 rounded text-sm font-medium cursor-default';
+                } else {
+                    status.textContent = data.error || 'Reload failed';
+                    status.className = 'ml-2 text-sm text-red-400';
+                    btn.disabled = false;
+                    btn.textContent = 'Retry Reload';
+                }
+            } catch (error) {
+                status.textContent = error.message;
+                status.className = 'ml-2 text-sm text-red-400';
+                btn.disabled = false;
+                btn.textContent = 'Retry Reload';
+            }
+        }
+
+        document.getElementById('toolpath-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('generate-btn');
+            const resultPanel = document.getElementById('result-panel');
+            const resultTitle = document.getElementById('result-title');
+            const resultContent = document.getElementById('result-content');
+            
+            // Disable button and show loading
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating...
+            `;
+            
+            // Gather form data
+            const formData = new FormData(e.target);
+            const params = {};
+            const stringFields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'heli_workzone', 'heli_pattern', 'pan_pattern'];
+            for (const [key, value] of formData.entries()) {
+                if (key === 'upload_to_irc5') {
+                    params[key] = true;
+                } else if (stringFields.includes(key)) {
+                    params[key] = value;
+                } else {
+                    params[key] = parseInt(value);
+                }
+            }
+            
+            // Check if upload checkbox is unchecked
+            if (!formData.has('upload_to_irc5')) {
+                params.upload_to_irc5 = false;
+            }
+            
+            // Save params to DB
+            await saveParamsToDB(params);
+            
+            try {
+                const response = await fetch('/api/toolpath/generate/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                
+                const data = await response.json();
+                
+                resultPanel.classList.remove('hidden');
+                
+                if (data.success) {
+                    if (data.upload_success && data.no_changes) {
+                        // No files changed
+                        resultTitle.textContent = '✓ No Changes Detected';
+                        resultTitle.className = 'text-lg font-semibold mb-4 text-blue-400';
+                        resultContent.innerHTML = `
+                            <div class="space-y-2">
+                                <p class="text-gray-300">Generated ${data.generated_files.length} modules</p>
+                                <p class="text-blue-400">All files identical to IRC5 - nothing to upload</p>
+                                <p class="text-gray-500 text-xs mt-2">Checked at ${data.upload_timestamp}</p>
+                            </div>
+                        `;
+                    } else if (data.upload_success) {
+                        resultTitle.textContent = '✓ Generation & Upload Complete';
+                        resultTitle.className = 'text-lg font-semibold mb-4 text-green-400';
+                        
+                        let backupInfo = '';
+                        if (data.backed_up_files && data.backed_up_files.length > 0) {
+                            backupInfo = `
+                                <div class="mt-3 p-3 bg-blue-900/30 border border-blue-700/50 rounded">
+                                    <p class="text-blue-300 text-sm font-medium mb-1">📁 Backup created</p>
+                                    <p class="text-gray-400 text-xs font-mono">${data.backup_dir}</p>
+                                    <p class="text-gray-500 text-xs mt-1">${data.backed_up_files.length} files backed up</p>
+                                </div>
+                            `;
+                        }
+                        
+                        const programInfo = data.program_name ? `<p class="text-gray-400 text-sm">Program: <span class="font-mono text-blue-300">${data.program_name}</span></p>` : '';
+                        const unchangedInfo = data.unchanged_files && data.unchanged_files.length > 0 
+                            ? `<p class="text-gray-500 text-xs">${data.unchanged_files.length} unchanged files skipped</p>` 
+                            : '';
+                        
+                        resultContent.innerHTML = `
+                            <div class="space-y-2">
+                                <p class="text-gray-300">Generated ${data.generated_files.length} modules</p>
+                                ${programInfo}
+                                <p class="text-green-400">Uploaded ${data.uploaded_files.length} changed file(s) to IRC5</p>
+                                ${unchangedInfo}
+                                ${backupInfo}
+                                <div class="mt-3 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded">
+                                    <p class="text-yellow-300 text-sm font-medium mb-2">⚠ Reload required on FlexPendant</p>
+                                    <p class="text-gray-400 text-xs mb-2">Files uploaded. To apply changes:</p>
+                                    <ol class="text-gray-400 text-xs list-decimal list-inside space-y-1 mb-2">
+                                        <li>On FlexPendant: <strong>ABB menu → Program Editor</strong></li>
+                                        <li><strong>File → Load Program → ${data.program_name || '[current program]'}</strong></li>
+                                        <li>Or switch to <strong>Auto mode</strong> and use button below</li>
+                                    </ol>
+                                    <button onclick="reloadProgram()" id="reload-btn" class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 rounded text-sm font-medium">
+                                        Try Remote Reload
+                                    </button>
+                                    <span id="reload-status" class="ml-2 text-sm"></span>
+                                </div>
+                                <div class="mt-3 p-3 bg-gray-700/50 rounded">
+                                    <p class="text-gray-400 text-xs mb-2">Uploaded at ${data.upload_timestamp}:</p>
+                                    <div class="text-sm font-mono text-green-400">${data.uploaded_files.join('<br>')}</div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (data.upload_success === false) {
+                        resultTitle.textContent = '⚠ Generated (Upload Failed)';
+                        resultTitle.className = 'text-lg font-semibold mb-4 text-yellow-400';
+                        resultContent.innerHTML = `
+                            <div class="space-y-2">
+                                <p class="text-gray-300">Generated ${data.generated_files.length} modules</p>
+                                <p class="text-red-400">Upload failed: ${data.upload_error || 'Unknown error'}</p>
+                                ${data.upload_failed ? `
+                                    <div class="mt-2 text-red-300 text-sm">
+                                        ${data.upload_failed.map(f => `${f.name}: ${f.error}`).join('<br>')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    } else {
+                        resultTitle.textContent = '✓ Generation Complete';
+                        resultTitle.className = 'text-lg font-semibold mb-4 text-blue-400';
+                        resultContent.innerHTML = `
+                            <p class="text-gray-300">Generated ${data.generated_files.length} modules (${data.timestamp})</p>
+                            <p class="text-gray-400 text-sm mt-1">Upload to IRC5 was not requested</p>
+                        `;
+                    }
+                } else {
+                    resultTitle.textContent = '✗ Generation Failed';
+                    resultTitle.className = 'text-lg font-semibold mb-4 text-red-400';
+                    resultContent.innerHTML = `<p class="text-red-300">${data.error || 'Unknown error'}</p>`;
+                }
+            } catch (error) {
+                resultPanel.classList.remove('hidden');
+                resultTitle.textContent = '✗ Error';
+                resultTitle.className = 'text-lg font-semibold mb-4 text-red-400';
+                resultContent.innerHTML = `<p class="text-red-300">${error.message}</p>`;
+            }
+            
+            // Re-enable button
+            btn.disabled = false;
+            btn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Generate & Push
+            `;
+        });
+
+        // Calculate and display start points (X, Y, Z) for each tool
+        // Note: Panel Z (FormHeight=150) is handled in RAPID, so Z here is just offsets
+        function updateStartPoints() {
+            const globalZ = parseInt(document.querySelector('input[name="z_offset"]')?.value) || 0;
+            const panelDatumX = parseInt(document.querySelector('input[name="panel_datum_x"]')?.value) || 0;
+            const panelDatumY = parseInt(document.querySelector('input[name="panel_datum_y"]')?.value) || 0;
+            const panelX = parseInt(document.querySelector('input[name="panel_x"]')?.value) || 0;
+            const panelY = parseInt(document.querySelector('input[name="panel_y"]')?.value) || 0;
+            const bedDatumX = parseInt(document.querySelector('input[name="bed_datum_x"]')?.value) || 0;
+            const bedDatumY = parseInt(document.querySelector('input[name="bed_datum_y"]')?.value) || 0;
+            const bedLengthX = parseInt(document.querySelector('input[name="bed_length_x"]')?.value) || 0;
+            const bedWidthY = parseInt(document.querySelector('input[name="bed_width_y"]')?.value) || 0;
+            const offsetX = parseInt(document.querySelector('input[name="serpentine_offset_x"]')?.value) || 100;
+            const offsetY = parseInt(document.querySelector('input[name="serpentine_offset_y"]')?.value) || 100;
+            
+            // Helper to calculate start point based on workzone
+            // Z = globalZ + toolZOffset (FormHeight=150 is handled in RAPID)
+            function getStartPoint(workzone, zOffset) {
+                if (workzone === 'panel') {
+                    return {
+                        x: panelDatumX + offsetX,
+                        y: panelDatumY + panelY - offsetY,
+                        z: globalZ + zOffset
+                    };
+                } else {
+                    return {
+                        x: bedDatumX + offsetX,
+                        y: bedDatumY + bedWidthY - offsetY,
+                        z: globalZ + zOffset
+                    };
+                }
+            }
+            
+            // Vacuum
+            const vacuumWorkzone = document.querySelector('select[name="vacuum_workzone"]')?.value || 'panel';
+            const vacuumZOffset = parseInt(document.querySelector('input[name="vacuum_z_offset"]')?.value) || 0;
+            const vacuumStart = getStartPoint(vacuumWorkzone, vacuumZOffset);
+            const vacuumDisplay = document.querySelector('.start-point[data-tool="vacuum"]');
+            if (vacuumDisplay) vacuumDisplay.textContent = `X:${vacuumStart.x} Y:${vacuumStart.y} Z:${vacuumStart.z}`;
+            
+            // Polisher
+            const polisherWorkzone = document.querySelector('select[name="polisher_workzone"]')?.value || 'bed';
+            const polisherZOffset = parseInt(document.querySelector('input[name="polisher_z_offset"]')?.value) || 0;
+            const polisherStart = getStartPoint(polisherWorkzone, polisherZOffset);
+            const polisherDisplay = document.querySelector('.start-point[data-tool="polisher"]');
+            if (polisherDisplay) polisherDisplay.textContent = `X:${polisherStart.x} Y:${polisherStart.y} Z:${polisherStart.z}`;
+            
+            // Screed - fixed to Panel workzone
+            const screedZOffset = parseInt(document.querySelector('input[name="screed_z_offset"]')?.value) || 0;
+            const screedStart = getStartPoint('panel', screedZOffset);
+            const screedDisplay = document.querySelector('.start-point[data-tool="screed"]');
+            if (screedDisplay) screedDisplay.textContent = `X:${screedStart.x} Y:${screedStart.y} Z:${screedStart.z}`;
+            
+            // Pan - fixed to Panel workzone
+            const panZOffset = parseInt(document.querySelector('input[name="pan_z_offset"]')?.value) || 0;
+            const panStart = getStartPoint('panel', panZOffset);
+            const panDisplay = document.querySelector('.start-point[data-tool="pan"]');
+            if (panDisplay) panDisplay.textContent = `X:${panStart.x} Y:${panStart.y} Z:${panStart.z}`;
+            
+            // Helicopter
+            const heliWorkzone = document.querySelector('select[name="heli_workzone"]')?.value || 'panel';
+            const heliZOffset = parseInt(document.querySelector('input[name="heli_z_offset"]')?.value) || 0;
+            const heliStart = getStartPoint(heliWorkzone, heliZOffset);
+            const heliDisplay = document.querySelector('.start-point[data-tool="heli"]');
+            if (heliDisplay) heliDisplay.textContent = `X:${heliStart.x} Y:${heliStart.y} Z:${heliStart.z}`;
+        }
+        
+        // Wire up recalculation on input changes
+        document.querySelectorAll('input[name="z_offset"], input[name="panel_z"], input[name="panel_datum_x"], input[name="panel_datum_y"], input[name="panel_x"], input[name="panel_y"], input[name="bed_datum_x"], input[name="bed_datum_y"], input[name="bed_length_x"], input[name="bed_width_y"], input[name="serpentine_offset_x"], input[name="serpentine_offset_y"], input[name="vacuum_z_offset"], input[name="polisher_z_offset"], input[name="screed_z_offset"], input[name="pan_z_offset"], input[name="heli_z_offset"]').forEach(input => {
+            input.addEventListener('input', updateStartPoints);
+        });
+        document.querySelectorAll('select[name="vacuum_workzone"], select[name="polisher_workzone"], select[name="heli_workzone"]').forEach(select => {
+            select.addEventListener('change', updateStartPoints);
+        });
+        
+        // Initial calculation on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadParamsFromDB().then(() => {
+                updateStartPoints();
+            });
+        });
+        
+        // Andrew's Old Programs button handler
+        document.getElementById('upload-original-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('upload-original-btn');
+            const resultPanel = document.getElementById('result-panel');
+            const resultTitle = document.getElementById('result-title');
+            const resultContent = document.getElementById('result-content');
+            
+            // Confirm before uploading
+            if (!confirm("Upload Andrew's original RAPID programs to IRC5?\n\nThis will replace the current programs on the controller.")) {
+                return;
+            }
+            
+            // Disable button and show loading
+            btn.disabled = true;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Uploading...
+            `;
+            
+            try {
+                const response = await fetch('/api/toolpath/upload-original/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                resultPanel.classList.remove('hidden');
+                
+                if (data.success) {
+                    resultTitle.textContent = "✓ Andrew's Programs Uploaded";
+                    resultTitle.className = 'text-lg font-semibold mb-4 text-amber-400';
+                    resultContent.innerHTML = `
+                        <div class="space-y-2">
+                            <p class="text-gray-300">Uploaded ${data.uploaded_files.length} modules to <span class="font-mono text-amber-300">${data.program_name}</span></p>
+                            <div class="mt-2 text-sm">
+                                <p class="text-gray-400 mb-1">Files uploaded:</p>
+                                <div class="font-mono text-xs text-gray-500 grid grid-cols-3 gap-1">
+                                    ${data.uploaded_files.map(f => `<span>${f}</span>`).join('')}
+                                </div>
+                            </div>
+                            ${data.backed_up_files && data.backed_up_files.length > 0 ? `
+                                <div class="mt-3 p-3 bg-blue-900/30 border border-blue-700/50 rounded">
+                                    <p class="text-blue-300 text-sm font-medium mb-1">📁 Backup created</p>
+                                    <p class="text-gray-400 text-xs font-mono">${data.backup_dir}</p>
+                                </div>
+                            ` : ''}
+                            <p class="text-gray-500 text-xs mt-2">Source: ${data.source_dir}</p>
+                            <p class="text-gray-500 text-xs">Uploaded at ${data.upload_timestamp}</p>
+                        </div>
+                    `;
+                } else {
+                    resultTitle.textContent = '✗ Upload Failed';
+                    resultTitle.className = 'text-lg font-semibold mb-4 text-red-400';
+                    resultContent.innerHTML = `
+                        <div class="text-red-300">
+                            <p>Error: ${data.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultPanel.classList.remove('hidden');
+                resultTitle.textContent = '✗ Request Failed';
+                resultTitle.className = 'text-lg font-semibold mb-4 text-red-400';
+                resultContent.innerHTML = `
+                    <div class="text-red-300">
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+
+        // ============================================
+        // Live Joint Data Fetching (independent of 3D)
+        // ============================================
+        console.log('Toolpath: Initializing joint data fetcher...');
+        const liveJoints = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0, track: 0 };
+        const liveDisplays = {
+            j1: document.getElementById('live-j1'),
+            j2: document.getElementById('live-j2'),
+            j3: document.getElementById('live-j3'),
+            j4: document.getElementById('live-j4'),
+            j5: document.getElementById('live-j5'),
+            j6: document.getElementById('live-j6'),
+            track: document.getElementById('live-track'),
+            rpm: document.getElementById('blade-rpm'),
+            status: document.getElementById('joint-status')
+        };
+        const overrideInputs = {
+            j1: document.getElementById('override-j1'),
+            j2: document.getElementById('override-j2'),
+            j3: document.getElementById('override-j3'),
+            j4: document.getElementById('override-j4'),
+            j5: document.getElementById('override-j5'),
+            j6: document.getElementById('override-j6'),
+            track: document.getElementById('override-track')
+        };
+        console.log('Toolpath: Display elements found:', Object.keys(liveDisplays).filter(k => liveDisplays[k]).length);
+        
+        async function fetchJointData() {
+            console.log('Toolpath: Fetching /api/position/...');
+            try {
+                const response = await fetch('/api/position/');
+                console.log('Toolpath: Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Toolpath: Got data:', data);
+                if (data.joints) {
+                    // Check for manual overrides first, fall back to IRC5 data
+                    liveJoints.j1 = (overrideInputs.j1?.value !== '' ? parseFloat(overrideInputs.j1.value) : parseFloat(data.joints.j1)) || 0;
+                    liveJoints.j2 = (overrideInputs.j2?.value !== '' ? parseFloat(overrideInputs.j2.value) : parseFloat(data.joints.j2)) || 0;
+                    liveJoints.j3 = (overrideInputs.j3?.value !== '' ? parseFloat(overrideInputs.j3.value) : parseFloat(data.joints.j3)) || 0;
+                    liveJoints.j4 = (overrideInputs.j4?.value !== '' ? parseFloat(overrideInputs.j4.value) : parseFloat(data.joints.j4)) || 0;
+                    liveJoints.j5 = (overrideInputs.j5?.value !== '' ? parseFloat(overrideInputs.j5.value) : parseFloat(data.joints.j5)) || 0;
+                    liveJoints.j6 = (overrideInputs.j6?.value !== '' ? parseFloat(overrideInputs.j6.value) : parseFloat(data.joints.j6)) || 0;
+                }
+                // Track override
+                const trackFromIRC5 = parseFloat(data.track) || 0;
+                liveJoints.track = (overrideInputs.track?.value !== '' ? parseFloat(overrideInputs.track.value) : trackFromIRC5);
+                
+                // Update displays
+                if (liveDisplays.j1) liveDisplays.j1.textContent = liveJoints.j1.toFixed(1) + '°';
+                if (liveDisplays.j2) liveDisplays.j2.textContent = liveJoints.j2.toFixed(1) + '°';
+                if (liveDisplays.j3) liveDisplays.j3.textContent = liveJoints.j3.toFixed(1) + '°';
+                if (liveDisplays.j4) liveDisplays.j4.textContent = liveJoints.j4.toFixed(1) + '°';
+                if (liveDisplays.j5) liveDisplays.j5.textContent = liveJoints.j5.toFixed(1) + '°';
+                if (liveDisplays.j6) liveDisplays.j6.textContent = liveJoints.j6.toFixed(1) + '°';
+                if (liveDisplays.track) liveDisplays.track.textContent = liveJoints.track.toFixed(0) + 'mm';
+                if (liveDisplays.status) { liveDisplays.status.textContent = '● Connected'; liveDisplays.status.className = 'text-xs text-green-400'; }
+            } catch (error) {
+                console.error('Toolpath: Joint fetch error:', error);
+                if (liveDisplays.status) { liveDisplays.status.textContent = '○ Disconnected'; liveDisplays.status.className = 'text-xs text-red-400'; }
+            }
+        }
+        
+        // Start fetching joint data immediately
+        console.log('Toolpath: Starting joint data fetch...');
+        fetchJointData();
+        setInterval(fetchJointData, 500);
+        window.liveJoints = liveJoints;
+
+        // ============================================
+        // 3D Robot Visualization with Three.js
+        // ============================================
+        (function() {
+            const container = document.getElementById('robot-3d-container');
+            if (!container) {
+                console.warn('3D container not found');
+                return;
+            }
+            
+            let toolRotation = 0;
+            let toolSpeed = 0.1;
+            
+            // Three.js setup
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827);
+            
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(8, 6, 10);
+            camera.lookAt(0, 1, 0);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+            
+            // Orbit controls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 1, 0);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 5);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+            
+            // Materials
+            const bedMaterial = new THREE.MeshLambertMaterial({ color: 0x374151 });
+            const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x4b5563 });
+            const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x1e3a5f });
+            const armMaterial = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+            const jointMaterial = new THREE.MeshLambertMaterial({ color: 0x3b82f6 });
+            const wristMaterial = new THREE.MeshLambertMaterial({ color: 0x6366f1 });
+            const toolMaterial = new THREE.MeshLambertMaterial({ color: 0xf59e0b });
+            
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(20, 20, 0x374151, 0x1f2937);
+            scene.add(gridHelper);
+            
+            // Concrete bed (9m x 3.8m, scaled down: 9 x 3.8 units)
+            const bedGeom = new THREE.BoxGeometry(9, 0.3, 3.8);
+            const bed = new THREE.Mesh(bedGeom, bedMaterial);
+            bed.position.set(0, 0.15, -2.4);
+            bed.receiveShadow = true;
+            scene.add(bed);
+            
+            // Track (10m long)
+            const trackGeom = new THREE.BoxGeometry(10, 0.2, 0.4);
+            const track = new THREE.Mesh(trackGeom, trackMaterial);
+            track.position.set(0, 0.1, 0);
+            scene.add(track);
+            
+            // Robot arm hierarchy
+            const robotGroup = new THREE.Group();
+            scene.add(robotGroup);
+            
+            // Base (slides on track) - J1 is base rotation
+            const baseGeom = new THREE.CylinderGeometry(0.3, 0.35, 0.4, 16);
+            const base = new THREE.Mesh(baseGeom, baseMaterial);
+            base.position.y = 0.4;
+            robotGroup.add(base);
+            
+            // Shoulder pivot (J1 rotates around Y)
+            const shoulderPivot = new THREE.Group();
+            base.add(shoulderPivot);
+            shoulderPivot.position.y = 0.2;
+            
+            // Link 1 (J2 - shoulder pitch)
+            const link1Pivot = new THREE.Group();
+            shoulderPivot.add(link1Pivot);
+            
+            const link1Geom = new THREE.BoxGeometry(0.15, 1.2, 0.15);
+            const link1 = new THREE.Mesh(link1Geom, armMaterial);
+            link1.position.y = 0.6;
+            link1Pivot.add(link1);
+            
+            const joint1Geom = new THREE.SphereGeometry(0.12, 16, 16);
+            const joint1 = new THREE.Mesh(joint1Geom, jointMaterial);
+            joint1.position.y = 1.2;
+            link1Pivot.add(joint1);
+            
+            // Link 2 (J3 - elbow)
+            const link2Pivot = new THREE.Group();
+            link2Pivot.position.y = 1.2;
+            link1Pivot.add(link2Pivot);
+            
+            const link2Geom = new THREE.BoxGeometry(0.12, 1.0, 0.12);
+            const link2 = new THREE.Mesh(link2Geom, armMaterial);
+            link2.position.y = 0.5;
+            link2Pivot.add(link2);
+            
+            const joint2Geom = new THREE.SphereGeometry(0.1, 16, 16);
+            const joint2 = new THREE.Mesh(joint2Geom, jointMaterial);
+            joint2.position.y = 1.0;
+            link2Pivot.add(joint2);
+            
+            // Wrist 1 (J4)
+            const wrist1Pivot = new THREE.Group();
+            wrist1Pivot.position.y = 1.0;
+            link2Pivot.add(wrist1Pivot);
+            
+            const wrist1Geom = new THREE.CylinderGeometry(0.08, 0.08, 0.3, 12);
+            const wrist1 = new THREE.Mesh(wrist1Geom, wristMaterial);
+            wrist1.position.y = 0.15;
+            wrist1Pivot.add(wrist1);
+            
+            // Wrist 2 (J5)
+            const wrist2Pivot = new THREE.Group();
+            wrist2Pivot.position.y = 0.3;
+            wrist1Pivot.add(wrist2Pivot);
+            
+            const wrist2Geom = new THREE.CylinderGeometry(0.06, 0.06, 0.2, 12);
+            wrist2Geom.rotateX(Math.PI / 2);
+            const wrist2 = new THREE.Mesh(wrist2Geom, wristMaterial);
+            wrist2Pivot.add(wrist2);
+            
+            // Tool flange (J6)
+            const flangePivot = new THREE.Group();
+            wrist2Pivot.add(flangePivot);
+            
+            const flangeGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.1, 16);
+            const flange = new THREE.Mesh(flangeGeom, new THREE.MeshLambertMaterial({ color: 0x6b7280 }));
+            flange.position.y = -0.15;
+            flangePivot.add(flange);
+            
+            // Helicopter blade tool
+            const toolPivot = new THREE.Group();
+            toolPivot.position.y = -0.25;
+            flangePivot.add(toolPivot);
+            
+            const bladeGeom = new THREE.BoxGeometry(0.8, 0.02, 0.1);
+            const blade1 = new THREE.Mesh(bladeGeom, toolMaterial);
+            toolPivot.add(blade1);
+            const blade2 = new THREE.Mesh(bladeGeom, toolMaterial);
+            blade2.rotation.y = Math.PI / 2;
+            toolPivot.add(blade2);
+            
+            const hubGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.05, 16);
+            const hub = new THREE.Mesh(hubGeom, new THREE.MeshLambertMaterial({ color: 0x92400e }));
+            toolPivot.add(hub);
+            
+            // Convert degrees to radians
+            const deg2rad = (deg) => deg * Math.PI / 180;
+            
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                // Apply joint angles (convert degrees to radians)
+                // Track position: 0-10000mm -> -5 to +5 units
+                robotGroup.position.x = (liveJoints.track / 10000) * 10 - 5;
+                
+                // J1: Base rotation (around Y axis) - positive = CCW from above
+                shoulderPivot.rotation.y = deg2rad(liveJoints.j1);
+                
+                // J2: Shoulder pitch (around X axis) - positive = toward track (forward tilt)
+                link1Pivot.rotation.x = deg2rad(-liveJoints.j2);
+                
+                // J3: Elbow pitch (around X axis) - positive = toward body (fold back)
+                link2Pivot.rotation.x = deg2rad(-liveJoints.j3);
+                
+                // J4: Wrist 1 roll (around Y axis) - positive = CW from behind
+                wrist1Pivot.rotation.y = deg2rad(-liveJoints.j4);
+                
+                // J5: Wrist 2 pitch (around X axis) - positive = toward robot
+                wrist2Pivot.rotation.x = deg2rad(-liveJoints.j5);
+                
+                // J6: Wrist 3 / flange rotation (around Y axis) - positive = CW from top
+                flangePivot.rotation.y = deg2rad(-liveJoints.j6);
+                
+                // Spin the tool
+                toolRotation += toolSpeed;
+                toolPivot.rotation.y = toolRotation;
+                
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            
+            // Handle resize
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+            
+            // Start animation
+            animate();
+            
+            // Blade speed from input
+            const bladeSpeedInput = document.querySelector('select[name="heli_blade_speed"]');
+            if (bladeSpeedInput && liveDisplays.rpm) {
+                liveDisplays.rpm.textContent = `${bladeSpeedInput.value} RPM`;
+                bladeSpeedInput.addEventListener('change', () => {
+                    liveDisplays.rpm.textContent = `${bladeSpeedInput.value} RPM`;
+                    toolSpeed = parseInt(bladeSpeedInput.value) / 700;
+                });
+            }
+        })();
+    </script>
+</body>
+</html>
