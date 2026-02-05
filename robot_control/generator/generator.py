@@ -16,6 +16,7 @@ from typing import Dict, List
 
 from .tools.helicopter import generate_py2heli
 from .tools.polisher import generate_py2polish
+from .tools.vacuum import generate_py2vacuum
 
 
 # Paths
@@ -59,7 +60,7 @@ class ToolpathGenerator:
         'panel_z': 150,
         'vacuum_z_offset': 0,
         'vacuum_speed': 100,
-        'vacuum_pattern': 'serpentine',
+        'vacuum_pattern': 'cross-hatch',
         'vacuum_workzone': 'panel',
         'vacuum_force': 50,
         'vacuum_z_min': -20,
@@ -72,14 +73,14 @@ class ToolpathGenerator:
         'pan_travel_speed': 100,
         'pan_blade_speed': 70,
         'pan_z_offset': 250,
-        'pan_pattern': 'serpentine',
+        'pan_pattern': 'cross-hatch',
         'heli_travel_speed': 40,
         'heli_blade_speed': 70,
         'heli_blade_angle': 0,
         'heli_force': 200,
         'heli_z_offset': 0,
         'heli_workzone': 'panel',
-        'heli_pattern': 'serpentine',
+        'heli_pattern': 'cross-hatch',
         'polisher_z_offset': 0,
         'polisher_workzone': 'bed',
         'polisher_start_force': 300,
@@ -88,6 +89,8 @@ class ToolpathGenerator:
         'polisher_approach_speed': 20,
         'polisher_retract_speed': 50,
         'polisher_pos_supv_dist': 100,
+        'polisher_pattern': 'cross-hatch',
+        'polisher_speed': 100,
         'screed_z_offset': 0,
         'vib_screed_speed': 100,
         'screed_angle_offset': 0,
@@ -156,6 +159,7 @@ class ToolpathGenerator:
         # Generate tool procedures
         py2heli_proc = generate_py2heli(self.params)
         py2polish_proc = generate_py2polish(self.params)
+        py2vacuum_proc = generate_py2vacuum(self.params)
         
         # Generate the main Py2 menu procedure
         py2main_proc = self._generate_py2main()
@@ -198,6 +202,8 @@ class ToolpathGenerator:
 {py2heli_proc}
 
 {py2polish_proc}
+
+{py2vacuum_proc}
     
     ! ========== END PY2 GENERATED PROCEDURES ==========
 
@@ -224,13 +230,15 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli,2:Polish";
+        TPReadNum iChoice,"1:Heli,2:Polish,3:Vacuum";
         
         TEST iChoice
         CASE 1:
             Py2Heli;
         CASE 2:
             Py2Polish;
+        CASE 3:
+            Py2Vacuum;
         DEFAULT:
             TPWrite "Invalid choice";
         ENDTEST

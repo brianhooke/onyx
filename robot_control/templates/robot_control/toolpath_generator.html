@@ -126,11 +126,11 @@
             <div class="bg-gray-800 rounded-lg p-4">
                 <h3 class="text-sm font-medium text-gray-300 mb-3">Tool Patterns</h3>
                 
-                <!-- Serpentine Pattern -->
+                <!-- Cross-hatch Pattern -->
                 <div class="border border-gray-700 rounded p-3 space-y-3">
-                    <span class="text-gray-400 text-sm font-medium">Serpentine</span>
+                    <span class="text-gray-400 text-sm font-medium">Cross-hatch</span>
                     
-                    <!-- Serpentine Global Settings -->
+                    <!-- Cross-hatch Global Settings -->
                     <div class="flex items-center gap-3 pl-4 flex-wrap">
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Offset X (mm)</label>
@@ -224,7 +224,7 @@
                             <label class="block text-gray-500 text-xs mb-1">Pattern</label>
                             <select name="vacuum_pattern"
                                 class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
-                                <option value="serpentine" selected>Serpentine</option>
+                                <option value="cross-hatch" selected>Cross-hatch</option>
                             </select>
                         </div>
                         <div>
@@ -281,11 +281,33 @@
                             </select>
                         </div>
                         <div>
+                            <label class="block text-gray-500 text-xs mb-1">Pattern</label>
+                            <select name="polisher_pattern"
+                                class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="cross-hatch" {% if defaults.polisher_pattern == 'cross-hatch' %}selected{% endif %}>Cross-hatch</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">First Direction</label>
+                            <select name="polisher_first_direction"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="x" {% if defaults.polisher_first_direction == 'x' %}selected{% endif %}>X</option>
+                                <option value="y" {% if defaults.polisher_first_direction == 'y' %}selected{% endif %}>Y</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
                             <input type="number" name="polisher_z_offset" value="{{ defaults.polisher_z_offset }}"
                                 min="-100" max="100"
                                 class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
                             <span class="block text-red-400 text-[10px]">-100 to 100 mm</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Speed (mm/s)</label>
+                            <input type="number" name="polisher_speed" value="{{ defaults.polisher_speed }}"
+                                min="10" max="200"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">10-200 mm/s</span>
                         </div>
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Start Force (N)</label>
@@ -403,7 +425,7 @@
                             <label class="block text-gray-500 text-xs mb-1">Pattern</label>
                             <select name="pan_pattern"
                                 class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
-                                <option value="serpentine" {% if defaults.pan_pattern == 'serpentine' %}selected{% endif %}>Serpentine</option>
+                                <option value="cross-hatch" {% if defaults.pan_pattern == 'cross-hatch' %}selected{% endif %}>Cross-hatch</option>
                             </select>
                         </div>
                         <div>
@@ -886,7 +908,7 @@
             // Gather form data
             const formData = new FormData(e.target);
             const params = {};
-            const stringFields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'heli_workzone', 'heli_pattern', 'pan_pattern'];
+            const stringFields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'pan_pattern'];
             for (const [key, value] of formData.entries()) {
                 if (key === 'upload_to_irc5') {
                     params[key] = true;
@@ -1219,7 +1241,7 @@
                 if (data.joints) {
                     // Check for manual overrides first, fall back to IRC5 data
                     liveJoints.j1 = (overrideInputs.j1?.value !== '' ? parseFloat(overrideInputs.j1.value) : parseFloat(data.joints.j1)) || 0;
-                    liveJoints.j2 = (overrideInputs.j2?.value !== '' ? parseFloat(overrideInputs.j2.value) : parseFloat(data.joints.j2)) || 0;
+                    liveJoints.j2 = (overrideInputs.j2?.value !== '' ? parseFloat(overrideInputs.j2.value) : parseFloat(data.joints.j2) - 90) || 0;
                     liveJoints.j3 = (overrideInputs.j3?.value !== '' ? parseFloat(overrideInputs.j3.value) : parseFloat(data.joints.j3)) || 0;
                     liveJoints.j4 = (overrideInputs.j4?.value !== '' ? parseFloat(overrideInputs.j4.value) : parseFloat(data.joints.j4)) || 0;
                     liveJoints.j5 = (overrideInputs.j5?.value !== '' ? parseFloat(overrideInputs.j5.value) : parseFloat(data.joints.j5)) || 0;
@@ -1416,14 +1438,14 @@
                 // Track position: 0-10000mm -> -5 to +5 units
                 robotGroup.position.x = (liveJoints.track / 10000) * 10 - 5;
                 
-                // J1: Base rotation (around Y axis) - positive = CCW from above
-                shoulderPivot.rotation.y = deg2rad(liveJoints.j1);
+                // J1: Base rotation (around Y axis) - offset by +90° for IRC5 convention
+                shoulderPivot.rotation.y = deg2rad(liveJoints.j1 + 90);
                 
                 // J2: Shoulder pitch (around X axis) - positive = toward track (forward tilt)
                 link1Pivot.rotation.x = deg2rad(-liveJoints.j2);
                 
-                // J3: Elbow pitch (around X axis) - positive = toward body (fold back)
-                link2Pivot.rotation.x = deg2rad(-liveJoints.j3);
+                // J3: Elbow pitch (around X axis) - offset by +90° for IRC5 convention
+                link2Pivot.rotation.x = deg2rad(-liveJoints.j3 + 90);
                 
                 // J4: Wrist 1 roll (around Y axis) - positive = CW from behind
                 wrist1Pivot.rotation.y = deg2rad(-liveJoints.j4);

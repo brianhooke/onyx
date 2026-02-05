@@ -292,7 +292,7 @@ def api_generate_toolpath(request):
         params = {}
         for key in ToolpathGenerator.DEFAULT_PARAMS.keys():
             if key in data and data[key] is not None:
-                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'heli_workzone', 'heli_pattern', 'pan_pattern'):
+                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'pan_pattern'):
                     params[key] = str(data[key])
                 elif key == 'serpentine_start_bottom':
                     params[key] = bool(int(data[key])) if data[key] != '' else False

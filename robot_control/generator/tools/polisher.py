@@ -5,7 +5,7 @@ Generates PROC Py2Polish() based on Andrew's Polish pattern.
 Key aspects:
 1. Uses tPolish tool (ToolNum = 6)
 2. Force control with FCPress commands
-3. Serpentine pattern across bed/panel
+3. Cross-hatch pattern across bed/panel (X passes then Y passes)
 4. Bed1Wyong work object
 """
 
@@ -17,7 +17,7 @@ def generate_py2polish(params: dict) -> str:
     Generate PROC Py2Polish() RAPID code.
     
     Based on Andrew's working Polish pattern with force control.
-    Uses serpentine pattern across the workzone.
+    Uses cross-hatch pattern across the workzone (X passes then Y passes).
     
     Uses frontend parameters:
     - polisher_workzone: 'bed' or 'panel'
@@ -36,6 +36,7 @@ def generate_py2polish(params: dict) -> str:
     """
     # Extract parameters with defaults
     workzone = params.get('polisher_workzone', 'bed')
+    first_direction = params.get('polisher_first_direction', 'x')  # 'x' or 'y' - which direction to pass first
     step_size = params.get('polisher_step', 450)
     global_z_offset = params.get('z_offset', 0)
     polisher_z_offset = params.get('polisher_z_offset', 0)
@@ -48,6 +49,7 @@ def generate_py2polish(params: dict) -> str:
     approach_speed = params.get('polisher_approach_speed', 20)
     retract_speed = params.get('polisher_retract_speed', 50)
     pos_supv_dist = params.get('polisher_pos_supv_dist', 100)
+    travel_speed = params.get('polisher_speed', 100)
     
     # Check if force control is disabled (all 3 force params = 0)
     force_enabled = not (start_force == 0 and motion_force == 0 and force_change == 0)
@@ -80,44 +82,36 @@ def generate_py2polish(params: dict) -> str:
     # Polisher tool width for edge offsets (not used for boundary calc anymore)
     polish_width = 200  # Approximate polisher contact width
     
-    # Generate pass code based on force control setting (NO LIFT during sweep)
+    # Generate pass code based on force control setting
+    # NOTE: Force control start/end happens ONCE outside the loop
+    # Pass code only does the sweep movement
     if force_enabled:
         pass_code = f'''            IF SweepDir=1 THEN
-                ! Forward pass (MinX to MaxX)
+                ! Forward pass (MinX to MaxX) - stay on surface with force control
                 TPWrite "Forward pass to MaxX";
-                
-                ! Calibrate and lower to work height
-                WaitTime\\inpos,0.1;
-                FCCalib PolishLoad;
-                MoveL Offs(pStart,0,0,50),vApproach,fine,tPolish\\WObj:=Bed1Wyong;
-                
-                ! Start force control
-                FCPress1LStart Offs(pStart,0,0,0),vApproach,\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tPolish\\WObj:=Bed1Wyong;
-                
-                ! Travel across with force control
                 FCPressL pEnd,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
-                
-                ! End force control and retract
-                FCPressEnd Offs(pEnd,0,0,75),vRetract,\\DeactOnly,tPolish\\WObj:=Bed1Wyong;
-                
             ELSE
-                ! Reverse pass (MaxX to MinX)
+                ! Reverse pass (MaxX to MinX) - stay on surface with force control
                 TPWrite "Reverse pass to MinX";
-                
-                ! Calibrate and lower to work height
-                WaitTime\\inpos,0.1;
-                FCCalib PolishLoad;
-                MoveL Offs(pEnd,0,0,50),vApproach,fine,tPolish\\WObj:=Bed1Wyong;
-                
-                ! Start force control
-                FCPress1LStart Offs(pEnd,0,0,0),vApproach,\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tPolish\\WObj:=Bed1Wyong;
-                
-                ! Travel across with force control
                 FCPressL pStart,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
-                
-                ! End force control and retract
-                FCPressEnd Offs(pStart,0,0,75),vRetract,\\DeactOnly,tPolish\\WObj:=Bed1Wyong;
             ENDIF'''
+        
+        # Step code for force control - use FCPressL to stay on surface
+        step_code = f'''                IF SweepDir=1 THEN
+                    pEnd.trans.y:=CurrentY;
+                    CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                    pEnd.extax.eax_a:=CalcTrack;
+                    FCPressL pEnd,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
+                ELSE
+                    pStart.trans.y:=CurrentY;
+                    CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x;
+                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                    pStart.extax.eax_a:=CalcTrack;
+                    FCPressL pStart,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
+                ENDIF'''
     else:
         # No force control - simple MoveL commands, STAY ON SURFACE (like helicopter)
         pass_code = '''            IF SweepDir=1 THEN
@@ -129,13 +123,302 @@ def generate_py2polish(params: dict) -> str:
                 TPWrite "Reverse pass to MinX (no FC)";
                 MoveL pStart,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
             ENDIF'''
+        
+        # Step code for no force control - use MoveL
+        step_code = '''                IF SweepDir=1 THEN
+                    pEnd.trans.y:=CurrentY;
+                    CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                    pEnd.extax.eax_a:=CalcTrack;
+                    MoveL pEnd,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
+                ELSE
+                    pStart.trans.y:=CurrentY;
+                    CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x;
+                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                    pStart.extax.eax_a:=CalcTrack;
+                    MoveL pStart,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
+                ENDIF'''
+    
+    # Build Phase 2 code (always cross-hatch - both directions)
+    # Note: currently Phase 1 = X passes, Phase 2 = Y passes regardless of first_direction
+    # TODO: swap phases if first_direction == 'y'
+    if force_enabled:
+        phase2_code = f'''
+        ! ============================================
+        ! PHASE 2: Y PASSES (sweep Y, step in X)
+        ! Cross-hatch pattern - continue from Phase 1
+        ! ============================================
+        TPWrite "========================================";
+        TPWrite "=== PHASE 2: Y Passes ===";
+        TPWrite "========================================";
+        
+        ! Continue from where X passes ended - NO diagonal repositioning
+        ! Determine actual X position based on final sweep direction
+        IF SweepDir=1 THEN
+            ! Last sweep was forward, so we ended at MaxX
+            CurrentX:=MaxX;
+        ELSE
+            ! Last sweep was reverse, so we ended at MinX
+            CurrentX:=MinX;
+        ENDIF
+        TPWrite "P2: Starting from CurrentX=" \\Num:=CurrentX;
+        TPWrite "P2: Starting from CurrentY=" \\Num:=CurrentY;
+        
+        ! Step direction: continue stepping in X from where we are
+        IF CurrentX>=MaxX THEN
+            StepDir:=-1;
+            TPWrite "P2: StepDir=-1 (toward MinX)";
+        ELSE
+            StepDir:=1;
+            TPWrite "P2: StepDir=+1 (toward MaxX)";
+        ENDIF
+        
+        ! First Y sweep: go to opposite Y bound from current position
+        IF CurrentY>((MinY+MaxY)/2) THEN
+            EndY:=MinY;
+            TPWrite "P2: First sweep toward MinY";
+        ELSE
+            EndY:=MaxY;
+            TPWrite "P2: First sweep toward MaxY";
+        ENDIF
+        
+        PassCount:=0;
+        
+        ! First Y sweep from current position (straight Y move, no diagonal)
+        TPWrite "P2: First Y sweep to EndY=" \\Num:=EndY;
+        pEnd.trans.x:=-1*CurrentX;
+        pEnd.trans.y:=EndY;
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pEnd.extax.eax_a:=CalcTrack;
+        TPWrite "P2: Moving...";
+        FCPressL pEnd,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
+        CurrentY:=EndY;
+        TPWrite "P2: First Y sweep complete";
+        
+        TPWrite "P2: Entering Y-pass loop...";
+        bDone:=FALSE;
+        
+        ! Y-pass loop - step in X, sweep in Y
+        WHILE bDone=FALSE DO
+            Incr PassCount;
+            TPWrite "----------------------------------------";
+            TPWrite "P2: Y Pass " \\Num:=PassCount;
+            
+            ! Calculate next column
+            NextX:=CurrentX+(StepDir*StepSize);
+            TPWrite "P2: CurrentX=" \\Num:=CurrentX;
+            TPWrite "P2: NextX=" \\Num:=NextX;
+            
+            ! Check if complete
+            IF (StepDir=1 AND NextX>MaxX) OR (StepDir=-1 AND NextX<MinX) THEN
+                TPWrite "P2: NextX out of bounds - done";
+                bDone:=TRUE;
+            ELSE
+                ! Clamp to bounds
+                IF NextX>MaxX THEN
+                    NextX:=MaxX;
+                    TPWrite "P2: Clamped to MaxX";
+                ELSEIF NextX<MinX THEN
+                    NextX:=MinX;
+                    TPWrite "P2: Clamped to MinX";
+                ENDIF
+                
+                ! Step to next X column (stay on surface)
+                TPWrite "P2: Step to X=" \\Num:=NextX;
+                pEnd.trans.x:=-1*NextX;
+                CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+                IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                pEnd.extax.eax_a:=CalcTrack;
+                TPWrite "P2: Moving to next X column...";
+                FCPressL pEnd,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
+                TPWrite "P2: Step complete";
+                CurrentX:=NextX;
+                
+                ! Flip sweep direction
+                SweepDir:=-1*SweepDir;
+                IF SweepDir=1 THEN
+                    EndY:=MinY;
+                    TPWrite "P2: Next sweep toward MinY=" \\Num:=EndY;
+                ELSE
+                    EndY:=MaxY;
+                    TPWrite "P2: Next sweep toward MaxY=" \\Num:=EndY;
+                ENDIF
+                
+                ! Sweep Y
+                TPWrite "P2: Sweep to Y=" \\Num:=EndY;
+                pEnd.trans.y:=EndY;
+                TPWrite "P2: Moving...";
+                FCPressL pEnd,vTravel,{motion_force},fine,tPolish\\WObj:=Bed1Wyong;
+                TPWrite "P2: Sweep complete";
+            ENDIF
+        ENDWHILE
+        
+        TPWrite "========================================";
+        TPWrite "P2: Y passes complete, total=" \\Num:=PassCount;
+        TPWrite "Cross-hatch complete!";
+        TPWrite "========================================";
+'''
+    else:
+        # No force control version
+        phase2_code = f'''
+        ! ============================================
+        ! PHASE 2: Y PASSES (sweep Y, step in X)
+        ! Cross-hatch pattern - continue from Phase 1
+        ! ============================================
+        TPWrite "========================================";
+        TPWrite "=== PHASE 2: Y Passes ===";
+        TPWrite "========================================";
+        
+        ! Continue from where X passes ended - NO diagonal repositioning
+        ! Determine actual X position based on final sweep direction
+        IF SweepDir=1 THEN
+            ! Last sweep was forward, so we ended at MaxX
+            CurrentX:=MaxX;
+        ELSE
+            ! Last sweep was reverse, so we ended at MinX
+            CurrentX:=MinX;
+        ENDIF
+        TPWrite "P2: Starting from CurrentX=" \\Num:=CurrentX;
+        TPWrite "P2: Starting from CurrentY=" \\Num:=CurrentY;
+        
+        ! Step direction: continue stepping in X from where we are
+        IF CurrentX>=MaxX THEN
+            StepDir:=-1;
+            TPWrite "P2: StepDir=-1 (toward MinX)";
+        ELSE
+            StepDir:=1;
+            TPWrite "P2: StepDir=+1 (toward MaxX)";
+        ENDIF
+        
+        ! First Y sweep: go to opposite Y bound from current position
+        IF CurrentY>((MinY+MaxY)/2) THEN
+            EndY:=MinY;
+            TPWrite "P2: First sweep toward MinY";
+        ELSE
+            EndY:=MaxY;
+            TPWrite "P2: First sweep toward MaxY";
+        ENDIF
+        
+        PassCount:=0;
+        
+        ! First Y sweep from current position (straight Y move, no diagonal)
+        TPWrite "P2: First Y sweep to EndY=" \\Num:=EndY;
+        pEnd.trans.x:=-1*CurrentX;
+        pEnd.trans.y:=EndY;
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pEnd.extax.eax_a:=CalcTrack;
+        TPWrite "P2: Moving...";
+        MoveL pEnd,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
+        CurrentY:=EndY;
+        TPWrite "P2: First Y sweep complete";
+        
+        TPWrite "P2: Entering Y-pass loop...";
+        bDone:=FALSE;
+        
+        ! Y-pass loop - step in X, sweep in Y
+        WHILE bDone=FALSE DO
+            Incr PassCount;
+            TPWrite "----------------------------------------";
+            TPWrite "P2: Y Pass " \\Num:=PassCount;
+            
+            ! Calculate next column
+            NextX:=CurrentX+(StepDir*StepSize);
+            TPWrite "P2: CurrentX=" \\Num:=CurrentX;
+            TPWrite "P2: NextX=" \\Num:=NextX;
+            
+            ! Check if complete
+            IF (StepDir=1 AND NextX>MaxX) OR (StepDir=-1 AND NextX<MinX) THEN
+                TPWrite "P2: NextX out of bounds - done";
+                bDone:=TRUE;
+            ELSE
+                ! Clamp to bounds
+                IF NextX>MaxX THEN
+                    NextX:=MaxX;
+                    TPWrite "P2: Clamped to MaxX";
+                ELSEIF NextX<MinX THEN
+                    NextX:=MinX;
+                    TPWrite "P2: Clamped to MinX";
+                ENDIF
+                
+                ! Step to next X column
+                TPWrite "P2: Step to X=" \\Num:=NextX;
+                pEnd.trans.x:=-1*NextX;
+                CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+                IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+                IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+                pEnd.extax.eax_a:=CalcTrack;
+                TPWrite "P2: Moving to next X column...";
+                MoveL pEnd,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
+                TPWrite "P2: Step complete";
+                CurrentX:=NextX;
+                
+                ! Flip sweep direction
+                SweepDir:=-1*SweepDir;
+                IF SweepDir=1 THEN
+                    EndY:=MinY;
+                    TPWrite "P2: Next sweep toward MinY=" \\Num:=EndY;
+                ELSE
+                    EndY:=MaxY;
+                    TPWrite "P2: Next sweep toward MaxY=" \\Num:=EndY;
+                ENDIF
+                
+                ! Sweep Y
+                TPWrite "P2: Sweep to Y=" \\Num:=EndY;
+                pEnd.trans.y:=EndY;
+                TPWrite "P2: Moving...";
+                MoveL pEnd,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
+                TPWrite "P2: Sweep complete";
+            ENDIF
+        ENDWHILE
+        
+        TPWrite "========================================";
+        TPWrite "P2: Y passes complete, total=" \\Num:=PassCount;
+        TPWrite "Cross-hatch complete!";
+        TPWrite "========================================";
+'''
+    
+    # Pre-build strings with backslashes (can't use backslash in f-string expressions)
+    if force_enabled:
+        pol_on_cmd = 'Pol_on;'
+        pol_off_cmd = 'Pol_off;'
+        fc_comment = '! Start force control - stays active for entire cross-hatch'
+        fc_wait = 'WaitTime\\inpos,0.1;'
+        fc_calib = 'FCCalib PolishLoad;'
+        fc_start = f'FCPress1LStart pStart,vApproach,\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tPolish\\WObj:=Bed1Wyong;'
+        fc_end_joints = 'CurrentJoints:=CJointT();'
+        fc_end_pos = 'CurrentPos:=CalcRobT(CurrentJoints,tPolish\\WObj:=Bed1Wyong);'
+        fc_end_cmd = 'FCPressEnd Offs(CurrentPos,0,0,75),vRetract,\\DeactOnly,tPolish\\WObj:=Bed1Wyong;'
+        safe_lift_comment = '! Already lifted by FCPressEnd'
+        safe_lift_joints = '! Moving to safe height'
+        safe_lift_move = ''
+    else:
+        pol_on_cmd = '! Pol_on SKIPPED - force control disabled'
+        pol_off_cmd = '! Pol_off SKIPPED - motor was not running'
+        fc_comment = '! No force control - simple move to surface'
+        fc_wait = ''
+        fc_calib = ''
+        fc_start = 'MoveL pStart,v50,fine,tPolish\\WObj:=Bed1Wyong;'
+        fc_end_joints = ''
+        fc_end_pos = ''
+        fc_end_cmd = ''
+        safe_lift_comment = 'CurrentJoints:=CJointT();'
+        safe_lift_joints = 'CurrentPos:=CalcRobT(CurrentJoints,tPolish\\WObj:=Bed1Wyong);'
+        safe_lift_move = 'MoveL Offs(CurrentPos,0,0,200),v200,z5,tPolish\\WObj:=Bed1Wyong;'
     
     # Build the procedure
     proc = f'''
     PROC Py2Polish()
-        ! Py2Polish - Polisher serpentine with force control
+        ! Py2Polish - Polisher with force control
         ! Generated by Onyx Toolpath Generator v2
         ! Workzone: {workzone}
+        ! First direction: {first_direction}
         ! Area: ({start_x},{start_y}) to ({end_x},{end_y})
         ! Z = {work_z}mm (FormHeight + offset)
         ! Step: {step_size}mm
@@ -154,11 +437,16 @@ def generate_py2polish(params: dict) -> str:
         VAR num MaxX:=0;
         VAR num StepSize:={step_size};
         VAR num SweepDir:=1;
+        VAR num StepDir:=1;
         VAR num PassCount:=0;
         VAR bool bDone:=FALSE;
+        VAR num CurrentX:=0;
+        VAR num StartY:=0;
+        VAR num EndY:=0;
+        VAR num NextX:=0;
         VAR speeddata vApproach:=[{approach_speed},15,2000,15];
         VAR speeddata vRetract:=[{retract_speed},15,2000,15];
-        VAR speeddata vTravel:=[100,15,2000,15];
+        VAR speeddata vTravel:=[{travel_speed},15,2000,15];
         VAR num TrackMin:={track_min};
         VAR num TrackMax:={track_max};
         VAR num CalcTrack:=0;
@@ -198,14 +486,15 @@ def generate_py2polish(params: dict) -> str:
         ENDIF
         
         ! ============================================
-        ! SERPENTINE PASSES (sweep X, step in Y)
-        ! Start at far Y, work back toward track
+        ! PHASE 1: X PASSES (sweep X, step in Y)
+        ! First direction: {first_direction}
         ! ============================================
         CurrentY:=MaxY;
         SweepDir:=1;
         PassCount:=0;
         
-        TPWrite "Starting serpentine at Y=" \\Num:=CurrentY;
+        TPWrite "Cross-hatch, first direction: {first_direction}";
+        TPWrite "Starting P1 (X passes) at Y=" \\Num:=CurrentY;
         
         ! Initialize start position (X negated per Andrew's pattern)
         pStart.trans:=[-1*MinX,CurrentY,SafeZ];
@@ -233,19 +522,23 @@ def generate_py2polish(params: dict) -> str:
         ConfJ\\Off;
         
         ! Turn on polisher (only if force control enabled)
-        {'Pol_on;' if force_enabled else '! Pol_on SKIPPED - force control disabled'}
+        {pol_on_cmd}
         
-        ! Lower to work height ONCE before starting serpentine
+        ! Lower to work height and START force control ONCE before cross-hatch
         pStart.trans.z:=WorkZ;
         pEnd.trans.z:=WorkZ;
         MoveJ Offs(pStart,0,0,50),v100,z5,tPolish\\WObj:=Bed1Wyong;
-        MoveL pStart,v50,fine,tPolish\\WObj:=Bed1Wyong;
         
-        TPWrite "Lowered to work surface, starting serpentine...";
+        {fc_comment}
+        {fc_wait}
+        {fc_calib}
+        {fc_start}
+        
+        TPWrite "On work surface, starting cross-hatch...";
         
         bDone:=FALSE;
         
-        ! Serpentine loop - STAY ON SURFACE throughout
+        ! X-pass loop - STAY ON SURFACE throughout
         WHILE CurrentY>=MinY AND bDone=FALSE DO
             Incr PassCount;
             TPWrite "----------------------------------------";
@@ -266,31 +559,24 @@ def generate_py2polish(params: dict) -> str:
                 TPWrite "Last pass reached - done";
                 bDone:=TRUE;
             ELSE
-                ! Step to next row - STAY ON SURFACE (like helicopter)
+                ! Step to next row - STAY ON SURFACE
                 CurrentY:=CurrentY-StepSize;
                 TPWrite "Step to Y=" \\Num:=CurrentY;
                 
                 ! Update Y and step while staying on surface (clamp track to limits)
-                IF SweepDir=1 THEN
-                    pEnd.trans.y:=CurrentY;
-                    CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
-                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-                    pEnd.extax.eax_a:=CalcTrack;
-                    MoveL pEnd,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
-                ELSE
-                    pStart.trans.y:=CurrentY;
-                    CalcTrack:=Bed1Wyong.uframe.trans.x+pStart.trans.x;
-                    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-                    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-                    pStart.extax.eax_a:=CalcTrack;
-                    MoveL pStart,vTravel,fine,tPolish\\WObj:=Bed1Wyong;
-                ENDIF
+{step_code}
                 
                 ! Flip direction
                 SweepDir:=-1*SweepDir;
             ENDIF
         ENDWHILE
+        
+        TPWrite "P1: X passes complete, total=" \\Num:=PassCount;
+{phase2_code}
+        ! END force control ONCE after all passes complete
+        {fc_end_joints}
+        {fc_end_pos}
+        {fc_end_cmd}
         
         TPWrite "========================================";
         TPWrite "Py2Polish: Complete";
@@ -298,16 +584,16 @@ def generate_py2polish(params: dict) -> str:
         TPWrite "========================================";
         
         ! Ensure polisher is off (only if it was turned on)
-        {'Pol_off;' if force_enabled else '! Pol_off SKIPPED - motor was not running'}
+        {pol_off_cmd}
         
         ! Re-enable configuration tracking
         ConfL\\On;
         ConfJ\\On;
         
-        ! Return to safe position
-        CurrentJoints:=CJointT();
-        CurrentPos:=CalcRobT(CurrentJoints,tPolish\\WObj:=Bed1Wyong);
-        MoveL Offs(CurrentPos,0,0,200),v200,z5,tPolish\\WObj:=Bed1Wyong;
+        ! Return to safe position (already lifted if force control was used)
+        {safe_lift_comment}
+        {safe_lift_joints}
+        {safe_lift_move}
         
         ! Return tool and go home
         TPWrite "Py2Polish: Dropping off polisher...";
@@ -322,7 +608,7 @@ def generate_py2polish(params: dict) -> str:
         TPWrite "========================================";
         
     ERROR
-        {'Pol_off;' if force_enabled else '! Pol_off SKIPPED'}
+        {pol_off_cmd}
         TPWrite "Py2Polish ERROR: " \\Num:=ERRNO;
         RAISE;
     ENDPROC

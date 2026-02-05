@@ -22,14 +22,14 @@ class ToolPathParameters(models.Model):
     # Vacuum parameters
     vacuum_z_offset = models.IntegerField(default=0, help_text="Vacuum Z offset (mm)")
     vacuum_speed = models.IntegerField(default=100, help_text="Vacuum speed (mm/s)")
-    vacuum_pattern = models.CharField(default='serpentine', max_length=50, help_text="Vacuum pattern")
+    vacuum_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Vacuum pattern")
     vacuum_workzone = models.CharField(default='panel', max_length=20, help_text="Vacuum workzone: panel or bed")
     vacuum_force = models.IntegerField(default=50, help_text="Vacuum target force (N, 10-150)")
     vacuum_z_min = models.IntegerField(default=-20, help_text="Vacuum min Z from surface (mm)")
     vacuum_z_max = models.IntegerField(default=50, help_text="Vacuum max Z from surface (mm)")
     vacuum_force_enabled = models.BooleanField(default=False, help_text="Enable force control for vacuum")
     
-    # Serpentine pattern steps (per tool)
+    # Cross-hatch pattern steps (per tool)
     polisher_step = models.IntegerField(default=450, help_text="Polisher step (mm)")
     vacuum_step = models.IntegerField(default=450, help_text="Vacuum step (mm)")
     pan_step = models.IntegerField(default=600, help_text="Pan step (mm)")
@@ -39,7 +39,7 @@ class ToolPathParameters(models.Model):
     pan_travel_speed = models.IntegerField(default=100, help_text="Pan travel speed (mm/s)")
     pan_blade_speed = models.IntegerField(default=70, help_text="Pan blade speed (RPM, 40-140)")
     pan_z_offset = models.IntegerField(default=250, help_text="Pan Z offset (mm, -200 to 200)")
-    pan_pattern = models.CharField(default='serpentine', max_length=50, help_text="Pan pattern")
+    pan_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Pan pattern")
     
     # Helicopter parameters
     heli_travel_speed = models.IntegerField(default=40, help_text="Helicopter travel speed (mm/s)")
@@ -48,7 +48,7 @@ class ToolPathParameters(models.Model):
     heli_force = models.IntegerField(default=200, help_text="Helicopter force (N, 100-500)")
     heli_z_offset = models.IntegerField(default=0, help_text="Helicopter Z offset (mm, -50 to 400)")
     heli_workzone = models.CharField(default='panel', max_length=20, help_text="Helicopter workzone: panel or bed")
-    heli_pattern = models.CharField(default='serpentine', max_length=50, help_text="Helicopter pattern")
+    heli_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Helicopter pattern")
     
     # Polisher force/speed parameters
     polisher_z_offset = models.IntegerField(default=0, help_text="Polisher Z offset (mm)")
@@ -59,13 +59,16 @@ class ToolPathParameters(models.Model):
     polisher_approach_speed = models.IntegerField(default=20, help_text="Polisher approach speed (mm/s)")
     polisher_retract_speed = models.IntegerField(default=50, help_text="Polisher retract speed (mm/s)")
     polisher_pos_supv_dist = models.IntegerField(default=100, help_text="Polisher position supervision distance (mm)")
+    polisher_first_direction = models.CharField(default='x', max_length=10, help_text="Polisher first pass direction: x or y")
+    polisher_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Polisher pattern")
+    polisher_speed = models.IntegerField(default=100, help_text="Polisher travel speed (mm/s)")
     # Vib Screed parameters
     screed_z_offset = models.IntegerField(default=0, help_text="Screed Z offset (mm)")
     vib_screed_speed = models.IntegerField(default=100, help_text="Vibrating screed speed (mm/s)")
     screed_angle_offset = models.IntegerField(default=0, help_text="Screed angle offset (degrees)")
     z_offset = models.IntegerField(default=0, help_text="Z offset (mm) - applies to all workzones")
     
-    # Serpentine pattern parameters
+    # Cross-hatch pattern parameters
     serpentine_offset_x = models.IntegerField(default=100, help_text="Serpentine X offset from edges (mm)")
     serpentine_offset_y = models.IntegerField(default=100, help_text="Serpentine Y offset from edges (mm)")
     serpentine_direction = models.IntegerField(default=1, help_text="Initial sweep direction: 1=left-to-right, -1=right-to-left")
@@ -126,6 +129,9 @@ class ToolPathParameters(models.Model):
             'polisher_approach_speed': self.polisher_approach_speed,
             'polisher_retract_speed': self.polisher_retract_speed,
             'polisher_pos_supv_dist': self.polisher_pos_supv_dist,
+            'polisher_first_direction': self.polisher_first_direction,
+            'polisher_pattern': self.polisher_pattern,
+            'polisher_speed': self.polisher_speed,
             'screed_z_offset': self.screed_z_offset,
             'vib_screed_speed': self.vib_screed_speed,
             'screed_angle_offset': self.screed_angle_offset,

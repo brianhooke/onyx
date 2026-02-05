@@ -175,7 +175,7 @@ def generate_py2heli(params: dict) -> str:
         HeliBlade_Angle {blade_angle};
         WaitTime 1;
         
-        ! Disable configuration tracking for serpentine movements
+        ! Disable configuration tracking for cross-hatch movements
         ConfL\\Off;
         ConfJ\\Off;
         
@@ -192,7 +192,7 @@ def generate_py2heli(params: dict) -> str:
         TPWrite "P1: Entering X-pass loop...";
         bDone:=FALSE;
         
-        ! X-pass serpentine loop (using flag instead of EXIT)
+        ! X-pass loop (using flag instead of EXIT)
         WHILE CurrentY>=MinY AND bDone=FALSE DO
             Incr PassCount;
             TPWrite "----------------------------------------";
@@ -279,42 +279,50 @@ def generate_py2heli(params: dict) -> str:
         TPWrite "=== PHASE 2: Y Passes ===";
         TPWrite "========================================";
         
-        ! Get current position from where X passes ended
-        CurrentX:=Abs(pEnd.trans.x);
-        TPWrite "Pass2: CurrentX=" \\Num:=CurrentX;
-        TPWrite "Pass2: CurrentY=" \\Num:=CurrentY;
+        ! Continue from where X passes ended - NO diagonal repositioning
+        ! Determine actual X position based on final sweep direction
+        IF SweepDir=1 THEN
+            ! Last sweep was forward, so we ended at MaxX
+            CurrentX:=MaxX;
+        ELSE
+            ! Last sweep was reverse, so we ended at MinX
+            CurrentX:=MinX;
+        ENDIF
+        TPWrite "P2: Starting from CurrentX=" \\Num:=CurrentX;
+        TPWrite "P2: Starting from CurrentY=" \\Num:=CurrentY;
         
-        ! Determine step direction based on where Pass 1 ended
-        IF CurrentX>((MinX+MaxX)/2) THEN
+        ! Step direction: continue stepping in X from where we are
+        IF CurrentX>=MaxX THEN
             StepDir:=-1;
-            TPWrite "Pass2: StepDir=-1";
+            TPWrite "P2: StepDir=-1 (toward MinX)";
         ELSE
             StepDir:=1;
-            TPWrite "Pass2: StepDir=+1";
+            TPWrite "P2: StepDir=+1 (toward MaxX)";
         ENDIF
         
-        ! Determine sweep direction based on where Pass 1 ended
+        ! First Y sweep: go to opposite Y bound from current position
+        ! This is just a straight Y move, no X change
         IF CurrentY>((MinY+MaxY)/2) THEN
-            SweepDir:=1;
-            StartY:=MaxY;
             EndY:=MinY;
-            TPWrite "P2: SweepDir=1 (toward MinY)";
+            TPWrite "P2: First sweep toward MinY";
         ELSE
-            SweepDir:=-1;
-            StartY:=MinY;
             EndY:=MaxY;
-            TPWrite "P2: SweepDir=-1 (toward MaxY)";
+            TPWrite "P2: First sweep toward MaxY";
         ENDIF
-        TPWrite "P2: StartY=" \\Num:=StartY;
-        TPWrite "P2: EndY=" \\Num:=EndY;
         
         PassCount:=0;
         
-        ! First Y sweep from current position
+        ! First Y sweep from current position (straight Y move, no diagonal)
         TPWrite "P2: First Y sweep to EndY=" \\Num:=EndY;
+        pEnd.trans.x:=-1*CurrentX;
         pEnd.trans.y:=EndY;
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x;
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pEnd.extax.eax_a:=CalcTrack;
         TPWrite "P2: Moving...";
         MoveL pEnd,vTravel,fine,tHeli\\WObj:=Bed1Wyong;
+        CurrentY:=EndY;
         TPWrite "P2: First Y sweep complete";
         
         TPWrite "P2: Entering Y-pass loop...";
