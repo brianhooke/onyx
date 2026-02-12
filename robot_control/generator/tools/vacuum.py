@@ -1,12 +1,14 @@
 """
 Vacuum tool procedure generator.
 
-Generates PROC Py2Vacuum() with cross-hatch pattern.
+Generates PROC Py2Vacuum() with selectable pattern:
+- cross-hatch: X passes then Y passes (original)
+- sweep-lift: Sweep max_x to min_x, lift, reposition, repeat (new vacuum end effector)
+
 Key aspects:
 1. Uses tVac tool (ToolNum = 5)
-2. Cross-hatch pattern: X passes then Y passes
-3. Bed1Wyong work object
-4. Track position clamped to limits
+2. Bed1Wyong work object
+3. Track position clamped to limits
 """
 
 from .utils import get_track_limits
@@ -16,42 +18,45 @@ def generate_py2vacuum(params: dict) -> str:
     """
     Generate PROC Py2Vacuum() RAPID code.
     
-    Cross-hatch pattern similar to helicopter:
-    - Phase 1: X passes (sweep X, step Y)
-    - Phase 2: Y passes (sweep Y, step X)
+    Supports two patterns:
+    - cross-hatch: X passes then Y passes (bidirectional sweeps)
+    - sweep-lift: Sweep max_x to min_x, lift 200mm, reposition to max_x at next Y, lower, repeat
     
     Uses frontend parameters:
+    - vacuum_pattern: 'cross-hatch' or 'sweep-lift'
     - vacuum_workzone: 'bed' or 'panel'
     - vacuum_step: Step size between passes (mm)
     - vacuum_z_offset: Additional Z offset (mm)
-    - vacuum_travel_speed: Travel speed (mm/s)
+    - vacuum_speed: Travel speed (mm/s)
     - Panel/bed dimensions for workzone calculation
     
     Returns:
         Complete PROC Py2Vacuum() as a string
     """
-    # Extract parameters with defaults (matches HTML form field names)
-    workzone = params.get('vacuum_workzone', 'bed')
-    step_size = params.get('vacuum_step', 300)
-    global_z_offset = params.get('z_offset', 0)
-    vacuum_z_offset = params.get('vacuum_z_offset', 0)
+    # Extract parameters (no defaults - values always provided by frontend/DB)
+    pattern = params['vacuum_pattern']
+    workzone = params['vacuum_workzone']
+    step_size = params['vacuum_step']
+    global_z_offset = params['z_offset']
+    vacuum_z_offset = params['vacuum_z_offset']
     total_z_offset = global_z_offset + vacuum_z_offset
-    travel_speed = params.get('vacuum_speed', 200)
+    travel_speed = params['vacuum_speed']
+    lift_height = 200  # Height to lift during sweep-lift repositioning
     
     # Calculate workzone boundaries based on selected workzone
     if workzone == 'panel':
         # Panel mode: use panel datum + dimensions
-        start_x = params.get('panel_datum_x', 1100)
-        start_y = params.get('panel_datum_y', 600)
-        panel_x = params.get('panel_x', 5900)
-        panel_y = params.get('panel_y', 2200)
-        work_z = 150 + total_z_offset  # FormHeight + offset
+        start_x = params['panel_datum_x']
+        start_y = params['panel_datum_y']
+        panel_x = params['panel_x']
+        panel_y = params['panel_y']
+        work_z = params['panel_z'] + total_z_offset
     else:  # bed
         # Bed mode: use bed datum + dimensions
-        start_x = params.get('bed_datum_x', 0)
-        start_y = params.get('bed_datum_y', 0)
-        panel_x = params.get('bed_length_x', 8500)
-        panel_y = params.get('bed_width_y', 1650)
+        start_x = params['bed_datum_x']
+        start_y = params['bed_datum_y']
+        panel_x = params['bed_length_x']
+        panel_y = params['bed_width_y']
         work_z = total_z_offset  # Bed is at Z=0
     
     # Calculate end coordinates
@@ -64,7 +69,27 @@ def generate_py2vacuum(params: dict) -> str:
     # Track limits (shared utility)
     track_min, track_max = get_track_limits(params)
     
-    # Build the procedure - Cross-hatch pattern
+    # Select pattern generator
+    if pattern == 'sweep-lift':
+        return _generate_sweep_lift_pattern(
+            params, workzone, step_size, travel_speed, lift_height,
+            start_x, start_y, end_x, end_y, work_z, nozzle_width,
+            track_min, track_max
+        )
+    else:
+        return _generate_cross_hatch_pattern(
+            params, workzone, step_size, travel_speed,
+            start_x, start_y, end_x, end_y, work_z, nozzle_width,
+            track_min, track_max
+        )
+
+
+def _generate_cross_hatch_pattern(
+    params, workzone, step_size, travel_speed,
+    start_x, start_y, end_x, end_y, work_z, nozzle_width,
+    track_min, track_max
+) -> str:
+    """Generate cross-hatch pattern (original vacuum pattern)."""
     proc = f'''
     PROC Py2Vacuum()
         ! Py2Vacuum - Cross-hatch pattern for vacuum
@@ -101,7 +126,7 @@ def generate_py2vacuum(params: dict) -> str:
         VAR num CalcTrack:=0;
         
         ! Initialize runtime values
-        WorkZ:={work_z};
+        WorkZ:=307;  ! Measured vacuum work height (535 - 228)
         SafeZ:=WorkZ+200;
         MinY:={start_y}+{nozzle_width}/2;
         MaxY:={end_y}-{nozzle_width}/2;
@@ -144,8 +169,8 @@ def generate_py2vacuum(params: dict) -> str:
         TPWrite "P1: Starting at CurrentY=" \\Num:=CurrentY;
         
         ! Initialize start position (X negated per Bed1Wyong)
-        pStart.trans:=[-1*(MinX-100),CurrentY,WorkZ];
-        pStart.rot:=OrientZYX(0,0,180);
+        pStart.trans:=[-1*MinX,CurrentY,WorkZ];
+        pStart.rot:=OrientZYX(0,10,180);
         pStart.robconf:=[0,0,0,0];
         
         ! Clamp track position
@@ -155,7 +180,7 @@ def generate_py2vacuum(params: dict) -> str:
         pStart.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         
         pEnd:=pStart;
-        pEnd.trans.x:=-1*(MaxX+100);
+        pEnd.trans.x:=-1*MaxX;
         CalcTrack:=Bed1Wyong.uframe.trans.x+pEnd.trans.x-{nozzle_width}/2;
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
@@ -330,6 +355,217 @@ def generate_py2vacuum(params: dict) -> str:
         ENDWHILE
         
         TPWrite "P2: Y passes complete, total=" \\Num:=PassCount;
+        
+        ! ============================================
+        ! FINISH: Turn off vacuum, raise, dropoff
+        ! ============================================
+        TPWrite "========================================";
+        TPWrite "Py2Vacuum: Complete";
+        TPWrite "========================================";
+        
+        ! Turn off vacuum
+        Vac_off;
+        
+        ! Raise to safe height
+        CurrentJoints:=CJointT();
+        CurrentPos:=CalcRobT(CurrentJoints,tVac\\WObj:=Bed1Wyong);
+        MoveL Offs(CurrentPos,0,0,200),v200,z5,tVac\\WObj:=Bed1Wyong;
+        
+        ! Re-enable config tracking
+        ConfL\\On;
+        ConfJ\\On;
+        
+        ! Return tool and go home
+        TPWrite "Py2Vacuum: Dropping off vacuum...";
+        Vac_Dropoff;
+        TPWrite "Py2Vacuum: Vacuum dropped off";
+        
+        TPWrite "Py2Vacuum: Homing...";
+        Home;
+        
+        TPWrite "========================================";
+        TPWrite "Py2Vacuum: COMPLETE";
+        TPWrite "========================================";
+        
+    ERROR
+        Vac_off;
+        TPWrite "Py2Vacuum ERROR: " \\Num:=ERRNO;
+        RAISE;
+    ENDPROC
+'''
+    return proc
+
+
+def _generate_sweep_lift_pattern(
+    params, workzone, step_size, travel_speed, lift_height,
+    start_x, start_y, end_x, end_y, work_z, nozzle_width,
+    track_min, track_max
+) -> str:
+    """
+    Generate sweep-lift pattern for new vacuum end effector.
+    
+    Pattern:
+    1. Start at max_x, min_y at safe height (+616mm)
+    2. Lower to surface, sweep from max_x to min_x
+    3. Lift 200mm
+    4. Move to min_x, step Y by step_size (still lifted)
+    5. Move to max_x at new Y (still lifted)
+    6. Lower to surface, sweep from max_x to min_x
+    7. Repeat until Y boundary reached
+    """
+    proc = f'''
+    PROC Py2Vacuum()
+        ! Py2Vacuum - Sweep-Lift pattern for vacuum
+        ! Generated by Onyx Toolpath Generator v2
+        ! Workzone: {workzone}
+        ! Area: ({start_x},{start_y}) to ({end_x},{end_y})
+        ! Z = {work_z}mm
+        ! Step: {step_size}mm
+        ! Pattern: Sweep-Lift (sweep max_x to min_x, lift, reposition, repeat)
+        
+        VAR robtarget pSweepStart;
+        VAR robtarget pSweepEnd;
+        VAR jointtarget CurrentJoints;
+        VAR robtarget CurrentPos;
+        VAR num WorkZ:=0;
+        VAR num LiftZ:=0;
+        VAR num SafeZ:=0;
+        VAR num CurrentY:=0;
+        VAR num MinY:=0;
+        VAR num MaxY:=0;
+        VAR num MinX:=0;
+        VAR num MaxX:=0;
+        VAR num StepSize:={step_size};
+        VAR num PassCount:=0;
+        VAR bool bDone:=FALSE;
+        VAR speeddata vTravel:=[{travel_speed},15,2000,15];
+        VAR speeddata vReposition:=[500,50,2000,50];
+        VAR num TrackMin:={track_min};
+        VAR num TrackMax:={track_max};
+        VAR num CalcTrack:=0;
+        
+        ! Initialize runtime values
+        WorkZ:=307;  ! Measured vacuum work height (535 - 228)
+        LiftZ:=WorkZ+{lift_height};
+        SafeZ:=WorkZ+200;
+        MinY:={start_y}+{nozzle_width}/2;
+        MaxY:={end_y}-{nozzle_width}/2;
+        MinX:={start_x}+{nozzle_width}/2;
+        MaxX:={end_x}-{nozzle_width}/2;
+        
+        TPWrite "========================================";
+        TPWrite "Py2Vacuum: Sweep-Lift Starting";
+        TPWrite "========================================";
+        TPWrite "Workzone: {workzone}";
+        TPWrite "MinX=" \\Num:=MinX;
+        TPWrite "MaxX=" \\Num:=MaxX;
+        TPWrite "MinY=" \\Num:=MinY;
+        TPWrite "MaxY=" \\Num:=MaxY;
+        TPWrite "WorkZ=" \\Num:=WorkZ;
+        TPWrite "LiftZ=" \\Num:=LiftZ;
+        TPWrite "StepSize=" \\Num:=StepSize;
+        
+        ! Get vacuum if needed
+        IF ToolNum<>5 THEN
+            TPWrite "Py2Vacuum: Getting vacuum...";
+            Home;
+            Vac_Pickup;
+        ELSE
+            ! Already have vacuum - ensure safe height
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tVac\\WObj:=Bed1Wyong);
+            IF CurrentPos.trans.z<600 THEN
+                MoveL Offs(CurrentPos,0,0,(600-CurrentPos.trans.z)),v500,z5,tVac\\WObj:=Bed1Wyong;
+            ENDIF
+        ENDIF
+        
+        ! Disable configuration tracking
+        ConfL\\Off;
+        ConfJ\\Off;
+        
+        ! Initialize sweep start position (MaxX, MinY at safe height)
+        ! X is negated per Bed1Wyong coordinate system
+        pSweepStart.trans:=[-1*MaxX,MinY,SafeZ];
+        pSweepStart.rot:=OrientZYX(0,10,180);
+        pSweepStart.robconf:=[0,0,0,0];
+        
+        ! Calculate track position for MaxX
+        CalcTrack:=Bed1Wyong.uframe.trans.x-MaxX;
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pSweepStart.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        
+        ! Initialize sweep end position (MinX, same Y)
+        pSweepEnd:=pSweepStart;
+        pSweepEnd.trans.x:=-1*MinX;
+        CalcTrack:=Bed1Wyong.uframe.trans.x-MinX;
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pSweepEnd.extax.eax_a:=CalcTrack;
+        
+        ! Move to start position (MaxX, MinY at safe height)
+        TPWrite "Moving to start position...";
+        MoveJ pSweepStart,v500,z5,tVac\\WObj:=Bed1Wyong;
+        
+        ! Turn on vacuum
+        TPWrite "Py2Vacuum: Starting vacuum...";
+        Vac_on;
+        WaitTime 1;
+        
+        ! Set current Y position
+        CurrentY:=MinY;
+        PassCount:=0;
+        bDone:=FALSE;
+        
+        TPWrite "Starting sweep-lift loop...";
+        
+        ! Main sweep-lift loop
+        WHILE CurrentY<=MaxY AND bDone=FALSE DO
+            Incr PassCount;
+            TPWrite "----------------------------------------";
+            TPWrite "Pass " \\Num:=PassCount;
+            TPWrite "CurrentY=" \\Num:=CurrentY;
+            
+            ! Update Y position in targets
+            pSweepStart.trans.y:=CurrentY;
+            pSweepEnd.trans.y:=CurrentY;
+            
+            ! Lower to work height at MaxX (sweep start)
+            pSweepStart.trans.z:=WorkZ;
+            TPWrite "Lowering to work surface...";
+            MoveL pSweepStart,v100,fine,tVac\\WObj:=Bed1Wyong;
+            
+            ! Sweep from MaxX to MinX (on surface)
+            pSweepEnd.trans.z:=WorkZ;
+            TPWrite "Sweeping MaxX to MinX...";
+            MoveL pSweepEnd,vTravel,fine,tVac\\WObj:=Bed1Wyong;
+            TPWrite "Sweep complete";
+            
+            ! Check if we've reached the end
+            IF (CurrentY+StepSize)>MaxY THEN
+                TPWrite "Last pass - at Y boundary";
+                bDone:=TRUE;
+            ELSE
+                ! Lift tool
+                TPWrite "Lifting tool...";
+                pSweepEnd.trans.z:=LiftZ;
+                MoveL pSweepEnd,v200,z5,tVac\\WObj:=Bed1Wyong;
+                
+                ! Step Y to next row (still at MinX, lifted)
+                CurrentY:=CurrentY+StepSize;
+                TPWrite "Stepping to Y=" \\Num:=CurrentY;
+                pSweepEnd.trans.y:=CurrentY;
+                MoveL pSweepEnd,vReposition,z5,tVac\\WObj:=Bed1Wyong;
+                
+                ! Move to MaxX at new Y (still lifted)
+                TPWrite "Moving to MaxX...";
+                pSweepStart.trans.y:=CurrentY;
+                pSweepStart.trans.z:=LiftZ;
+                MoveL pSweepStart,vReposition,z5,tVac\\WObj:=Bed1Wyong;
+            ENDIF
+        ENDWHILE
+        
+        TPWrite "Sweep-lift passes complete, total=" \\Num:=PassCount;
         
         ! ============================================
         ! FINISH: Turn off vacuum, raise, dropoff

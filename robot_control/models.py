@@ -25,8 +25,7 @@ class ToolPathParameters(models.Model):
     vacuum_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Vacuum pattern")
     vacuum_workzone = models.CharField(default='panel', max_length=20, help_text="Vacuum workzone: panel or bed")
     vacuum_force = models.IntegerField(default=50, help_text="Vacuum target force (N, 10-150)")
-    vacuum_z_min = models.IntegerField(default=-20, help_text="Vacuum min Z from surface (mm)")
-    vacuum_z_max = models.IntegerField(default=50, help_text="Vacuum max Z from surface (mm)")
+    vacuum_z_range = models.IntegerField(default=30, help_text="Vacuum Z range around offset (+/- mm)")
     vacuum_force_enabled = models.BooleanField(default=False, help_text="Enable force control for vacuum")
     
     # Cross-hatch pattern steps (per tool)
@@ -40,6 +39,9 @@ class ToolPathParameters(models.Model):
     pan_blade_speed = models.IntegerField(default=70, help_text="Pan blade speed (RPM, 40-140)")
     pan_z_offset = models.IntegerField(default=250, help_text="Pan Z offset (mm, -200 to 200)")
     pan_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Pan pattern")
+    pan_force = models.IntegerField(default=0, help_text="Pan force (N, 0=off, 100-500)")
+    pan_force_change = models.IntegerField(default=100, help_text="Pan force change rate (N)")
+    pan_pos_supv_dist = models.IntegerField(default=125, help_text="Pan position supervision distance (mm)")
     
     # Helicopter parameters
     heli_travel_speed = models.IntegerField(default=40, help_text="Helicopter travel speed (mm/s)")
@@ -103,8 +105,7 @@ class ToolPathParameters(models.Model):
             'vacuum_pattern': self.vacuum_pattern,
             'vacuum_workzone': self.vacuum_workzone,
             'vacuum_force': self.vacuum_force,
-            'vacuum_z_min': self.vacuum_z_min,
-            'vacuum_z_max': self.vacuum_z_max,
+            'vacuum_z_range': self.vacuum_z_range,
             'vacuum_force_enabled': self.vacuum_force_enabled,
             'polisher_step': self.polisher_step,
             'vacuum_step': self.vacuum_step,
@@ -114,6 +115,9 @@ class ToolPathParameters(models.Model):
             'pan_blade_speed': self.pan_blade_speed,
             'pan_z_offset': self.pan_z_offset,
             'pan_pattern': self.pan_pattern,
+            'pan_force': self.pan_force,
+            'pan_force_change': self.pan_force_change,
+            'pan_pos_supv_dist': self.pan_pos_supv_dist,
             'heli_travel_speed': self.heli_travel_speed,
             'heli_blade_speed': self.heli_blade_speed,
             'heli_blade_angle': self.heli_blade_angle,

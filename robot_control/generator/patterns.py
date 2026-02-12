@@ -169,3 +169,60 @@ def _generate_steps(start: float, end: float, step: float) -> List[float]:
             values.append(end)
     
     return values
+
+
+def sweep_lift(
+    min_x: float,
+    max_x: float,
+    min_y: float,
+    max_y: float,
+    step_size: float,
+    lift_height: float = 200,
+) -> List[Point]:
+    """
+    Generate a sweep-lift pattern for vacuum tool.
+    
+    Pattern:
+    1. Start at max_x, min_y at safe height
+    2. Sweep from max_x to min_x (work move on surface)
+    3. Lift tool (rapid move)
+    4. Move to min_x, step Y by step_size (rapid move)
+    5. Move to max_x at new Y (rapid move)
+    6. Lower to surface, sweep from max_x to min_x
+    7. Repeat until Y boundary reached
+    
+    Key difference from cross-hatch: Tool lifts off surface for repositioning,
+    only sweeps in one direction (max_x to min_x).
+    
+    Args:
+        min_x: Left edge of workspace (sweep end)
+        max_x: Right edge of workspace (sweep start)
+        min_y: Bottom edge of workspace (starting Y)
+        max_y: Top edge of workspace (ending Y)
+        step_size: Distance to step in Y between passes
+        lift_height: Height to lift during repositioning (for reference only)
+    
+    Returns:
+        List of Points with x, y coordinates and move_type
+        move_type "rapid" = lifted/repositioning moves
+        move_type "work" = on-surface sweep moves
+    """
+    points: List[Point] = []
+    
+    # Generate Y positions for each pass
+    y_values = _generate_steps(min_y, max_y, step_size)
+    
+    for i, y in enumerate(y_values):
+        if i == 0:
+            # First pass: rapid to start position (max_x, min_y)
+            points.append(Point(max_x, y, "rapid"))
+        else:
+            # Subsequent passes: we're at min_x from previous sweep
+            # Lift (implied by rapid), move to min_x at new Y, then to max_x
+            points.append(Point(min_x, y, "rapid"))  # Step Y (lifted)
+            points.append(Point(max_x, y, "rapid"))  # Move to sweep start (lifted)
+        
+        # Sweep from max_x to min_x (on surface)
+        points.append(Point(min_x, y, "work"))
+    
+    return points

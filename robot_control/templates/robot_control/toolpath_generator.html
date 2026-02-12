@@ -224,7 +224,8 @@
                             <label class="block text-gray-500 text-xs mb-1">Pattern</label>
                             <select name="vacuum_pattern"
                                 class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
-                                <option value="cross-hatch" selected>Cross-hatch</option>
+                                <option value="cross-hatch" {% if defaults.vacuum_pattern == 'cross-hatch' %}selected{% endif %}>Cross-hatch</option>
+                                <option value="sweep-lift" {% if defaults.vacuum_pattern == 'sweep-lift' %}selected{% endif %}>Sweep-Lift</option>
                             </select>
                         </div>
                         <div>
@@ -249,15 +250,8 @@
                             <span class="block text-red-400 text-[10px]">10-150</span>
                         </div>
                         <div>
-                            <label class="block text-gray-500 text-xs mb-1">Z Min (mm)</label>
-                            <input type="number" name="vacuum_z_min" value="{{ defaults.vacuum_z_min }}"
-                                min="-50" max="0"
-                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
-                            <span class="block text-red-400 text-[10px]">-50 to 0</span>
-                        </div>
-                        <div>
-                            <label class="block text-gray-500 text-xs mb-1">Z Max (mm)</label>
-                            <input type="number" name="vacuum_z_max" value="{{ defaults.vacuum_z_max }}"
+                            <label class="block text-gray-500 text-xs mb-1">Z Range (±mm)</label>
+                            <input type="number" name="vacuum_z_range" value="{{ defaults.vacuum_z_range }}"
                                 min="0" max="100"
                                 class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
                             <span class="block text-red-400 text-[10px]">0-100</span>
@@ -460,6 +454,13 @@
                                 min="40" max="140"
                                 class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
                             <span class="block text-red-400 text-[10px]">40-140 RPM</span>
+                        </div>
+                        <div>
+                            <label class="block text-gray-500 text-xs mb-1">Force (N)</label>
+                            <input type="number" name="pan_force" value="{{ defaults.pan_force }}"
+                                min="0" max="500"
+                                class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                            <span class="block text-red-400 text-[10px]">0=off, 100-500</span>
                         </div>
                     </div>
                 </div>

@@ -17,6 +17,8 @@ from typing import Dict, List
 from .tools.helicopter import generate_py2heli
 from .tools.polisher import generate_py2polish
 from .tools.vacuum import generate_py2vacuum
+from .tools.pan import generate_py2pan
+from .tools.sequences import generate_seq_bed_clean
 
 
 # Paths
@@ -63,8 +65,7 @@ class ToolpathGenerator:
         'vacuum_pattern': 'cross-hatch',
         'vacuum_workzone': 'panel',
         'vacuum_force': 50,
-        'vacuum_z_min': -20,
-        'vacuum_z_max': 50,
+        'vacuum_z_range': 30,
         'vacuum_force_enabled': False,
         'polisher_step': 450,
         'vacuum_step': 450,
@@ -74,6 +75,9 @@ class ToolpathGenerator:
         'pan_blade_speed': 70,
         'pan_z_offset': 250,
         'pan_pattern': 'cross-hatch',
+        'pan_force': 0,
+        'pan_force_change': 100,
+        'pan_pos_supv_dist': 125,
         'heli_travel_speed': 40,
         'heli_blade_speed': 70,
         'heli_blade_angle': 0,
@@ -160,6 +164,8 @@ class ToolpathGenerator:
         py2heli_proc = generate_py2heli(self.params)
         py2polish_proc = generate_py2polish(self.params)
         py2vacuum_proc = generate_py2vacuum(self.params)
+        py2pan_proc = generate_py2pan(self.params)
+        seq_bed_clean_proc = generate_seq_bed_clean(self.params)
         
         # Generate the main Py2 menu procedure
         py2main_proc = self._generate_py2main()
@@ -204,6 +210,10 @@ class ToolpathGenerator:
 {py2polish_proc}
 
 {py2vacuum_proc}
+
+{py2pan_proc}
+
+{seq_bed_clean_proc}
     
     ! ========== END PY2 GENERATED PROCEDURES ==========
 
@@ -230,7 +240,7 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli,2:Polish,3:Vacuum";
+        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:BedClean";
         
         TEST iChoice
         CASE 1:
@@ -239,6 +249,10 @@ class ToolpathGenerator:
             Py2Polish;
         CASE 3:
             Py2Vacuum;
+        CASE 4:
+            Py2Pan;
+        CASE 5:
+            SeqBedClean;
         DEFAULT:
             TPWrite "Invalid choice";
         ENDTEST

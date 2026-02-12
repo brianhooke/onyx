@@ -34,22 +34,22 @@ def generate_py2polish(params: dict) -> str:
     Returns:
         Complete PROC Py2Polish() as a string
     """
-    # Extract parameters with defaults
-    workzone = params.get('polisher_workzone', 'bed')
+    # Extract parameters (no defaults - values always provided by frontend/DB)
+    workzone = params['polisher_workzone']
     first_direction = params.get('polisher_first_direction', 'x')  # 'x' or 'y' - which direction to pass first
-    step_size = params.get('polisher_step', 450)
-    global_z_offset = params.get('z_offset', 0)
-    polisher_z_offset = params.get('polisher_z_offset', 0)
+    step_size = params['polisher_step']
+    global_z_offset = params['z_offset']
+    polisher_z_offset = params['polisher_z_offset']
     total_z_offset = global_z_offset + polisher_z_offset
     
-    # Force control parameters (defaults from Andrew's working Polish pattern)
-    start_force = params.get('polisher_start_force', 300)
-    motion_force = params.get('polisher_motion_force', 300)
-    force_change = params.get('polisher_force_change', 100)
-    approach_speed = params.get('polisher_approach_speed', 20)
-    retract_speed = params.get('polisher_retract_speed', 50)
-    pos_supv_dist = params.get('polisher_pos_supv_dist', 100)
-    travel_speed = params.get('polisher_speed', 100)
+    # Force control parameters
+    start_force = params['polisher_start_force']
+    motion_force = params['polisher_motion_force']
+    force_change = params['polisher_force_change']
+    approach_speed = params['polisher_approach_speed']
+    retract_speed = params['polisher_retract_speed']
+    pos_supv_dist = params['polisher_pos_supv_dist']
+    travel_speed = params.get('polisher_speed', 100)  # Check if this exists in frontend
     
     # Check if force control is disabled (all 3 force params = 0)
     force_enabled = not (start_force == 0 and motion_force == 0 and force_change == 0)
@@ -60,17 +60,17 @@ def generate_py2polish(params: dict) -> str:
     # Calculate workzone boundaries based on selected workzone
     if workzone == 'panel':
         # Panel mode: use panel datum + dimensions
-        datum_x = params.get('panel_datum_x', 1100)
-        datum_y = params.get('panel_datum_y', 600)
-        length_x = params.get('panel_x', 5900)
-        width_y = params.get('panel_y', 2200)
-        work_z = 150 + total_z_offset  # FormHeight + offset
+        datum_x = params['panel_datum_x']
+        datum_y = params['panel_datum_y']
+        length_x = params['panel_x']
+        width_y = params['panel_y']
+        work_z = params['panel_z'] + total_z_offset
     else:  # bed
         # Bed mode: use bed datum + dimensions
-        datum_x = params.get('bed_datum_x', 0)
-        datum_y = params.get('bed_datum_y', 0)
-        length_x = params.get('bed_length_x', 8500)
-        width_y = params.get('bed_width_y', 1650)
+        datum_x = params['bed_datum_x']
+        datum_y = params['bed_datum_y']
+        length_x = params['bed_length_x']
+        width_y = params['bed_width_y']
         work_z = total_z_offset  # Bed is at Z=0
     
     # Start position offset by half step size (tool centered on first pass)

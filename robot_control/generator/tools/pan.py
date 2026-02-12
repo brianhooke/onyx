@@ -1,49 +1,43 @@
 """
-Helicopter tool procedure generator.
+Pan tool procedure generator.
 
-Generates PROC Py2Heli() based on Andrew's HeliFC pattern with force control.
+Generates PROC Py2Pan() based on the helicopter cross-hatch pattern.
+The Pan is a circular disc attached to the helicopter tool - uses same
+pickup/dropoff and blade speed controls but no blade angle adjustment.
+
 Key characteristics:
-- Uses force control (FCPress commands) when heli_force > 0
-- Falls back to fixed height mode when heli_force = 0
-- X coordinates are negated (Bed1Wyong coordinate system)
-- extax formula: Bed1Wyong.uframe.trans.x + trans.x + offset
-- Track position clamped to limits - arm extends to reach beyond
+- Uses tHeli tool (Pan attaches to helicopter)
+- Supports force control (pan_force > 0) or fixed height mode (pan_force = 0)
+- Blade angle always 0 (Pan disc is flat)
+- Cross-hatch pattern identical to helicopter
+- Force control uses FCPress1LStart, FCPressL, FCPressEnd (same as HeliFC)
 """
 
 from .utils import get_track_limits
 
 
-def generate_py2heli(params: dict) -> str:
+def generate_py2pan(params: dict) -> str:
     """
-    Generate PROC Py2Heli() RAPID code with force control.
+    Generate PROC Py2Pan() RAPID code.
     
-    Force control modes:
-    - heli_force = 0: Fixed height mode (MoveL commands)
-    - heli_force > 0: Force control mode (FCPressL commands)
+    Pan supports two modes:
+    - pan_force = 0: Fixed height mode (Z = FormHeight + pan_z_offset)
+    - pan_force > 0: Force control mode (targets specified force in Newtons)
     
-    Uses frontend parameters:
-    - panel_datum_x, panel_datum_y: Start corner (near track)
-    - panel_x, panel_y: Panel dimensions  
-    - panel_z: Panel height
-    - heli_travel_speed: Travel speed
-    - heli_blade_speed: Blade RPM
-    - heli_blade_angle: Blade angle (degrees)
-    - heli_z_offset: Additional Z offset
-    - helicopter_step: Step size between passes
-    - heli_force: Target force (N, 0=fixed height, 100-500=force control)
-    
-    Returns:
-        Complete PROC Py2Heli() as a string
+    Force control uses the same FC commands as helicopter:
+    - FCCalib for calibration
+    - FCPress1LStart to start force-controlled movement
+    - FCPressL for force-controlled linear movement  
+    - FCPressEnd to end force control
     """
     # Extract parameters (no defaults - values always provided by frontend/DB)
-    workzone = params['heli_workzone']
-    step_size = params['helicopter_step']
+    workzone = params.get('pan_workzone', 'panel')  # TODO: Add pan_workzone to frontend
+    step_size = params['pan_step']
     global_z_offset = params['z_offset']
-    heli_z_offset = params['heli_z_offset']
-    total_z_offset = global_z_offset + heli_z_offset
-    travel_speed = params['heli_travel_speed']
-    blade_speed = params['heli_blade_speed']
-    blade_angle = params['heli_blade_angle']
+    pan_z_offset = params['pan_z_offset']
+    total_z_offset = global_z_offset + pan_z_offset
+    travel_speed = params['pan_travel_speed']
+    blade_speed = params['pan_blade_speed']
     
     # Calculate workzone boundaries based on selected workzone
     if workzone == 'panel':
@@ -60,18 +54,18 @@ def generate_py2heli(params: dict) -> str:
         work_z = total_z_offset  # Bed is at Z=0
     
     # Force control parameters
-    heli_force = params['heli_force']
-    force_change = 100  # Standard force change rate
-    pos_supv_dist = 125  # Standard position supervision distance
+    pan_force = params['pan_force']
+    force_change = params.get('pan_force_change', 100)  # Not yet in frontend
+    pos_supv_dist = params.get('pan_pos_supv_dist', 125)  # Not yet in frontend
     
     # Determine if force control is enabled
-    use_force_control = heli_force > 0
+    use_force_control = pan_force > 0
     
     # Calculate end coordinates (far corner)
     end_x = start_x + panel_x
     end_y = start_y + panel_y
     
-    # HeliBladeWidth constant (from baseline)
+    # Pan blade width - same as helicopter blade width
     blade_width = 600
     
     # Track limits (shared utility)
@@ -79,11 +73,11 @@ def generate_py2heli(params: dict) -> str:
     
     # Build conditional code blocks based on force control mode
     if use_force_control:
-        mode_desc = f"FORCE CONTROL MODE: {heli_force}N"
-        mode_note = f"Force={heli_force}N, ForceChange={force_change}, PosSupvDist={pos_supv_dist}"
-        mode_tpwrite = 'TPWrite "MODE: FORCE CONTROL, Force=" \\Num:=HeliForce;'
+        mode_desc = f"FORCE CONTROL MODE: {pan_force}N"
+        mode_note = f"Force={pan_force}N, ForceChange={force_change}, PosSupvDist={pos_supv_dist}"
+        mode_tpwrite = 'TPWrite "MODE: FORCE CONTROL, Force=" \\Num:=PanForce;'
         fc_calib = '''! Force control calibration
-        TPWrite "Py2Heli: Calibrating force control...";
+        TPWrite "Py2Pan: Calibrating force control...";
         FCCalib HeliLoad70rpm;
         WaitTime 0.5;'''
         fc_confirm = '''! Operator confirmation before force control engagement
@@ -94,17 +88,17 @@ def generate_py2heli(params: dict) -> str:
         Stop;'''
         fc_start = f'''! Start force control
         TPWrite "P1: Starting force control...";
-        FCPress1LStart Offs(pStart,-25,0,-5),v10,\\Fz:=HeliForce,15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tHeli\\WObj:=Bed1Wyong;
+        FCPress1LStart Offs(pStart,-25,0,-5),v10,\\Fz:=PanForce,15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tHeli\\WObj:=Bed1Wyong;
         bFCActive:=TRUE;'''
         move_cmd = 'FCPressL'
-        move_suffix = ',HeliForce,fine,tHeli\\WObj:=Bed1Wyong;'
-        fc_end = '''! End force control BEFORE lifting (critical - prevents blade dig-in)
+        move_suffix = ',PanForce,fine,tHeli\\WObj:=Bed1Wyong;'
+        fc_end = '''! End force control before lifting
         TPWrite "FINISH: Ending force control...";
         CurrentJoints:=CJointT();
         CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);
         FCPressEnd Offs(CurrentPos,0,0,50),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;
         bFCActive:=FALSE;
-        TPWrite "FINISH: Force control ended, tool lifted off surface";'''
+        TPWrite "FINISH: Force control ended";'''
         error_fc = '''IF bFCActive THEN
             FCPressEnd Offs(CurrentPos,0,0,100),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;
         ENDIF'''
@@ -118,18 +112,13 @@ def generate_py2heli(params: dict) -> str:
         MoveL pStart,v50,fine,tHeli\\WObj:=Bed1Wyong;'''
         move_cmd = 'MoveL'
         move_suffix = ',fine,tHeli\\WObj:=Bed1Wyong;'
-        fc_end = '''! Lift off surface BEFORE stopping blades (critical - prevents blade dig-in)
-        TPWrite "FINISH: Lifting off surface...";
-        CurrentJoints:=CJointT();
-        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);
-        MoveJ Offs(CurrentPos,0,0,50),v100,fine,tHeli\\WObj:=Bed1Wyong;
-        TPWrite "FINISH: Tool lifted off surface";'''
+        fc_end = ''
         error_fc = ''
     
     # Build the procedure
     proc = f'''
-    PROC Py2Heli()
-        ! Py2Heli - Cross-hatch pattern with force control
+    PROC Py2Pan()
+        ! Py2Pan - Cross-hatch pattern for Pan tool
         ! Generated by Onyx Toolpath Generator v2
         ! Panel: ({start_x},{start_y}) to ({end_x},{end_y})
         ! {mode_note}
@@ -163,7 +152,7 @@ def generate_py2heli(params: dict) -> str:
         VAR num TrackMin:={track_min};
         VAR num TrackMax:={track_max};
         VAR num CalcTrack:=0;
-        VAR num HeliForce:={heli_force};
+        VAR num PanForce:={pan_force};
         
         ! Initialize runtime values
         WorkZ:=FormHeight+{total_z_offset};
@@ -174,7 +163,7 @@ def generate_py2heli(params: dict) -> str:
         MaxX:={end_x}-{blade_width}/2;
         
         TPWrite "========================================";
-        TPWrite "Py2Heli: Cross-hatch Starting";
+        TPWrite "Py2Pan: Cross-hatch Starting";
         TPWrite "========================================";
         TPWrite "Panel X: " \\Num:={start_x};
         TPWrite " to X: " \\Num:={end_x};
@@ -189,9 +178,9 @@ def generate_py2heli(params: dict) -> str:
         TPWrite "StepSize=" \\Num:=StepSize;
         {mode_tpwrite}
         
-        ! Get helicopter if needed
+        ! Get helicopter tool if needed (Pan attaches to it)
         IF ToolNum<>2 THEN
-            TPWrite "Py2Heli: Getting helicopter...";
+            TPWrite "Py2Pan: Getting helicopter...";
             Home;
             Heli_Pickup;
         ENDIF
@@ -238,12 +227,10 @@ def generate_py2heli(params: dict) -> str:
         pStart.trans.z:=SafeZ;
         MoveJ pStart,v500,z5,tHeli\\WObj:=Bed1Wyong;
         
-        ! Home stepper and set blade angle
-        TPWrite "Py2Heli: Homing stepper...";
+        ! Home stepper (Pan uses 0 blade angle - no angle adjustment)
+        TPWrite "Py2Pan: Homing stepper...";
         Heli_Stepper_Home;
-        TPWrite "Py2Heli: Setting blade angle to " \\Num:={blade_angle};
-        HeliBlade_Angle {blade_angle};
-        TPWrite "Py2Heli: Blade angle set to " \\Num:={blade_angle};
+        HeliBlade_Angle 0;
         WaitTime 1;
         
         {fc_calib}
@@ -253,7 +240,7 @@ def generate_py2heli(params: dict) -> str:
         ConfJ\\Off;
         
         ! Start blade rotation
-        TPWrite "Py2Heli: Starting blade at " \\Num:={blade_speed};
+        TPWrite "Py2Pan: Starting blade at " \\Num:={blade_speed};
         TPWrite " RPM...";
         HeliBladeSpeed {blade_speed},"FWD";
         WaitTime 2;
@@ -465,8 +452,7 @@ def generate_py2heli(params: dict) -> str:
         TPWrite "========================================";
         
         ! ============================================
-        ! FINISH: LIFT OFF FIRST, then stop blade, return tool
-        ! CRITICAL: Must lift off before stopping blades to prevent dig-in
+        ! FINISH: Stop blade, end force control, lift tool, return
         ! ============================================
         TPWrite "========================================";
         TPWrite "=== FINISH ===";
@@ -474,18 +460,17 @@ def generate_py2heli(params: dict) -> str:
         
         {fc_end}
         
-        ! NOW stop the blade (tool is already off the surface)
         TPWrite "FINISH: Stopping blade...";
         HeliBladeSpeed 0,"FWD";
         WaitTime 1;
         TPWrite "FINISH: Blade stopped";
         
-        ! Lift further off the bed
-        TPWrite "FINISH: Lifting to safe height...";
+        ! Lift off the bed
+        TPWrite "FINISH: Lifting off bed...";
         CurrentJoints:=CJointT();
         CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);
         MoveJ Offs(CurrentPos,0,0,200),v100,fine,tHeli\\WObj:=Bed1Wyong;
-        TPWrite "FINISH: At safe height";
+        TPWrite "FINISH: Lifted 200mm";
         
         ! Re-enable configuration tracking
         TPWrite "FINISH: Re-enabling ConfL/ConfJ...";
@@ -502,7 +487,7 @@ def generate_py2heli(params: dict) -> str:
         Home;
         
         TPWrite "========================================";
-        TPWrite "Py2Heli: COMPLETE";
+        TPWrite "Py2Pan: COMPLETE";
         TPWrite "========================================";
         
     ERROR

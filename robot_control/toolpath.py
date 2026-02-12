@@ -33,7 +33,7 @@ def api_toolpath_save_params(request):
             'bed_length_x', 'bed_width_y', 'bed_datum_x', 'bed_datum_y',
             'panel_datum_x', 'panel_datum_y', 'panel_x', 'panel_y', 'panel_z',
             'vacuum_z_offset', 'vacuum_speed', 'vacuum_pattern', 'vacuum_workzone',
-            'vacuum_force', 'vacuum_z_min', 'vacuum_z_max', 'vacuum_force_enabled',
+            'vacuum_force', 'vacuum_z_range', 'vacuum_force_enabled',
             'polisher_step', 'vacuum_step', 'pan_step', 'helicopter_step',
             'pan_travel_speed', 'pan_blade_speed', 'pan_z_offset', 'pan_pattern',
             'heli_travel_speed', 'heli_blade_speed', 'heli_blade_angle', 'heli_force', 'heli_z_offset', 'heli_workzone', 'heli_pattern',
