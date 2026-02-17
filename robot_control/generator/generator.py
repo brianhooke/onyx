@@ -18,6 +18,7 @@ from .tools.helicopter import generate_py2heli
 from .tools.polisher import generate_py2polish
 from .tools.vacuum import generate_py2vacuum
 from .tools.pan import generate_py2pan
+from .tools.vib_screed import generate_py2vib_screed
 from .tools.sequences import generate_seq_bed_clean
 
 
@@ -165,6 +166,7 @@ class ToolpathGenerator:
         py2polish_proc = generate_py2polish(self.params)
         py2vacuum_proc = generate_py2vacuum(self.params)
         py2pan_proc = generate_py2pan(self.params)
+        py2vib_screed_proc = generate_py2vib_screed(self.params)
         seq_bed_clean_proc = generate_seq_bed_clean(self.params)
         
         # Generate the main Py2 menu procedure
@@ -213,6 +215,8 @@ class ToolpathGenerator:
 
 {py2pan_proc}
 
+{py2vib_screed_proc}
+
 {seq_bed_clean_proc}
     
     ! ========== END PY2 GENERATED PROCEDURES ==========
@@ -240,7 +244,7 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:BedClean";
+        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
         
         TEST iChoice
         CASE 1:
@@ -252,6 +256,8 @@ class ToolpathGenerator:
         CASE 4:
             Py2Pan;
         CASE 5:
+            Py2VibScreed;
+        CASE 6:
             SeqBedClean;
         DEFAULT:
             TPWrite "Invalid choice";
