@@ -153,6 +153,7 @@ def generate_py2pan(params: dict) -> str:
         VAR num TrackMax:={track_max};
         VAR num CalcTrack:=0;
         VAR num PanForce:={pan_force};
+        VAR fcforcevector myForceVector;
         
         ! Initialize runtime values
         WorkZ:=FormHeight+{total_z_offset};
@@ -294,6 +295,13 @@ def generate_py2pan(params: dict) -> str:
                 TPWrite "P1: Sweep to pStart (near X)";
                 {move_cmd} pStart,vTravel{move_suffix}
             ENDIF
+            
+            ! Log force and Z position after sweep
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
+            myForceVector:=FCGetForce(\Tool:=tHeli);
+            TPWrite "P1: Z=" \\Num:=CurrentPos.trans.z;
+            TPWrite "P1: Force=" \\Num:=myForceVector.zforce;
             TPWrite "P1: Sweep complete";
             
             IF (CurrentY-StepSize)<MinY THEN
@@ -316,6 +324,13 @@ def generate_py2pan(params: dict) -> str:
                     IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
                     pEnd.extax.eax_a:=CalcTrack;
                     {move_cmd} pEnd,vTravel{move_suffix}
+                    
+                    ! Log force and Z after step move
+                    CurrentJoints:=CJointT();
+                    CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
+                    myForceVector:=FCGetForce(\Tool:=tHeli);
+                    TPWrite "P1: Z=" \\Num:=CurrentPos.trans.z;
+                    TPWrite "P1: Force=" \\Num:=myForceVector.zforce;
                 ELSE
                     pStart.trans.y:=CurrentY;
                     IF CurrentY<1800 THEN
@@ -327,6 +342,13 @@ def generate_py2pan(params: dict) -> str:
                     IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
                     pStart.extax.eax_a:=CalcTrack;
                     {move_cmd} pStart,vTravel{move_suffix}
+                    
+                    ! Log force and Z after step move
+                    CurrentJoints:=CJointT();
+                    CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
+                    myForceVector:=FCGetForce(\Tool:=tHeli);
+                    TPWrite "P1: Z=" \\Num:=CurrentPos.trans.z;
+                    TPWrite "P1: Force=" \\Num:=myForceVector.zforce;
                 ENDIF
                 
                 SweepDir:=-1*SweepDir;
@@ -385,6 +407,13 @@ def generate_py2pan(params: dict) -> str:
         TPWrite "P2: Moving...";
         {move_cmd} pEnd,vTravel{move_suffix}
         CurrentY:=EndY;
+        
+        ! Log force and Z after first Y sweep
+        CurrentJoints:=CJointT();
+        CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
+        myForceVector:=FCGetForce(\Tool:=tHeli);
+        TPWrite "P2: Z=" \\Num:=CurrentPos.trans.z;
+        TPWrite "P2: Force=" \\Num:=myForceVector.zforce;
         TPWrite "P2: First Y sweep complete";
         
         TPWrite "P2: Entering Y-pass loop...";
@@ -424,6 +453,13 @@ def generate_py2pan(params: dict) -> str:
                 pEnd.extax.eax_a:=CalcTrack;
                 TPWrite "P2: Moving to next X column...";
                 {move_cmd} pEnd,vTravel{move_suffix}
+                
+                ! Log force and Z after step
+                CurrentJoints:=CJointT();
+                CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
+                myForceVector:=FCGetForce(\Tool:=tHeli);
+                TPWrite "P2: Z=" \\Num:=CurrentPos.trans.z;
+                TPWrite "P2: Force=" \\Num:=myForceVector.zforce;
                 TPWrite "P2: Step complete";
                 CurrentX:=NextX;
                 
@@ -442,6 +478,13 @@ def generate_py2pan(params: dict) -> str:
                 pEnd.trans.y:=EndY;
                 TPWrite "P2: Moving...";
                 {move_cmd} pEnd,vTravel{move_suffix}
+                
+                ! Log force and Z after Y sweep
+                CurrentJoints:=CJointT();
+                CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
+                myForceVector:=FCGetForce(\Tool:=tHeli);
+                TPWrite "P2: Z=" \\Num:=CurrentPos.trans.z;
+                TPWrite "P2: Force=" \\Num:=myForceVector.zforce;
                 TPWrite "P2: Sweep complete";
             ENDIF
         ENDWHILE
