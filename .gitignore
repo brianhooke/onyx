@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 .venv/
+.venv312/
 venv/
 ENV/
 env/
@@ -29,3 +30,7 @@ Thumbs.db
 # Environment
 .env
 *.env
+
+# Generated RAPID program outputs / local robot artifacts
+backups/
+rapid/

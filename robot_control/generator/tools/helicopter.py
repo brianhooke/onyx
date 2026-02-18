@@ -11,6 +11,7 @@ Key characteristics:
 """
 
 from .utils import get_track_limits
+from ..patterns import rectangular_spiral
 
 
 def generate_py2heli(params: dict) -> str:
@@ -45,6 +46,10 @@ def generate_py2heli(params: dict) -> str:
     blade_speed = params['heli_blade_speed']
     blade_angle = params['heli_blade_angle']
     
+    pattern = params.get('heli_pattern', 'cross-hatch')
+    spiral_direction = params.get('heli_spiral_direction', 'anticlockwise')
+    formwork_offset = params.get('heli_formwork_offset', 0)
+
     # Calculate workzone boundaries based on selected workzone
     if workzone == 'panel':
         start_x = params['panel_datum_x']
@@ -73,6 +78,24 @@ def generate_py2heli(params: dict) -> str:
     
     # HeliBladeWidth constant (from baseline)
     blade_width = 600
+
+    # Common work bounds (used for both cross-hatch and rectangular spiral)
+    min_x = start_x + blade_width / 2
+    max_x = end_x - blade_width / 2
+    min_y = start_y + blade_width / 2
+    max_y = end_y - blade_width / 2
+
+    spiral_points = []
+    if pattern == 'rectangular_spiral':
+        spiral_points = rectangular_spiral(
+            min_x=min_x,
+            max_x=max_x,
+            min_y=min_y,
+            max_y=max_y,
+            step_size=step_size,
+            formwork_offset=formwork_offset,
+            direction=spiral_direction,
+        )
     
     # Track limits (shared utility)
     track_min, track_max = get_track_limits(params)
@@ -127,6 +150,38 @@ def generate_py2heli(params: dict) -> str:
         error_fc = ''
     
     # Build the procedure
+    spiral_motion_block = ''
+    if pattern == 'rectangular_spiral':
+        lines = []
+        lines.append('        TPWrite "========================================";')
+        lines.append('        TPWrite "LIVE: Pattern=rectangular_spiral";')
+        lines.append('        TPWrite "LIVE: SpiralDir";')
+        lines.append(f'        TPWrite "LIVE: {spiral_direction}";')
+        lines.append('        TPWrite "========================================";')
+
+        for pt in spiral_points:
+            x = pt.x
+            y = pt.y
+            lines.append(f'        CurrentX:={x};')
+            lines.append(f'        CurrentY:={y};')
+            lines.append('        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];')
+            lines.append('        pCurrent.rot:=OrientZYX(0,0,180);')
+            lines.append('        pCurrent.robconf:=[0,0,0,0];')
+            lines.append('        IF CurrentY<1800 THEN')
+            lines.append(f'            CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x+1000+{blade_width}/2;')
+            lines.append('        ELSE')
+            lines.append(f'            CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x+{blade_width}/2;')
+            lines.append('        ENDIF')
+            lines.append('        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF')
+            lines.append('        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF')
+            lines.append('        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];')
+            lines.append('        TPWrite "LIVE: Heli XY";')
+            lines.append('        TPWrite "LIVE: x=" \\Num:=CurrentX;')
+            lines.append('        TPWrite "LIVE: y=" \\Num:=CurrentY;')
+            lines.append(f'        {move_cmd} pCurrent,vTravel{move_suffix}')
+
+        spiral_motion_block = "\n".join(lines)
+
     proc = f'''
     PROC Py2Heli()
         ! Py2Heli - Cross-hatch pattern with force control
@@ -165,6 +220,10 @@ def generate_py2heli(params: dict) -> str:
         VAR num CalcTrack:=0;
         VAR num HeliForce:={heli_force};
         VAR fcforcevector myForceVector;
+        VAR num StepperPos:=0;
+        VAR num StepsPerRevolution:=0;
+        VAR num RevstoAngle:=0;
+        VAR num BladePitch:=0;
         
         ! Initialize runtime values
         WorkZ:=FormHeight+{total_z_offset};
@@ -246,6 +305,17 @@ def generate_py2heli(params: dict) -> str:
         HeliBlade_Angle {blade_angle};
         TPWrite "Py2Heli: Blade angle set to " \\Num:={blade_angle};
         WaitTime 1;
+
+        ! Live telemetry baseline (blade pitch derived from Tools module)
+        StepperPos:=Tools\\StepperPos;
+        StepsPerRevolution:=Tools\\StepsPerRevolution;
+        RevstoAngle:=Tools\\RevstoAngle;
+        IF (StepsPerRevolution*RevstoAngle)<>0 THEN
+            BladePitch:=StepperPos/(StepsPerRevolution*RevstoAngle);
+        ELSE
+            BladePitch:=0;
+        ENDIF
+        TPWrite "LIVE: Heli Pitch=" \\Num:=BladePitch;
         
         {fc_calib}
         
@@ -271,7 +341,13 @@ def generate_py2heli(params: dict) -> str:
         
         TPWrite "P1: Entering X-pass loop...";
         bDone:=FALSE;
-        
+
+        ! Rectangular spiral mode bypasses the cross-hatch loops
+        IF "{pattern}"="rectangular_spiral" THEN
+{spiral_motion_block}
+            bDone:=TRUE;
+        ENDIF
+
         ! X-pass loop (using flag instead of EXIT)
         WHILE CurrentY>=MinY AND bDone=FALSE DO
             Incr PassCount;
@@ -279,6 +355,10 @@ def generate_py2heli(params: dict) -> str:
             TPWrite "P1: X Pass " \\Num:=PassCount;
             TPWrite "P1: CurrentY=" \\Num:=CurrentY;
             TPWrite "P1: SweepDir=" \\Num:=SweepDir;
+
+            TPWrite "LIVE: Heli XY";
+            TPWrite "LIVE: x=" \\Num:=CurrentX;
+            TPWrite "LIVE: y=" \\Num:=CurrentY;
             
             pStart.trans.y:=CurrentY;
             pEnd.trans.y:=CurrentY;
@@ -437,6 +517,10 @@ def generate_py2heli(params: dict) -> str:
             Incr PassCount;
             TPWrite "----------------------------------------";
             TPWrite "P2: Y Pass " \\Num:=PassCount;
+
+            TPWrite "LIVE: Heli XY";
+            TPWrite "LIVE: x=" \\Num:=CurrentX;
+            TPWrite "LIVE: y=" \\Num:=CurrentY;
             
             ! Calculate next column
             NextX:=CurrentX+(StepDir*StepSize);

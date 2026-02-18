@@ -37,13 +37,14 @@ def api_toolpath_save_params(request):
             'polisher_step', 'vacuum_step', 'pan_step', 'helicopter_step',
             'pan_travel_speed', 'pan_blade_speed', 'pan_z_offset', 'pan_pattern',
             'heli_travel_speed', 'heli_blade_speed', 'heli_blade_angle', 'heli_force', 'heli_z_offset', 'heli_workzone', 'heli_pattern',
+            'heli_spiral_direction', 'heli_formwork_offset',
             'polisher_z_offset', 'polisher_workzone', 'polisher_start_force', 'polisher_motion_force', 'polisher_force_change',
             'polisher_approach_speed', 'polisher_retract_speed', 'polisher_pos_supv_dist',
             'screed_z_offset', 'vib_screed_speed', 'screed_angle_offset', 'z_offset',
             'serpentine_offset_x', 'serpentine_offset_y', 'serpentine_direction', 'serpentine_start_bottom'
         ]
         
-        string_fields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'heli_workzone', 'heli_pattern', 'pan_pattern']
+        string_fields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern']
         bool_fields = ['serpentine_start_bottom', 'vacuum_force_enabled']
         
         for field in field_names:

@@ -163,6 +163,28 @@
                             </select>
                         </div>
                     </div>
+
+                    <!-- Rectangular spiral (Helicopter) -->
+                    <div id="heliSpiralParams" class="border-t border-gray-700 pt-2 mt-2">
+                        <span class="text-gray-500 text-xs mb-2 block">Rectangular spiral (Helicopter)</span>
+                        <div class="flex items-center gap-4 pl-4 flex-wrap">
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Direction</label>
+                                <select name="heli_spiral_direction"
+                                    class="w-32 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                    <option value="anticlockwise" {% if defaults.heli_spiral_direction == 'anticlockwise' %}selected{% endif %}>anticlockwise</option>
+                                    <option value="clockwise" {% if defaults.heli_spiral_direction == 'clockwise' %}selected{% endif %}>clockwise</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Formwork offset (mm)</label>
+                                <input type="number" name="heli_formwork_offset" value="{{ defaults.heli_formwork_offset }}"
+                                    min="0" max="1000"
+                                    class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm">
+                                <span class="block text-red-400 text-[10px]">mm</span>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- Tool Steps -->
                     <div class="border-t border-gray-700 pt-2 mt-2">
@@ -481,9 +503,12 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-gray-500 text-xs mb-1">Pattern <span class="text-yellow-500">(fixed)</span></label>
-                            <input type="text" name="heli_pattern" value="cross-hatch" readonly
-                                class="w-28 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-400 text-sm cursor-not-allowed">
+                            <label class="block text-gray-500 text-xs mb-1">Pattern</label>
+                            <select name="heli_pattern"
+                                class="w-36 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm">
+                                <option value="cross-hatch" {% if defaults.heli_pattern == 'cross-hatch' %}selected{% endif %}>cross-hatch</option>
+                                <option value="rectangular_spiral" {% if defaults.heli_pattern == 'rectangular_spiral' %}selected{% endif %}>rectangular_spiral</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-gray-500 text-xs mb-1">Z Offset</label>
@@ -572,6 +597,21 @@
                             Andrew's Old Programs
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Live Log -->
+            <div class="mt-4 bg-gray-800 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-medium text-gray-300">Live Log</h3>
+                    <span id="live-log-status" class="text-xs text-gray-500">Idle</span>
+                </div>
+                <div class="bg-gray-900 rounded-lg overflow-hidden" style="height: 400px;">
+                    <div class="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
+                        <div class="text-xs text-gray-500">Current Tool</div>
+                        <div id="live-current-tool" class="text-xs text-white font-mono">none</div>
+                    </div>
+                    <div id="live-log-lines" class="h-full px-3 py-2 overflow-y-auto text-xs font-mono text-gray-200 space-y-1"></div>
                 </div>
             </div>
         </form>
@@ -677,11 +717,91 @@
     <script>
         // Load params from DB and check IRC5 connection on load
         document.addEventListener('DOMContentLoaded', () => {
-            loadParamsFromDB();
-            checkConnection();
-            setupValidation();
             setupSaveButton();
+            setupWorkzoneSelection();
+            setupFormValidation();
+            setupHeliSpiralParams();
+            
+            // Live log polling
+            const statusEl = document.getElementById('live-log-status');
+            const currentToolEl = document.getElementById('live-current-tool');
+            const linesEl = document.getElementById('live-log-lines');
+            if (!statusEl || !currentToolEl || !linesEl) {
+                return;
+            }
+
+            let seen = new Set();
+            let isFetching = false;
+
+            async function pollLiveLog() {
+                if (isFetching) {
+                    return;
+                }
+                isFetching = true;
+                statusEl.textContent = 'Updating...';
+
+                try {
+                    const response = await fetch('/api/live-log/?contains=LIVE:');
+                    const data = await response.json();
+
+                    if (data.current_tool) {
+                        currentToolEl.textContent = data.current_tool;
+                    }
+
+                    if (Array.isArray(data.lines)) {
+                        const newLines = data.lines.slice().reverse();
+                        for (const line of newLines) {
+                            if (!line || seen.has(line)) {
+                                continue;
+                            }
+                            seen.add(line);
+                            const div = document.createElement('div');
+                            div.textContent = line;
+                            linesEl.appendChild(div);
+                        }
+
+                        while (linesEl.childNodes.length > 200) {
+                            const first = linesEl.firstChild;
+                            if (!first) {
+                                break;
+                            }
+                            const txt = first.textContent;
+                            if (txt) {
+                                seen.delete(txt);
+                            }
+                            linesEl.removeChild(first);
+                        }
+
+                        const nearBottom = (linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight) < 40;
+                        if (nearBottom) {
+                            linesEl.scrollTop = linesEl.scrollHeight;
+                        }
+                    }
+
+                    statusEl.textContent = 'Live';
+                } catch (error) {
+                    statusEl.textContent = 'Error';
+                } finally {
+                    isFetching = false;
+                }
+            }
+
+            pollLiveLog();
+            setInterval(pollLiveLog, 1000);
         });
+
+        function setupHeliSpiralParams() {
+            const heliPatternSelect = document.querySelector('select[name="heli_pattern"]');
+            const heliSpiralParams = document.getElementById('heliSpiralParams');
+            if (!heliPatternSelect || !heliSpiralParams) return;
+
+            const spiralInputs = heliSpiralParams.querySelectorAll('select, input');
+
+            heliSpiralParams.classList.remove('hidden');
+            spiralInputs.forEach((el) => {
+                el.disabled = false;
+            });
+        }
         
         // Validation rules
         function validateParams() {
@@ -909,7 +1029,7 @@
             // Gather form data
             const formData = new FormData(e.target);
             const params = {};
-            const stringFields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'pan_pattern'];
+            const stringFields = ['vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern'];
             for (const [key, value] of formData.entries()) {
                 if (key === 'upload_to_irc5') {
                     params[key] = true;

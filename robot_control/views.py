@@ -74,6 +74,80 @@ def api_position(request):
 
 
 @require_http_methods(["GET"])
+def api_live_log(request):
+    """Get a lightweight live snapshot for the Toolpath Generator live log panel."""
+    client = IRC5Client()
+
+    try:
+        contains = request.GET.get('contains', 'LIVE:')
+
+        # Current tool
+        tool_num = client.get_rapid_variable('Tools', 'ToolNum')
+        tool_names = {
+            '1': 'TCMaster (empty)',
+            '2': 'Helicopter',
+            '3': 'Vibrating Screed',
+            '4': 'Plotter',
+            '5': 'Vacuum',
+            '6': 'Polisher'
+        }
+        tool_name = tool_names.get(str(tool_num), f'Unknown ({tool_num})')
+
+        # TCP snapshot (world)
+        tcp = client.get_robot_position() or {}
+        x = tcp.get('x')
+        y = tcp.get('y')
+
+        # Helicopter blade pitch (degrees) derived from stepper position
+        stepper_pos = client.get_rapid_variable('Tools', 'StepperPos')
+        steps_per_rev = client.get_rapid_variable('Tools', 'StepsPerRevolution')
+        revs_to_angle = client.get_rapid_variable('Tools', 'RevstoAngle')
+
+        pitch_deg = None
+        try:
+            if stepper_pos is not None and steps_per_rev is not None and revs_to_angle is not None:
+                denom = float(steps_per_rev) * float(revs_to_angle)
+                if denom != 0:
+                    pitch_deg = float(stepper_pos) / denom
+        except (TypeError, ValueError):
+            pitch_deg = None
+
+        ts = datetime.now().strftime("%H:%M:%S")
+        lines = []
+
+        # Filtered recent event log lines (e.g. TPWrite output)
+        try:
+            events = client.get_event_log_detailed(30)
+            for e in events:
+                title = e.get('title')
+                if not title:
+                    continue
+                if contains and contains not in title:
+                    continue
+                # Prefer controller timestamp if present; otherwise fall back to local time
+                evt_ts = e.get('timestamp') or ts
+                lines.append(f"{evt_ts} {title}")
+        except Exception:
+            pass
+
+        if x is not None and y is not None:
+            lines.append(f"{ts} Heli XY: x={x}, y={y}")
+        if pitch_deg is not None:
+            lines.append(f"{ts} Heli Pitch: {pitch_deg:.2f}°")
+
+        return JsonResponse({
+            'current_tool': tool_name,
+            'tool_num': tool_num,
+            'x': x,
+            'y': y,
+            'blade_pitch_deg': pitch_deg,
+            'lines': lines,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
 def api_events(request):
     """Get recent event log entries."""
     client = IRC5Client()
@@ -292,7 +366,7 @@ def api_generate_toolpath(request):
         params = {}
         for key in ToolpathGenerator.DEFAULT_PARAMS.keys():
             if key in data and data[key] is not None:
-                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'pan_pattern'):
+                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern'):
                     params[key] = str(data[key])
                 elif key == 'serpentine_start_bottom':
                     params[key] = bool(int(data[key])) if data[key] != '' else False
