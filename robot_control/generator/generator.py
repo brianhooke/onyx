@@ -14,7 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from .tools.helicopter import generate_py2heli
+# TEMPORARILY DISABLED: Helicopter tool generation (re-enable later)
+# from .tools.helicopter import generate_py2heli
 from .tools.polisher import generate_py2polish
 from .tools.vacuum import generate_py2vacuum
 from .tools.pan import generate_py2pan
@@ -86,6 +87,8 @@ class ToolpathGenerator:
         'heli_z_offset': 0,
         'heli_workzone': 'panel',
         'heli_pattern': 'cross-hatch',
+        'heli_spiral_direction': 'anticlockwise',
+        'heli_formwork_offset': 100,
         'polisher_z_offset': 0,
         'polisher_workzone': 'bed',
         'polisher_start_force': 300,
@@ -162,7 +165,9 @@ class ToolpathGenerator:
         import re
         
         # Generate tool procedures
-        py2heli_proc = generate_py2heli(self.params)
+        # TEMPORARILY DISABLED: Helicopter tool generation (re-enable later)
+        # py2heli_proc = generate_py2heli(self.params)
+        py2heli_proc = ""
         py2polish_proc = generate_py2polish(self.params)
         py2vacuum_proc = generate_py2vacuum(self.params)
         py2pan_proc = generate_py2pan(self.params)
@@ -244,20 +249,18 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
+        TPReadNum iChoice,"1:Polish,2:Vac,3:Pan,4:Screed,5:BedClean";
         
         TEST iChoice
         CASE 1:
-            Py2Heli;
-        CASE 2:
             Py2Polish;
-        CASE 3:
+        CASE 2:
             Py2Vacuum;
-        CASE 4:
+        CASE 3:
             Py2Pan;
-        CASE 5:
+        CASE 4:
             Py2VibScreed;
-        CASE 6:
+        CASE 5:
             SeqBedClean;
         DEFAULT:
             TPWrite "Invalid choice";

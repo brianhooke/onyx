@@ -51,6 +51,8 @@ class ToolPathParameters(models.Model):
     heli_z_offset = models.IntegerField(default=0, help_text="Helicopter Z offset (mm, -50 to 400)")
     heli_workzone = models.CharField(default='panel', max_length=20, help_text="Helicopter workzone: panel or bed")
     heli_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Helicopter pattern")
+    heli_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Rectangular spiral direction: clockwise or anticlockwise")
+    heli_formwork_offset = models.IntegerField(default=100, help_text="Rectangular spiral formwork offset from edges (mm)")
     
     # Polisher force/speed parameters
     polisher_z_offset = models.IntegerField(default=0, help_text="Polisher Z offset (mm)")
@@ -125,6 +127,8 @@ class ToolPathParameters(models.Model):
             'heli_z_offset': self.heli_z_offset,
             'heli_workzone': self.heli_workzone,
             'heli_pattern': self.heli_pattern,
+            'heli_spiral_direction': self.heli_spiral_direction,
+            'heli_formwork_offset': self.heli_formwork_offset,
             'polisher_z_offset': self.polisher_z_offset,
             'polisher_workzone': self.polisher_workzone,
             'polisher_start_force': self.polisher_start_force,

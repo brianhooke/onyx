@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('api/status/', views.api_status, name='api_status'),
     path('api/position/', views.api_position, name='api_position'),
+    path('api/live-log/', views.api_live_log, name='api_live_log'),
     path('api/events/', views.api_events, name='api_events'),
     path('api/events/detailed/', views.api_events_detailed, name='api_events_detailed'),
     path('api/events/latest/', views.api_events_latest, name='api_events_latest'),

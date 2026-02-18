@@ -148,6 +148,97 @@ def cross_hatch(
     return points
 
 
+def rectangular_spiral(
+    min_x: float,
+    max_x: float,
+    min_y: float,
+    max_y: float,
+    step_size: float,
+    formwork_offset: float,
+    direction: Literal["clockwise", "anticlockwise"] = "anticlockwise",
+) -> List[Point]:
+    """
+    Generate a rectangular spiral pattern (inward spiral).
+
+    Intention / design notes:
+    - This is a *pure geometry* generator: it only outputs XY points and move hints.
+      The caller (tool generators) decides how to translate these points into robot
+      motions and Z behavior.
+    - The spiral is defined by a shrinking axis-aligned rectangle. We start at the
+      same logical corner every time:
+
+        start = (min_x + formwork_offset, max_y - formwork_offset)
+
+      i.e. the **top-left** corner of the offset rectangle.
+    - `formwork_offset` is the safety margin from the workzone boundary (panel or bed).
+      It is applied to all four sides before the spiral begins.
+    - Each completed loop moves the rectangle inwards by `step_size` on all sides:
+
+        left  += step_size
+        right -= step_size
+        bottom += step_size
+        top   -= step_size
+
+      This continues until the remaining rectangle collapses (no area left).
+
+    Direction semantics:
+    - The user-facing request describes the "anticlockwise" example as starting at
+      top-left, then traversing top -> right -> bottom -> left (which is clockwise
+      in a conventional XY frame where +Y is up). For consistency with that request,
+      this function intentionally treats:
+
+        direction='anticlockwise'
+            as: top-left -> top-right -> bottom-right -> bottom-left
+
+        direction='clockwise'
+            as the reverse traversal: top-left -> bottom-left -> bottom-right -> top-right
+
+      (The name is preserved to match the UI/parameter names you specified.)
+
+    Move types:
+    - The first point is marked as "rapid".
+    - All subsequent points are marked as "work".
+    """
+
+    points: List[Point] = []
+
+    if step_size <= 0:
+        return points
+
+    left = min_x + formwork_offset
+    right = max_x - formwork_offset
+    bottom = min_y + formwork_offset
+    top = max_y - formwork_offset
+
+    if left > right or bottom > top:
+        return points
+
+    first = True
+    while left <= right and bottom <= top:
+        start = Point(left, top, "rapid" if first else "work")
+        points.append(start)
+        first = False
+
+        if direction == "anticlockwise":
+            # Requested example ordering (see docstring)
+            points.append(Point(right, top, "work"))
+            points.append(Point(right, bottom, "work"))
+            points.append(Point(left, bottom, "work"))
+        else:
+            # Reverse traversal (clockwise option in UI)
+            points.append(Point(left, bottom, "work"))
+            points.append(Point(right, bottom, "work"))
+            points.append(Point(right, top, "work"))
+
+        # Shrink for next loop
+        left += step_size
+        right -= step_size
+        bottom += step_size
+        top -= step_size
+
+    return points
+
+
 def _generate_steps(start: float, end: float, step: float) -> List[float]:
     """Generate a list of values from start toward end with given step."""
     values = []
