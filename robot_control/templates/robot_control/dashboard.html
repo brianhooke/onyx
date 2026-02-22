@@ -22,15 +22,15 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
+<body class="bg-gray-500 text-gray-900 min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
         <div class="mb-8 flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold text-white">Onyx</h1>
-                <p class="text-gray-400">ABB IRB 6700 Robot Control System</p>
+                <h1 class="text-3xl font-bold text-gray-900">Onyx</h1>
+                <p class="text-gray-500">ABB IRB 6700 Robot Control System</p>
             </div>
-            <a href="/toolpath/" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors">
+            <a href="/toolpath/" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
@@ -39,62 +39,62 @@
         </div>
 
         <!-- Connection Status Card -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-semibold">Controller Status</h2>
-                <button onclick="refreshStatus()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">
+                <button onclick="refreshStatus()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
                     Refresh
                 </button>
             </div>
             
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-gray-700 rounded p-4">
-                    <div class="text-gray-400 text-sm mb-1">Connection</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Connection</div>
                     <div class="flex items-center gap-2">
                         <span id="connection-indicator" class="status-indicator status-disconnected"></span>
                         <span id="connection-status" class="font-medium">Checking...</span>
                     </div>
                 </div>
                 
-                <div class="bg-gray-700 rounded p-4">
-                    <div class="text-gray-400 text-sm mb-1">Controller State</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Controller State</div>
                     <div id="controller-state" class="font-medium">-</div>
                 </div>
                 
-                <div class="bg-gray-700 rounded p-4">
-                    <div class="text-gray-400 text-sm mb-1">Operation Mode</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Operation Mode</div>
                     <div id="operation-mode" class="font-medium">-</div>
                 </div>
                 
-                <div class="bg-gray-700 rounded p-4">
-                    <div class="text-gray-400 text-sm mb-1">Execution State</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Execution State</div>
                     <div id="execution-state" class="font-medium">-</div>
                 </div>
             </div>
             
-            <div class="mt-4 text-sm text-gray-400">
+            <div class="mt-4 text-sm text-gray-500">
                 <span>RobotWare: </span>
                 <span id="robotware-version">-</span>
             </div>
         </div>
 
         <!-- Control Panel -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-200">
             <h2 class="text-xl font-semibold mb-4">Program Control</h2>
             
             <div class="flex flex-wrap gap-4">
                 <button onclick="startExecution()" id="btn-start"
-                    class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded font-medium">
+                    class="bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium">
                     ▶ Start
                 </button>
                 
                 <button onclick="stopExecution()" id="btn-stop"
-                    class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded font-medium">
+                    class="bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium">
                     ■ Stop
                 </button>
                 
                 <button onclick="resetPP()" id="btn-reset"
-                    class="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded font-medium">
+                    class="bg-amber-500 hover:bg-amber-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium">
                     ↺ Reset PP
                 </button>
             </div>
@@ -105,54 +105,54 @@
         <!-- Robot Position -->
         <div class="grid md:grid-cols-2 gap-6 mb-6">
             <!-- TCP Position -->
-            <div class="bg-gray-800 rounded-lg p-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                 <h2 class="text-xl font-semibold mb-4">TCP Position (World)</h2>
                 <div class="grid grid-cols-3 gap-4 text-center">
-                    <div class="bg-gray-700 rounded p-3">
-                        <div class="text-gray-400 text-xs mb-1">X</div>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        <div class="text-gray-500 text-xs mb-1">X</div>
                         <div id="tcp-x" class="font-mono text-lg">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-3">
-                        <div class="text-gray-400 text-xs mb-1">Y</div>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        <div class="text-gray-500 text-xs mb-1">Y</div>
                         <div id="tcp-y" class="font-mono text-lg">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-3">
-                        <div class="text-gray-400 text-xs mb-1">Z</div>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        <div class="text-gray-500 text-xs mb-1">Z</div>
                         <div id="tcp-z" class="font-mono text-lg">-</div>
                     </div>
                 </div>
             </div>
             
             <!-- Joint Positions -->
-            <div class="bg-gray-800 rounded-lg p-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                 <h2 class="text-xl font-semibold mb-4">Joint Angles (°)</h2>
                 <div class="grid grid-cols-4 gap-2 text-center">
-                    <div class="bg-gray-700 rounded p-2">
-                        <div class="text-gray-400 text-xs">J1</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div class="text-gray-500 text-xs">J1</div>
                         <div id="joint-1" class="font-mono text-sm">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <div class="text-gray-400 text-xs">J2</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div class="text-gray-500 text-xs">J2</div>
                         <div id="joint-2" class="font-mono text-sm">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <div class="text-gray-400 text-xs">J3</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div class="text-gray-500 text-xs">J3</div>
                         <div id="joint-3" class="font-mono text-sm">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <div class="text-gray-400 text-xs">J4</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div class="text-gray-500 text-xs">J4</div>
                         <div id="joint-4" class="font-mono text-sm">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <div class="text-gray-400 text-xs">J5</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div class="text-gray-500 text-xs">J5</div>
                         <div id="joint-5" class="font-mono text-sm">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <div class="text-gray-400 text-xs">J6</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div class="text-gray-500 text-xs">J6</div>
                         <div id="joint-6" class="font-mono text-sm">-</div>
                     </div>
-                    <div class="bg-gray-700 rounded p-2 col-span-2">
-                        <div class="text-gray-400 text-xs">Track</div>
+                    <div class="bg-gray-50 rounded-lg p-2 border border-gray-100 col-span-2">
+                        <div class="text-gray-500 text-xs">Track</div>
                         <div id="joint-track" class="font-mono text-sm">-</div>
                     </div>
                 </div>
@@ -160,14 +160,14 @@
         </div>
 
         <!-- Force/Torque Sensor Panel -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-200">
             <h2 class="text-xl font-semibold mb-4">Force / Torque Sensor</h2>
             <div class="grid grid-cols-3 md:grid-cols-6 gap-4">
                 <!-- Fx -->
                 <div class="flex flex-col items-center">
                     <div class="relative w-20 h-20">
                         <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                             <circle id="gauge-fx" cx="50" cy="50" r="40" stroke="#3b82f6" stroke-width="8" fill="none"
                                 stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"/>
                         </svg>
@@ -182,7 +182,7 @@
                 <div class="flex flex-col items-center">
                     <div class="relative w-20 h-20">
                         <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                             <circle id="gauge-fy" cx="50" cy="50" r="40" stroke="#22c55e" stroke-width="8" fill="none"
                                 stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"/>
                         </svg>
@@ -197,7 +197,7 @@
                 <div class="flex flex-col items-center">
                     <div class="relative w-20 h-20">
                         <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                             <circle id="gauge-fz" cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none"
                                 stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"/>
                         </svg>
@@ -212,7 +212,7 @@
                 <div class="flex flex-col items-center">
                     <div class="relative w-20 h-20">
                         <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                             <circle id="gauge-tx" cx="50" cy="50" r="40" stroke="#8b5cf6" stroke-width="8" fill="none"
                                 stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"/>
                         </svg>
@@ -227,7 +227,7 @@
                 <div class="flex flex-col items-center">
                     <div class="relative w-20 h-20">
                         <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                             <circle id="gauge-ty" cx="50" cy="50" r="40" stroke="#ec4899" stroke-width="8" fill="none"
                                 stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"/>
                         </svg>
@@ -242,7 +242,7 @@
                 <div class="flex flex-col items-center">
                     <div class="relative w-20 h-20">
                         <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" fill="none"/>
+                            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                             <circle id="gauge-tz" cx="50" cy="50" r="40" stroke="#06b6d4" stroke-width="8" fill="none"
                                 stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"/>
                         </svg>
@@ -262,7 +262,7 @@
 
         <!-- Program Info & Speed -->
         <div class="grid md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-gray-800 rounded-lg p-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                 <h2 class="text-xl font-semibold mb-4">Program Pointer</h2>
                 <div class="space-y-2">
                     <div class="flex justify-between">
@@ -280,23 +280,23 @@
                 </div>
             </div>
             
-            <div class="bg-gray-800 rounded-lg p-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                 <h2 class="text-xl font-semibold mb-4">Current Speed</h2>
                 <div class="grid grid-cols-2 gap-4 text-center">
                     <div>
-                        <div class="text-gray-400 text-xs mb-1">TCP</div>
+                        <div class="text-gray-500 text-xs mb-1">TCP</div>
                         <div id="tcp-speed" class="text-2xl font-bold text-blue-400">-</div>
                         <div class="text-gray-500 text-xs">m/s</div>
                     </div>
                     <div>
-                        <div class="text-gray-400 text-xs mb-1">Track</div>
+                        <div class="text-gray-500 text-xs mb-1">Track</div>
                         <div id="track-speed" class="text-2xl font-bold text-green-400">-</div>
                         <div class="text-gray-500 text-xs">m/s</div>
                     </div>
                 </div>
             </div>
             
-            <div class="bg-gray-800 rounded-lg p-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                 <h2 class="text-xl font-semibold mb-4">Recent Events</h2>
                 <div id="event-log" class="space-y-2 text-sm max-h-32 overflow-y-auto">
                     <div class="text-gray-500">Loading...</div>
@@ -305,22 +305,22 @@
         </div>
 
         <!-- Tasks & Modules -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-200">
             <h2 class="text-xl font-semibold mb-4">RAPID Tasks</h2>
             
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-gray-400 text-sm mb-2">Task</label>
+                    <label class="block text-gray-500 text-sm mb-2">Task</label>
                     <select id="task-select" onchange="loadModules()" 
-                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-900">
                         <option value="">Loading...</option>
                     </select>
                 </div>
                 
                 <div>
-                    <label class="block text-gray-400 text-sm mb-2">Module</label>
+                    <label class="block text-gray-500 text-sm mb-2">Module</label>
                     <select id="module-select" 
-                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-900">
                         <option value="">Select a task first</option>
                     </select>
                 </div>
@@ -328,7 +328,7 @@
         </div>
 
         <!-- Tool Changer Status -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-semibold">Tool Changer</h2>
                 <div class="flex items-center gap-2">
@@ -339,38 +339,38 @@
             
             <div class="grid md:grid-cols-4 gap-4">
                 <!-- Current Tool -->
-                <div class="bg-gray-700/50 rounded-lg p-4">
-                    <div class="text-gray-400 text-sm mb-1">Current Tool</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Current Tool</div>
                     <div class="flex items-center gap-2">
                         <span id="tc-tool-num" class="text-2xl font-bold text-blue-400">-</span>
-                        <span id="tc-tool-name" class="text-gray-300">Loading...</span>
+                        <span id="tc-tool-name" class="text-gray-700">Loading...</span>
                     </div>
                 </div>
                 
                 <!-- Tool State -->
-                <div class="bg-gray-700/50 rounded-lg p-4">
-                    <div class="text-gray-400 text-sm mb-1">Changer State</div>
-                    <div id="tc-state" class="text-xl font-semibold text-gray-300">-</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Changer State</div>
+                    <div id="tc-state" class="text-xl font-semibold text-gray-700">-</div>
                 </div>
                 
                 <!-- Program Pointer -->
-                <div class="bg-gray-700/50 rounded-lg p-4">
-                    <div class="text-gray-400 text-sm mb-1">Program Pointer</div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div class="text-gray-500 text-sm mb-1">Program Pointer</div>
                     <div id="tc-prog-ptr" class="text-sm font-mono text-yellow-400 truncate">-</div>
                     <div id="tc-prog-line" class="text-xs text-gray-500 mt-1">-</div>
                 </div>
                 
                 <!-- Signals -->
-                <div class="bg-gray-700/50 rounded-lg p-4">
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
                     <div class="text-gray-400 text-sm mb-2">I/O Signals</div>
                     <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                         <div class="flex items-center gap-2">
                             <span id="tc-do13" class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>
-                            <span class="text-gray-400">DO13 Release</span>
+                            <span class="text-gray-600">DO13 Release</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <span id="tc-di13" class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>
-                            <span class="text-gray-400">DI13 Released</span>
+                            <span class="text-gray-600">DI13 Released</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <span id="tc-do14" class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>

@@ -2,36 +2,36 @@
 <!-- Included by toolpath_generator_compact.html -->
 
 <!-- Bed & Panel Visualization -->
-<div id="bed-visualization" class="bg-gray-800 rounded-lg p-2">
+<div id="bed-visualization" class="card p-2">
     <div class="flex items-center justify-between mb-1">
-        <h3 class="text-xs font-medium text-gray-400">Bed & Panel Preview</h3>
+        <h3 class="text-xs font-medium text-gray-600">Bed & Panel Preview</h3>
         <span class="text-[10px] text-gray-500">Units: mm</span>
     </div>
     <div class="flex gap-2">
         <!-- Tool list with demo buttons -->
         <div class="flex flex-col gap-2 text-sm min-w-[180px]">
             <div class="flex items-center justify-between gap-2">
-                <span class="text-blue-400 font-medium">Vacuum</span>
-                <button type="button" data-tool="vacuum" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+                <span class="text-blue-600 font-medium">Vacuum</span>
+                <button type="button" data-tool="vacuum" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
             </div>
             <div class="flex items-center justify-between gap-2">
-                <span class="text-green-400 font-medium">Polisher</span>
-                <button type="button" data-tool="polisher" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+                <span class="text-green-600 font-medium">Polisher</span>
+                <button type="button" data-tool="polisher" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
             </div>
             <div class="flex items-center justify-between gap-2">
-                <span class="text-purple-400 font-medium">Helicopter</span>
-                <button type="button" data-tool="helicopter" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+                <span class="text-purple-600 font-medium">Helicopter</span>
+                <button type="button" data-tool="helicopter" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
             </div>
             <div class="flex items-center justify-between gap-2">
-                <span class="text-orange-400 font-medium">Pan</span>
-                <button type="button" data-tool="pan" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+                <span class="text-orange-600 font-medium">Pan</span>
+                <button type="button" data-tool="pan" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
             </div>
             <div class="flex items-center justify-between gap-2">
-                <span class="text-yellow-400 font-medium">Screed</span>
-                <button type="button" data-tool="screed" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+                <span class="text-amber-600 font-medium">Screed</span>
+                <button type="button" data-tool="screed" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
             </div>
             <!-- Legend -->
-            <div class="mt-2 pt-2 border-t border-gray-700 flex flex-col gap-1">
+            <div class="mt-2 pt-2 border-t border-gray-200 flex flex-col gap-1">
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-3 rounded-sm" style="background: #1e3a5f; border: 1px solid #3b82f6;"></div>
                     <span class="text-xs text-gray-500">Bed</span>
@@ -43,8 +43,8 @@
             </div>
         </div>
         <!-- SVG visualization -->
-        <div class="flex-1 bg-gray-900 rounded overflow-hidden">
-            <svg id="bed-svg" class="w-full" style="height: 280px;" viewBox="0 0 750 340">
+        <div class="flex-1 bg-gray-100 rounded overflow-hidden border border-gray-200">
+            <svg id="bed-svg" class="w-full" style="height: 300px;" viewBox="0 0 750 300">
                 <rect id="bed-rect" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
                 <rect id="panel-rect" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
                 <g id="coverage-trail"></g>
@@ -57,22 +57,22 @@
         </div>
         <!-- Metrics column -->
         <div class="flex flex-col gap-3 min-w-[200px] text-sm">
-            <div class="text-gray-400 font-medium text-sm border-b border-gray-700 pb-1">Metrics</div>
+            <div class="text-gray-600 font-medium text-sm border-b border-gray-200 pb-1">Metrics</div>
             <div class="flex flex-col gap-1">
                 <span class="text-xs text-gray-500">Active Tool</span>
-                <span id="demo-tool-name" class="font-medium text-gray-300 text-base">—</span>
+                <span id="demo-tool-name" class="font-medium text-gray-900 text-base">—</span>
             </div>
             <div class="flex flex-col gap-1">
                 <span class="text-xs text-gray-500">Duration</span>
-                <span id="demo-duration" class="text-gray-300">—</span>
+                <span id="demo-duration" class="text-gray-700">—</span>
             </div>
             <!-- Timeline slider -->
             <div id="demo-timeline" class="mt-2 hidden">
                 <div class="flex items-center gap-2">
-                    <button id="demo-play-btn" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300">
+                    <button id="demo-play-btn" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600 border border-gray-200">
                         <span id="play-icon">▶</span>
                     </button>
-                    <input type="range" id="demo-slider" min="0" max="1000" value="0" class="flex-1 h-2 bg-gray-700 rounded appearance-none cursor-pointer">
+                    <input type="range" id="demo-slider" min="0" max="1000" value="0" class="flex-1 h-2 bg-gray-200 rounded appearance-none cursor-pointer">
                 </div>
             </div>
         </div>
@@ -94,8 +94,8 @@ function setupBedVisualization() {
     if (!svg || !bedRect || !panelRect) return;
     
     const svgWidth = 750;
-    const svgHeight = 340;
-    const margin = { top: 10, right: 15, bottom: 30, left: 40 };
+    const svgHeight = 300;
+    const margin = { top: 10, right: 10, bottom: 10, left: 10 };
     const plotWidth = svgWidth - margin.left - margin.right;
     const plotHeight = svgHeight - margin.top - margin.bottom;
     
@@ -173,57 +173,6 @@ function setupBedVisualization() {
         oLabel.textContent = '(0,0)';
         axisLabels.appendChild(oLabel);
         
-        // X axis ticks
-        const xInt = bedLengthX <= 6000 ? 1000 : 2000;
-        for (let x = xInt; x <= bedLengthX; x += xInt) {
-            const pos = worldToSvg(x, 0);
-            const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            tick.setAttribute('x1', pos.x); tick.setAttribute('y1', pos.y);
-            tick.setAttribute('x2', pos.x); tick.setAttribute('y2', pos.y + 4);
-            tick.setAttribute('stroke', '#6b7280'); tick.setAttribute('stroke-width', '1');
-            axisLabels.appendChild(tick);
-            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            label.setAttribute('x', pos.x); label.setAttribute('y', pos.y + 12);
-            label.setAttribute('fill', '#9ca3af'); label.setAttribute('font-size', '8');
-            label.setAttribute('text-anchor', 'middle');
-            label.textContent = x;
-            axisLabels.appendChild(label);
-        }
-        
-        // Y axis ticks
-        const yInt = bedWidthY <= 3000 ? 500 : 1000;
-        for (let y = yInt; y <= bedWidthY; y += yInt) {
-            const pos = worldToSvg(0, y);
-            const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            tick.setAttribute('x1', pos.x); tick.setAttribute('y1', pos.y);
-            tick.setAttribute('x2', pos.x + 4); tick.setAttribute('y2', pos.y);
-            tick.setAttribute('stroke', '#6b7280'); tick.setAttribute('stroke-width', '1');
-            axisLabels.appendChild(tick);
-            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            label.setAttribute('x', pos.x + 6); label.setAttribute('y', pos.y + 3);
-            label.setAttribute('fill', '#9ca3af'); label.setAttribute('font-size', '8');
-            label.textContent = y;
-            axisLabels.appendChild(label);
-        }
-        
-        // X axis label
-        const xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        xLabel.setAttribute('x', offsetX + bedDisplayWidth / 2);
-        xLabel.setAttribute('y', originSvg.y + 25);
-        xLabel.setAttribute('fill', '#d1d5db'); xLabel.setAttribute('font-size', '10');
-        xLabel.setAttribute('text-anchor', 'middle');
-        xLabel.textContent = 'X (mm) →';
-        axisLabels.appendChild(xLabel);
-        
-        // Bed label
-        const bedLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        bedLabel.setAttribute('x', offsetX + bedDisplayWidth / 2);
-        bedLabel.setAttribute('y', offsetY - 6);
-        bedLabel.setAttribute('fill', '#60a5fa'); bedLabel.setAttribute('font-size', '10');
-        bedLabel.setAttribute('text-anchor', 'middle');
-        bedLabel.textContent = `Bed: ${bedLengthX} × ${bedWidthY}`;
-        dimensionLabels.appendChild(bedLabel);
-        
         // Panel label
         const pLabelX = panelOrigin.x + panelDisplayWidth / 2;
         const pLabelY = panelOrigin.y + panelDisplayHeight / 2;
@@ -234,12 +183,32 @@ function setupBedVisualization() {
         panelLabel.textContent = `${panelX} × ${panelY}`;
         dimensionLabels.appendChild(panelLabel);
         
-        const datumLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        datumLabel.setAttribute('x', pLabelX); datumLabel.setAttribute('y', pLabelY + 8);
-        datumLabel.setAttribute('fill', '#9ca3af'); datumLabel.setAttribute('font-size', '8');
-        datumLabel.setAttribute('text-anchor', 'middle');
-        datumLabel.textContent = `@ (${panelDatumX}, ${panelDatumY})`;
-        dimensionLabels.appendChild(datumLabel);
+        // Hard Y Offset line
+        const hardYOffset = getVal('hard_y_offset', 0);
+        if (hardYOffset > 0) {
+            const hardYPos = worldToSvg(0, hardYOffset);
+            const lineStartX = worldToSvg(bedLengthX + 1000, 0).x;
+            const lineEndX = worldToSvg(-1000, 0).x;
+            
+            const hardYLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            hardYLine.setAttribute('x1', lineStartX);
+            hardYLine.setAttribute('y1', hardYPos.y);
+            hardYLine.setAttribute('x2', lineEndX);
+            hardYLine.setAttribute('y2', hardYPos.y);
+            hardYLine.setAttribute('stroke', '#f97316');
+            hardYLine.setAttribute('stroke-width', '2');
+            hardYLine.setAttribute('stroke-dasharray', '8,4');
+            dimensionLabels.appendChild(hardYLine);
+            
+            const hardYLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            hardYLabel.setAttribute('x', lineStartX + 5);
+            hardYLabel.setAttribute('y', hardYPos.y - 4);
+            hardYLabel.setAttribute('fill', '#f97316');
+            hardYLabel.setAttribute('font-size', '9');
+            hardYLabel.setAttribute('text-anchor', 'start');
+            hardYLabel.textContent = `Hard Y Offset (${hardYOffset}mm)`;
+            dimensionLabels.appendChild(hardYLabel);
+        }
         
         // Expose worldToSvg for pattern overlay
         window.bedVisualization = { update: updateVisualization, worldToSvg, scale, offsetX, offsetY, bedDisplayWidth, bedDisplayHeight };
@@ -366,12 +335,25 @@ const TOOL_COLORS = {
     screed: '#facc15',      // yellow-400
 };
 
-const TOOL_DIAMETER = 500;    // mm (polisher)
-const HELI_BLADE_WIDTH = 1150; // mm (from FixedParameters.mod HeliBladeWidth - used for helicopter & pan)
+// Tool diameters - read from form inputs (fall back to defaults)
+function getToolDiameter(tool) {
+    const getVal = (name, def) => {
+        const el = document.querySelector(`input[name="${name}"]`);
+        const v = el ? parseFloat(el.value) : NaN;
+        return isNaN(v) ? def : v;
+    };
+    switch(tool) {
+        case 'vacuum': return getVal('vacuum_diameter', 500);
+        case 'polisher': return getVal('polisher_diameter', 450);
+        case 'helicopter': return getVal('heli_diameter', 1150);
+        case 'pan': return getVal('pan_diameter', 600);
+        default: return 500;
+    }
+}
 const SCREED_LENGTH_Y = 3800; // mm (along Y axis)
 const SCREED_WIDTH_X = 120;   // mm (along X axis)
-const VACUUM_LENGTH_Y = 300;  // mm (along Y axis)
-const VACUUM_WIDTH_X = 50;    // mm (along X axis)
+const VACUUM_LENGTH_Y = 300;  // mm (along Y axis - legacy, now uses diameter)
+const VACUUM_WIDTH_X = 50;    // mm (along X axis - legacy)
 const VACUUM_HANDLE_LENGTH = 250; // mm (matches 250mm offset about axis 6)
 const VACUUM_HANDLE_WIDTH = 30;  // mm (wider for visibility)
 const VACUUM_ROTATION_SPEED = 360; // degrees per second (0.5s for 180°)
@@ -699,7 +681,7 @@ function createToolCircle(tool) {
         circleGroup.appendChild(g);
     } else if (tool === 'helicopter' || tool === 'pan') {
         // Helicopter/Pan with rotating blades
-        const diameter = HELI_BLADE_WIDTH;
+        const diameter = getToolDiameter(tool);
         const radius = (diameter / 2) * scale;
         
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -738,7 +720,8 @@ function createToolCircle(tool) {
         circleGroup.appendChild(g);
     } else {
         // Polisher is a circle
-        const radius = (TOOL_DIAMETER / 2) * scale;
+        const diameter = getToolDiameter(tool);
+        const radius = (diameter / 2) * scale;
         
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('id', 'demo-tool');
@@ -835,8 +818,8 @@ function updateCoverage(toolX, toolY, axis6 = 0) {
             }
         }
     } else {
-        // Circular tools - helicopter/pan use HeliBladeWidth, polisher uses TOOL_DIAMETER
-        const diameter = (demoState.tool === 'helicopter' || demoState.tool === 'pan') ? HELI_BLADE_WIDTH : TOOL_DIAMETER;
+        // Circular tools - use actual diameter from form inputs
+        const diameter = getToolDiameter(demoState.tool);
         const toolRadius = diameter / 2;
         
         const minCol = Math.max(0, Math.floor((toolX - toolRadius) / cellSize));
