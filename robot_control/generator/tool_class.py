@@ -302,6 +302,12 @@ class Tool(ABC):
             width_y = params['bed_width_y']
             base_z = 0
         
+        # Apply hard_y_offset: use min of panel's max Y or hard_y_offset (absolute ceiling)
+        hard_y_offset = params.get('hard_y_offset', 0)
+        panel_max_y = datum_y + width_y
+        effective_max_y = min(panel_max_y, hard_y_offset) if hard_y_offset > 0 else panel_max_y
+        effective_width_y = effective_max_y - datum_y
+        
         # Get tool-specific offsets
         z_offset = params.get('z_offset', 0) + params.get(f'{self.name.lower()}_z_offset', 0)
         tool_width = self._get_tool_width()
@@ -312,11 +318,11 @@ class Tool(ABC):
             'datum_x': datum_x,
             'datum_y': datum_y,
             'length_x': length_x,
-            'width_y': width_y,
+            'width_y': effective_width_y,
             'min_x': datum_x + tool_width / 2,
             'max_x': datum_x + length_x - tool_width / 2,
             'min_y': datum_y + tool_width / 2,
-            'max_y': datum_y + width_y - tool_width / 2,
+            'max_y': effective_max_y - tool_width / 2,
             'work_z': base_z + z_offset,
             'safe_z': base_z + z_offset + 200,
             'step_size': step_size,
@@ -410,6 +416,9 @@ class Tool(ABC):
         # Track current axis 6 position for rotation moves
         current_axis_6 = None
         
+        # Get axis_5 tilt angle (for vacuum tool - pipe angle)
+        axis_5_angle = params.get('vacuum_axis_5', 0) if self.config.name == 'Vac' else 0
+        
         # Generate moves for each point
         for i, point in enumerate(points):
             axis_6_str = f", axis_6={point.axis_6:.0f}" if point.axis_6 is not None else ""
@@ -417,13 +426,15 @@ class Tool(ABC):
             lines.append(f"        CurrentX:={point.x:.0f};")
             lines.append(f"        CurrentY:={point.y:.0f};")
             
-            # Handle Z based on move type (lifted for rapid, work height for work)
-            if point.move_type == "rapid":
+            # Handle Z based on move type (lifted for rapid/lift, work height for work/place)
+            if point.move_type in ("rapid", "lift"):
                 lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
             else:
                 lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
             
-            lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
+            # Use point's axis_5 if specified, otherwise use tool param
+            point_axis_5 = point.axis_5 if point.axis_5 is not None else axis_5_angle
+            lines.append(f"        pCurrent.rot:=OrientZYX(0,{point_axis_5},180);")
             lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
             lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
             lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
@@ -677,11 +688,18 @@ class VibratingScreened(Tool):
     def _get_pattern_points(self, params: Dict[str, Any]) -> List[Point]:
         """VibScreed uses single pass pattern."""
         workzone = self._get_workzone_params(params)
-        panel_offset = 200  # Fixed offset from panel edges
-        y_center = (workzone['min_y'] + workzone['max_y']) / 2
+        
+        # Edge offset: positive extends beyond panel edges
+        edge_offset = params.get('screed_edge_offset', 200)
+        
+        # Y center is max of panel center or bed center (safety - prevents hitting robot on narrow panels)
+        panel_y_center = (workzone['min_y'] + workzone['max_y']) / 2
+        bed_y_center = params.get('bed_datum_y', 0) + params.get('bed_width_y', 3000) / 2
+        y_center = max(panel_y_center, bed_y_center)
+        
         return single_pass(
-            start_x=workzone['datum_x'] + panel_offset,
-            end_x=workzone['datum_x'] + workzone['length_x'] - panel_offset,
+            start_x=workzone['datum_x'] - edge_offset,
+            end_x=workzone['datum_x'] + workzone['length_x'] + edge_offset,
             y_position=y_center,
             approach_offset=50,
         )

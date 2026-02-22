@@ -28,6 +28,7 @@ class ToolPathParameters(models.Model):
     vacuum_force_enabled = models.BooleanField(default=False, help_text="Enable force control for vacuum")
     vacuum_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Vacuum spiral direction: clockwise or anticlockwise")
     vacuum_formwork_offset = models.IntegerField(default=100, help_text="Vacuum spiral formwork offset from edges (mm)")
+    vacuum_axis_5 = models.IntegerField(default=0, help_text="Vacuum axis 5 tilt angle (degrees)")
     
     # Cross-hatch pattern steps (per tool)
     polisher_step = models.IntegerField(default=450, help_text="Polisher step (mm)")
@@ -75,7 +76,9 @@ class ToolPathParameters(models.Model):
     screed_z_offset = models.IntegerField(default=0, help_text="Screed Z offset (mm)")
     vib_screed_speed = models.IntegerField(default=100, help_text="Vibrating screed speed (mm/s)")
     screed_angle_offset = models.IntegerField(default=0, help_text="Screed angle offset (degrees)")
+    screed_edge_offset = models.IntegerField(default=200, help_text="Screed edge offset (mm) - positive extends beyond panel edges")
     z_offset = models.IntegerField(default=0, help_text="Z offset (mm) - applies to all workzones")
+    hard_y_offset = models.IntegerField(default=0, help_text="Hard Y offset (mm) - absolute minimum Y bound for all tools")
     
     # Cross-hatch pattern parameters (legacy/global - deprecated, use per-tool params below)
     serpentine_offset_x = models.IntegerField(default=100, help_text="Serpentine X offset from edges (mm)")
@@ -173,7 +176,9 @@ class ToolPathParameters(models.Model):
             'screed_z_offset': self.screed_z_offset,
             'vib_screed_speed': self.vib_screed_speed,
             'screed_angle_offset': self.screed_angle_offset,
+            'screed_edge_offset': self.screed_edge_offset,
             'z_offset': self.z_offset,
+            'hard_y_offset': self.hard_y_offset,
             'serpentine_offset_x': self.serpentine_offset_x,
             'serpentine_offset_y': self.serpentine_offset_y,
             'serpentine_direction': self.serpentine_direction,
@@ -198,6 +203,7 @@ class ToolPathParameters(models.Model):
             # Per-tool spiral parameters
             'vacuum_spiral_direction': self.vacuum_spiral_direction,
             'vacuum_formwork_offset': self.vacuum_formwork_offset,
+            'vacuum_axis_5': self.vacuum_axis_5,
             'polisher_spiral_direction': self.polisher_spiral_direction,
             'polisher_formwork_offset': self.polisher_formwork_offset,
             'pan_spiral_direction': self.pan_spiral_direction,

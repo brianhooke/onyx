@@ -30,12 +30,18 @@ class Point:
     """A point in the pattern with move type hint."""
     x: float
     y: float
-    move_type: Literal["rapid", "work"]  # rapid=fast positioning, work=process move
+    move_type: Literal["rapid", "work", "lift", "place"]  # rapid=fast positioning, work=process move, lift/place=vacuum transitions
+    axis_5: Optional[float] = None  # Axis 5 tilt angle in degrees (vacuum pipe tilts towards max_x/far end of bed, None = unchanged)
     axis_6: Optional[float] = None  # Axis 6 rotation in degrees (None = unchanged)
     
     def __repr__(self) -> str:
+        extras = []
+        if self.axis_5 is not None:
+            extras.append(f"axis_5={self.axis_5:.0f}")
         if self.axis_6 is not None:
-            return f"Point({self.x:.0f}, {self.y:.0f}, '{self.move_type}', axis_6={self.axis_6:.0f})"
+            extras.append(f"axis_6={self.axis_6:.0f}")
+        if extras:
+            return f"Point({self.x:.0f}, {self.y:.0f}, '{self.move_type}', {', '.join(extras)})"
         return f"Point({self.x:.0f}, {self.y:.0f}, '{self.move_type}')"
 
 

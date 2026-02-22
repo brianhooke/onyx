@@ -67,6 +67,8 @@
                         <input type="number" name="z_offset" value="{{ defaults.z_offset }}" class="compact-input w-12">
                         <span class="text-gray-500 text-xs">Panel Z:</span>
                         <input type="number" name="panel_z" value="150" readonly class="compact-input w-12 bg-gray-800 text-gray-500 cursor-not-allowed">
+                        <span class="text-gray-500 text-xs">Hard Y Offset:</span>
+                        <input type="number" name="hard_y_offset" value="{{ defaults.hard_y_offset }}" class="compact-input w-14" title="Absolute minimum Y bound for all tools (mm)">
                     </div>
                 </details>
                 
@@ -247,7 +249,7 @@
                             <td class="py-1 px-1"><input type="number" name="vacuum_speed" value="{{ defaults.vacuum_speed }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="vacuum_force" value="{{ defaults.vacuum_force }}" class="compact-input"></td>
                             <td class="py-1 px-1 text-gray-600">—</td>
-                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1"><input type="number" name="vacuum_axis_5" value="{{ defaults.vacuum_axis_5|default:0 }}" class="compact-input" title="Axis 5 tilt angle (vacuum pipe angle)"></td>
                         </tr>
                         <!-- Polisher -->
                         <tr class="tool-row">
@@ -276,7 +278,7 @@
                             <td class="py-1 px-1 text-yellow-400 font-medium">Vib Screed</td>
                             <td class="py-1 px-1 text-gray-500">Panel</td>
                             <td class="py-1 px-1 text-gray-600">—</td>
-                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1"><input type="number" name="screed_edge_offset" value="{{ defaults.screed_edge_offset }}" class="compact-input" title="Edge offset (mm) - positive extends beyond panel"></td>
                             <td class="py-1 px-1"><input type="number" name="screed_z_offset" value="{{ defaults.screed_z_offset }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="vib_screed_speed" value="{{ defaults.vib_screed_speed }}" class="compact-input"></td>
                             <td class="py-1 px-1 text-gray-600">—</td>
@@ -388,6 +390,16 @@
                         <div class="flex items-center gap-1">
                             <span class="text-gray-500">Retract:</span>
                             <input type="number" name="polisher_retract_speed" value="{{ defaults.polisher_retract_speed }}" class="compact-input w-16">
+                        </div>
+                    </div>
+                </details>
+                <!-- Vib Screed (collapsible) -->
+                <details class="mt-2 pt-2 border-t border-gray-700">
+                    <summary class="text-[10px] text-yellow-400 cursor-pointer hover:text-yellow-300">Vib Screed ▸</summary>
+                    <div class="flex flex-wrap gap-3 mt-2 text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Edge Offset:</span>
+                            <input type="number" name="screed_edge_offset" value="{{ defaults.screed_edge_offset }}" class="compact-input w-16" title="Positive extends beyond panel edges (mm)">
                         </div>
                     </div>
                 </details>

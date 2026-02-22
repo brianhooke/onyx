@@ -633,6 +633,7 @@ def api_pattern_points(request):
                 'pattern': data.get('vacuum_pattern', 'cross-hatch'),
                 'tool_offset': data.get('vacuum_tool_offset', 500),
                 'axis_6_initial': data.get('vacuum_axis_6_initial', 0),
+                'axis_5': data.get('vacuum_axis_5', 0),  # Vacuum pipe tilt angle
                 'formwork_offset': data.get('vacuum_formwork_offset', 50),
                 'spiral_direction': data.get('vacuum_spiral_direction', 'anticlockwise'),
                 'handle_length': 250,  # Vacuum handle length for corner offset
@@ -651,6 +652,7 @@ def api_pattern_points(request):
         config = tool_config.get(tool, tool_config['polisher'])
         
         # Calculate workzone bounds
+        hard_y_offset = data.get('hard_y_offset', 0)
         if config['workzone'] == 'bed':
             min_x, max_x = 0, bed_length_x
             min_y, max_y = 0, bed_width_y
@@ -658,7 +660,9 @@ def api_pattern_points(request):
             min_x = panel_datum_x
             max_x = panel_datum_x + panel_x
             min_y = panel_datum_y
-            max_y = panel_datum_y + panel_y
+            # Apply hard_y_offset: use min of panel's Y or hard_y_offset (absolute ceiling)
+            panel_max_y = panel_datum_y + panel_y
+            max_y = min(panel_max_y, hard_y_offset) if hard_y_offset > 0 else panel_max_y
         
         step = config['step'] or 200
         pattern_type = config['pattern']
@@ -693,9 +697,14 @@ def api_pattern_points(request):
                 axis_6_initial=config.get('axis_6_initial', 0),
             )
         elif pattern_type == 'single-pass':
-            y_center = (min_y + max_y) / 2
+            # Y center is max of panel center or bed center (safety - prevents hitting robot on narrow panels)
+            panel_y_center = (min_y + max_y) / 2
+            bed_y_center = bed_width_y / 2
+            y_center = max(panel_y_center, bed_y_center)
+            # Edge offset: positive extends beyond panel edges
+            edge_offset = data.get('screed_edge_offset', 200)
             points = single_pass(
-                start_x=min_x + 200, end_x=max_x - 200, y_position=y_center,
+                start_x=min_x - edge_offset, end_x=max_x + edge_offset, y_position=y_center,
             )
         else:  # cross-hatch
             points = cross_hatch(
