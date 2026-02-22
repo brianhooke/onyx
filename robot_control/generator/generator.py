@@ -14,30 +14,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-# TEMPORARILY DISABLED: Helicopter tool generation (re-enable later)
-# from .tools.helicopter import generate_py2heli
-from .tools.polisher import generate_py2polish
-from .tools.vacuum import generate_py2vacuum
-from .tools.pan import generate_py2pan
-from .tools.vib_screed import generate_py2vib_screed
+# Tool class-based generation (all tools)
+from .tool_class import TOOLS, get_tool
 from .tools.sequences import generate_seq_bed_clean
 
 
 # Paths
 SCRIPT_DIR = Path(__file__).parent
-PROJECT_ROOT = SCRIPT_DIR.parent.parent
-RAPID_ROOT = PROJECT_ROOT / "RAPID" / "RAPID"
-SOURCE_PROGMOD = RAPID_ROOT / "TASK1" / "PROGMOD"
+TEMPLATES_DIR = SCRIPT_DIR / "templates"
 
 # Files to copy without modification
 STATIC_FILES = [
-    "Brian.mod",
+    "FixedParameters.mod",
     "ErrorHandling.mod",
     "MainModule.mod",
-    "RobotTargets.mod",
     "Tools.mod",
-    "Toolstations.mod",
-    "WebController.mod",
     "FCtesting.mod",
 ]
 
@@ -52,68 +43,70 @@ class ToolpathGenerator:
     Generates RAPID modules with user parameters and Py2 menu structure.
     """
     
-    DEFAULT_PARAMS = {
-        'bed_length_x': 12000,
-        'bed_width_y': 3200,
-        'bed_datum_x': 1100,
-        'bed_datum_y': 600,
-        'panel_datum_x': 1100,
-        'panel_datum_y': 600,
-        'panel_x': 5900,
-        'panel_y': 2200,
-        'panel_z': 150,
-        'vacuum_z_offset': 0,
-        'vacuum_speed': 100,
-        'vacuum_pattern': 'cross-hatch',
-        'vacuum_workzone': 'panel',
-        'vacuum_force': 50,
-        'vacuum_z_range': 30,
-        'vacuum_force_enabled': False,
-        'polisher_step': 450,
-        'vacuum_step': 450,
-        'pan_step': 600,
-        'helicopter_step': 600,
-        'pan_travel_speed': 100,
-        'pan_blade_speed': 70,
-        'pan_z_offset': 250,
-        'pan_pattern': 'cross-hatch',
-        'pan_force': 0,
-        'pan_force_change': 100,
-        'pan_pos_supv_dist': 125,
-        'heli_travel_speed': 40,
-        'heli_blade_speed': 70,
-        'heli_blade_angle': 0,
-        'heli_force': 200,
-        'heli_z_offset': 0,
-        'heli_workzone': 'panel',
-        'heli_pattern': 'cross-hatch',
-        'heli_spiral_direction': 'anticlockwise',
-        'heli_formwork_offset': 100,
-        'polisher_z_offset': 0,
-        'polisher_workzone': 'bed',
-        'polisher_start_force': 300,
-        'polisher_motion_force': 300,
-        'polisher_force_change': 100,
-        'polisher_approach_speed': 20,
-        'polisher_retract_speed': 50,
-        'polisher_pos_supv_dist': 100,
-        'polisher_pattern': 'cross-hatch',
-        'polisher_speed': 100,
-        'screed_z_offset': 0,
-        'vib_screed_speed': 100,
-        'screed_angle_offset': 0,
-        'z_offset': 0,
-        'serpentine_offset_x': 100,
-        'serpentine_offset_y': 100,
-        'serpentine_direction': 1,
-        'serpentine_start_bottom': False,
-    }
+    # Required parameters - all must be provided from DB, no defaults here
+    REQUIRED_PARAMS = [
+        'bed_length_x',
+        'bed_width_y',
+        'bed_datum_x',
+        'bed_datum_y',
+        'panel_datum_x',
+        'panel_datum_y',
+        'panel_x',
+        'panel_y',
+        'panel_z',
+        'vacuum_z_offset',
+        'vacuum_speed',
+        'vacuum_pattern',
+        'vacuum_workzone',
+        'vacuum_force',
+        'vacuum_force_enabled',
+        'polisher_step',
+        'vacuum_step',
+        'pan_step',
+        'helicopter_step',
+        'pan_travel_speed',
+        'pan_blade_speed',
+        'pan_z_offset',
+        'pan_pattern',
+        'pan_force',
+        'pan_force_change',
+        'pan_pos_supv_dist',
+        'heli_travel_speed',
+        'heli_blade_speed',
+        'heli_blade_angle',
+        'heli_force',
+        'heli_z_offset',
+        'heli_workzone',
+        'heli_pattern',
+        'heli_spiral_direction',
+        'heli_formwork_offset',
+        'polisher_z_offset',
+        'polisher_workzone',
+        'polisher_start_force',
+        'polisher_motion_force',
+        'polisher_force_change',
+        'polisher_approach_speed',
+        'polisher_retract_speed',
+        'polisher_pos_supv_dist',
+        'polisher_pattern',
+        'polisher_speed',
+        'screed_z_offset',
+        'vib_screed_speed',
+        'screed_angle_offset',
+        'z_offset',
+        'serpentine_offset_x',
+        'serpentine_offset_y',
+        'serpentine_direction',
+        'serpentine_start_bottom',
+    ]
     
-    def __init__(self, params: dict = None):
-        merged = dict(self.DEFAULT_PARAMS)
-        if params:
-            merged.update(params)
-        self.params = merged
+    def __init__(self, params: dict):
+        # Validate all required parameters are present
+        missing = [p for p in self.REQUIRED_PARAMS if p not in params]
+        if missing:
+            raise ValueError(f"Missing required parameters from DB: {', '.join(missing)}")
+        
+        self.params = dict(params)
         self.timestamp = datetime.now().strftime("%d-%b_%H:%M").lower()
     
     def generate(self) -> Dict:
@@ -128,26 +121,19 @@ class ToolpathGenerator:
         
         # 1. Copy static files
         for filename in STATIC_FILES:
-            src = SOURCE_PROGMOD / filename
+            src = TEMPLATES_DIR / filename
             dst = output_dir / filename
             if src.exists():
                 shutil.copy2(src, dst)
                 generated_files.append(filename)
         
         # 2. Process ToolPaths.mod
-        toolpaths_src = SOURCE_PROGMOD / TOOLPATHS_FILE
+        toolpaths_src = TEMPLATES_DIR / TOOLPATHS_FILE
         if toolpaths_src.exists():
             content = toolpaths_src.read_text(encoding='utf-8', errors='ignore')
             content = self._process_toolpaths(content)
             (output_dir / TOOLPATHS_FILE).write_text(content, encoding='utf-8')
             generated_files.append(TOOLPATHS_FILE)
-        
-        # 3. Update MainModule.mod to call MainMenu instead of PetePanels
-        mainmod_path = output_dir / "MainModule.mod"
-        if mainmod_path.exists():
-            content = mainmod_path.read_text(encoding='utf-8', errors='ignore')
-            content = content.replace('PetePanels', 'MainMenu')
-            mainmod_path.write_text(content, encoding='utf-8')
         
         return {
             'output_dir': str(output_dir),
@@ -159,29 +145,25 @@ class ToolpathGenerator:
     def _process_toolpaths(self, content: str) -> str:
         """
         Process ToolPaths.mod:
-        1. Replace entire PetePanels proc with simplified version
-        2. Inject Py2 procedures
+        1. Inject Py2 procedures before ENDMODULE
         """
         import re
         
-        # Generate tool procedures
-        # TEMPORARILY DISABLED: Helicopter tool generation (re-enable later)
-        # py2heli_proc = generate_py2heli(self.params)
-        py2heli_proc = ""
-        py2polish_proc = generate_py2polish(self.params)
-        py2vacuum_proc = generate_py2vacuum(self.params)
-        py2pan_proc = generate_py2pan(self.params)
-        py2vib_screed_proc = generate_py2vib_screed(self.params)
+        # Generate tool procedures using Tool class
+        py2heli_proc = TOOLS['helicopter'].generate_procedure(self.params)
+        py2polish_proc = TOOLS['polisher'].generate_procedure(self.params)
+        py2vacuum_proc = TOOLS['vacuum'].generate_procedure(self.params)
+        py2pan_proc = TOOLS['pan'].generate_procedure(self.params)
+        py2vib_screed_proc = TOOLS['vib_screed'].generate_procedure(self.params)
         seq_bed_clean_proc = generate_seq_bed_clean(self.params)
         
         # Generate the main Py2 menu procedure
         py2main_proc = self._generate_py2main()
         
-        # === REPLACE ENTIRE PetePanels with MainMenu ===
-        # The baseline has complex nested TEST/CASE - replace the whole thing
-        petepanels_pattern = r'PROC PetePanels\(\).*?ENDPROC'
-        
-        new_mainmenu = f'''PROC MainMenu()
+        # Generate MainMenu procedure (injected with other Py2 procedures)
+        new_mainmenu = f'''
+    PROC MainMenu()
+        VAR num iTask;
         TPErase;
         TPReadNum iTask,"1:Home,2:Py2_{self.timestamp}";
         TEST iTask
@@ -196,20 +178,19 @@ class ToolpathGenerator:
         RAISE;
     ENDPROC'''
         
-        content = re.sub(petepanels_pattern, new_mainmenu, content, flags=re.DOTALL)
-        
         # Find ENDMODULE and insert our procedures before it
         if "ENDMODULE" in content:
             # Remove any existing Py2 procedures first
             content = self._remove_existing_py2_procs(content)
             
-            # Insert new procedures
+            # Insert new procedures (including MainMenu)
             insert_block = f"""
     
     ! ========== PY2 GENERATED PROCEDURES ==========
     ! Generated: {self.timestamp}
     ! Do not edit manually - regenerate via web interface
-    
+{new_mainmenu}
+
 {py2main_proc}
 
 {py2heli_proc}

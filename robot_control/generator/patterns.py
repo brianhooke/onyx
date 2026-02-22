@@ -1,12 +1,21 @@
 """
-Pure geometry pattern generators.
+Pure geometry pattern generators for robot toolpaths.
 
-These functions know nothing about RAPID or robots.
-They just generate lists of coordinates for different patterns.
+These functions generate pure XY coordinates with move type hints.
+They know nothing about RAPID, robots, or tools - they just generate geometry.
+
+The Tool class (tool_class.py) consumes these patterns and translates them
+into actual RAPID code with proper track clamping, force control, etc.
+
+Available patterns:
+    - cross_hatch: Bidirectional passes (X then Y, or Y then X)
+    - rectangular_spiral: Inward spiral from edges to center
+    - sweep_lift: Unidirectional sweeps with lift-reposition (vacuum)
+    - single_pass: Single linear pass (vibrating screed)
 """
 
 from dataclasses import dataclass
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 
 @dataclass
@@ -15,6 +24,25 @@ class Point:
     x: float
     y: float
     move_type: Literal["rapid", "work"]  # rapid=fast positioning, work=process move
+    
+    def __repr__(self) -> str:
+        return f"Point({self.x:.0f}, {self.y:.0f}, '{self.move_type}')"
+
+
+@dataclass
+class PatternConfig:
+    """Configuration for pattern generation - passed from Tool to pattern functions."""
+    min_x: float
+    max_x: float
+    min_y: float
+    max_y: float
+    step_size: float
+    # Optional pattern-specific params
+    first_direction: Literal["x", "y"] = "x"
+    start_corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"] = "top_left"
+    spiral_direction: Literal["clockwise", "anticlockwise"] = "anticlockwise"
+    formwork_offset: float = 0
+    lift_height: float = 200
 
 
 def cross_hatch(
@@ -317,3 +345,86 @@ def sweep_lift(
         points.append(Point(min_x, y, "work"))
     
     return points
+
+
+def single_pass(
+    start_x: float,
+    end_x: float,
+    y_position: float,
+    approach_offset: float = 50,
+) -> List[Point]:
+    """
+    Generate a single linear pass pattern (e.g., vibrating screed).
+    
+    This is the simplest pattern: approach, work pass, depart.
+    
+    Args:
+        start_x: Starting X position
+        end_x: Ending X position  
+        y_position: Fixed Y position for the pass
+        approach_offset: X offset for approach/depart moves
+    
+    Returns:
+        List of Points: [approach, start, end, depart]
+    """
+    points = [
+        Point(start_x - approach_offset, y_position, "rapid"),  # Approach
+        Point(start_x, y_position, "work"),  # Start of pass
+        Point(end_x, y_position, "work"),    # End of pass
+        Point(end_x + approach_offset, y_position, "rapid"),  # Depart
+    ]
+    return points
+
+
+def generate_pattern(pattern_type: str, config: PatternConfig) -> List[Point]:
+    """
+    Factory function to generate any pattern from a PatternConfig.
+    
+    This is the main entry point for Tool class to use.
+    
+    Args:
+        pattern_type: One of 'cross_hatch', 'rectangular_spiral', 'sweep_lift', 'single_pass'
+        config: PatternConfig with all necessary parameters
+        
+    Returns:
+        List of Points for the pattern
+    """
+    if pattern_type == 'cross_hatch':
+        return cross_hatch(
+            min_x=config.min_x,
+            max_x=config.max_x,
+            min_y=config.min_y,
+            max_y=config.max_y,
+            step_size=config.step_size,
+            first_direction=config.first_direction,
+            start_corner=config.start_corner,
+        )
+    elif pattern_type == 'rectangular_spiral':
+        return rectangular_spiral(
+            min_x=config.min_x,
+            max_x=config.max_x,
+            min_y=config.min_y,
+            max_y=config.max_y,
+            step_size=config.step_size,
+            formwork_offset=config.formwork_offset,
+            direction=config.spiral_direction,
+        )
+    elif pattern_type == 'sweep_lift':
+        return sweep_lift(
+            min_x=config.min_x,
+            max_x=config.max_x,
+            min_y=config.min_y,
+            max_y=config.max_y,
+            step_size=config.step_size,
+            lift_height=config.lift_height,
+        )
+    elif pattern_type == 'single_pass':
+        # For single pass, use min_x to max_x, y at center of workzone
+        y_center = (config.min_y + config.max_y) / 2
+        return single_pass(
+            start_x=config.min_x,
+            end_x=config.max_x,
+            y_position=y_center,
+        )
+    else:
+        raise ValueError(f"Unknown pattern type: {pattern_type}")
