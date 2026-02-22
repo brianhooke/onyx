@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/toolpath/upload-original/', views.api_upload_original_progmod, name='api_upload_original_progmod'),
     path('api/toolpath/params/', toolpath.api_toolpath_params, name='api_toolpath_params'),
     path('api/toolpath/params/save/', toolpath.api_toolpath_save_params, name='api_toolpath_save_params'),
+    path('api/toolpath/pattern-points/', views.api_pattern_points, name='api_pattern_points'),
     path('api/reload-program/', views.api_reload_program, name='api_reload_program'),
     path('api/tool-changer/', views.api_tool_changer, name='api_tool_changer'),
     path('api/activity-log/', views.api_activity_log, name='api_activity_log'),

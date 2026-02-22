@@ -12,7 +12,26 @@ from .generator import ToolpathGenerator
 from .models import ToolPathParameters
 
 # Backup directory for RAPID modules
-BACKUP_DIR = Path(__file__).parent.parent / 'backups'
+BACKUP_DIR = Path(__file__).parent / 'data' / 'backups'
+MAX_BACKUPS = 5  # Keep only the last N backup folders
+
+
+def cleanup_old_backups():
+    """Remove old backup folders, keeping only the most recent MAX_BACKUPS."""
+    if not BACKUP_DIR.exists():
+        return
+    
+    # Get all backup subdirectories sorted by modification time (newest first)
+    backup_dirs = sorted(
+        [d for d in BACKUP_DIR.iterdir() if d.is_dir()],
+        key=lambda d: d.stat().st_mtime,
+        reverse=True
+    )
+    
+    # Delete old backups beyond MAX_BACKUPS
+    import shutil
+    for old_dir in backup_dirs[MAX_BACKUPS:]:
+        shutil.rmtree(old_dir, ignore_errors=True)
 
 
 def dashboard(request):
@@ -77,6 +96,11 @@ def api_position(request):
 def api_live_log(request):
     """Get a lightweight live snapshot for the Toolpath Generator live log panel."""
     client = IRC5Client()
+
+    # Fast-fail if not connected (avoid multiple 10s timeouts)
+    conn = client.test_connection()
+    if not conn['connected']:
+        return JsonResponse({'lines': [], 'current_tool': 'disconnected'})
 
     try:
         contains = request.GET.get('contains', 'LIVE:')
@@ -342,7 +366,7 @@ def toolpath_generator(request):
     # Load saved parameters from database, fall back to code defaults
     params, _ = ToolPathParameters.objects.get_or_create(pk=1)
     defaults = params.to_dict()
-    return render(request, 'robot_control/toolpath_generator.html', {'defaults': defaults})
+    return render(request, 'robot_control/toolpath_generator_compact.html', {'defaults': defaults})
 
 
 @csrf_exempt
@@ -362,11 +386,14 @@ def api_generate_toolpath(request):
     try:
         data = json.loads(request.body)
         
-        # Extract parameters (use defaults for missing)
-        params = {}
-        for key in ToolpathGenerator.DEFAULT_PARAMS.keys():
+        # Load all parameters from DB first (single source of truth)
+        db_params = ToolPathParameters.get_instance().to_dict()
+        
+        # Overlay with any values from POST data
+        params = dict(db_params)
+        for key in ToolpathGenerator.REQUIRED_PARAMS:
             if key in data and data[key] is not None:
-                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_first_direction', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern'):
+                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern'):
                     params[key] = str(data[key])
                 elif key == 'serpentine_start_bottom':
                     params[key] = bool(int(data[key])) if data[key] != '' else False
@@ -419,6 +446,9 @@ def api_generate_toolpath(request):
             
             response_data['backup_dir'] = str(backup_subdir)
             response_data['backed_up_files'] = backed_up
+            
+            # Clean up old backups, keeping only the most recent ones
+            cleanup_old_backups()
             
             # Compare generated files with backed up files - only upload changed files
             output_dir = Path(result['output_dir'])
@@ -497,7 +527,7 @@ def api_upload_original_progmod(request):
             })
         
         # Original PROGMOD directory
-        original_progmod = Path(__file__).parent.parent / 'RAPID' / 'RAPID' / 'TASK1' / 'PROGMOD'
+        original_progmod = Path(__file__).parent / 'generator' / 'templates_original'
         
         if not original_progmod.exists():
             return JsonResponse({
@@ -547,6 +577,140 @@ def api_upload_original_progmod(request):
 def api_toolpath_defaults(request):
     """Get default toolpath parameters."""
     return JsonResponse(ToolpathGenerator.DEFAULT_PARAMS)
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def api_pattern_points(request):
+    """Get pattern points for a tool given current parameters."""
+    from .generator.patterns import cross_hatch, rectangular_spiral, sweep_lift, single_pass
+    
+    try:
+        data = json.loads(request.body)
+        tool = data.get('tool', 'polisher')
+        
+        # Get workzone parameters
+        panel_datum_x = data.get('panel_datum_x', 0)
+        panel_datum_y = data.get('panel_datum_y', 0)
+        panel_x = data.get('panel_x', 3000)
+        panel_y = data.get('panel_y', 2000)
+        bed_length_x = data.get('bed_length_x', 12000)
+        bed_width_y = data.get('bed_width_y', 3300)
+        
+        # Tool-specific parameters
+        # edge_offset = diameter/2 - overhang (tool center position to achieve overhang)
+        tool_config = {
+            'polisher': {
+                'workzone': data.get('polisher_workzone', 'panel'),
+                'step': data.get('polisher_step', 200),
+                'pattern': data.get('polisher_pattern', 'cross-hatch'),
+                'formwork_offset': data.get('polisher_formwork_offset', 50),
+                'spiral_direction': data.get('polisher_spiral_direction', 'anticlockwise'),
+                'diameter': data.get('polisher_diameter', 450),
+                'overhang': data.get('polisher_overhang', 50),
+            },
+            'helicopter': {
+                'workzone': data.get('heli_workzone', 'panel'),
+                'step': data.get('helicopter_step', 150),
+                'pattern': data.get('heli_pattern', 'cross-hatch'),
+                'formwork_offset': data.get('heli_formwork_offset', 50),
+                'spiral_direction': data.get('heli_spiral_direction', 'anticlockwise'),
+                'diameter': data.get('heli_diameter', 1150),
+                'overhang': data.get('heli_overhang', 50),
+            },
+            'pan': {
+                'workzone': 'panel',
+                'step': data.get('pan_step', 200),
+                'pattern': data.get('pan_pattern', 'cross-hatch'),
+                'formwork_offset': data.get('pan_formwork_offset', 50),
+                'spiral_direction': data.get('pan_spiral_direction', 'anticlockwise'),
+                'diameter': data.get('pan_diameter', 600),
+                'overhang': data.get('pan_overhang', 50),
+            },
+            'vacuum': {
+                'workzone': data.get('vacuum_workzone', 'panel'),
+                'step': data.get('vacuum_step', 400),
+                'pattern': data.get('vacuum_pattern', 'cross-hatch'),
+                'tool_offset': data.get('vacuum_tool_offset', 500),
+                'axis_6_initial': data.get('vacuum_axis_6_initial', 0),
+                'formwork_offset': data.get('vacuum_formwork_offset', 50),
+                'spiral_direction': data.get('vacuum_spiral_direction', 'anticlockwise'),
+                'handle_length': 250,  # Vacuum handle length for corner offset
+                'diameter': data.get('vacuum_diameter', 500),
+                'overhang': data.get('vacuum_overhang', 50),
+            },
+            'screed': {
+                'workzone': 'panel',
+                'step': 0,
+                'pattern': 'single-pass',
+                'diameter': 0,
+                'overhang': 0,
+            },
+        }
+        
+        config = tool_config.get(tool, tool_config['polisher'])
+        
+        # Calculate workzone bounds
+        if config['workzone'] == 'bed':
+            min_x, max_x = 0, bed_length_x
+            min_y, max_y = 0, bed_width_y
+        else:
+            min_x = panel_datum_x
+            max_x = panel_datum_x + panel_x
+            min_y = panel_datum_y
+            max_y = panel_datum_y + panel_y
+        
+        step = config['step'] or 200
+        pattern_type = config['pattern']
+        
+        # Calculate edge offset from diameter and overhang
+        # edge_offset = diameter/2 - overhang (tool center position to achieve overhang)
+        diameter = config.get('diameter', 0)
+        overhang = config.get('overhang', 0)
+        edge_offset = (diameter / 2) - overhang if diameter > 0 else 0
+        
+        # Apply edge offset to workzone bounds for cross-hatch patterns
+        xhatch_min_x = min_x + edge_offset
+        xhatch_max_x = max_x - edge_offset
+        xhatch_min_y = min_y + edge_offset
+        xhatch_max_y = max_y - edge_offset
+        
+        # Generate pattern points
+        if pattern_type in ('rectangular-spiral', 'rectangular_spiral'):
+            points = rectangular_spiral(
+                min_x=min_x, max_x=max_x, min_y=min_y, max_y=max_y,
+                step_size=step,
+                formwork_offset=config.get('formwork_offset', 50),
+                direction=config.get('spiral_direction', 'anticlockwise'),
+                tool=tool,
+                handle_length=config.get('handle_length', 0),
+            )
+        elif pattern_type == 'sweep-lift':
+            points = sweep_lift(
+                min_x=min_x, max_x=max_x, min_y=min_y, max_y=max_y,
+                step_size=step,
+                tool_offset=config.get('tool_offset', 500),
+                axis_6_initial=config.get('axis_6_initial', 0),
+            )
+        elif pattern_type == 'single-pass':
+            y_center = (min_y + max_y) / 2
+            points = single_pass(
+                start_x=min_x + 200, end_x=max_x - 200, y_position=y_center,
+            )
+        else:  # cross-hatch
+            points = cross_hatch(
+                min_x=xhatch_min_x, max_x=xhatch_max_x, min_y=xhatch_min_y, max_y=xhatch_max_y,
+                step_size=step, first_direction='x',
+                tool=tool,
+                handle_length=250 if tool == 'vacuum' else 0,
+            )
+        
+        # Convert to list of dicts (include axis_6 if present)
+        result = [{'x': p.x, 'y': p.y, 'move_type': p.move_type, 'axis_6': p.axis_6} for p in points]
+        
+        return JsonResponse({'success': True, 'points': result, 'tool': tool})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @require_http_methods(["GET"])

@@ -79,7 +79,9 @@ class IRC5Client:
     def test_connection(self):
         """Test connection to IRC5 controller."""
         try:
-            response = self._get("/rw/system")
+            # Use short timeout for connection test to avoid blocking UI
+            url = f"{self.base_url}/rw/system"
+            response = self.session.get(url, timeout=2)
             return {
                 'connected': True,
                 'status_code': response.status_code,

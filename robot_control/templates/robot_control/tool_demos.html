@@ -1,0 +1,1166 @@
+<!-- Tool Demos - Bed & Panel Visualization Component -->
+<!-- Included by toolpath_generator_compact.html -->
+
+<!-- Bed & Panel Visualization -->
+<div id="bed-visualization" class="bg-gray-800 rounded-lg p-2">
+    <div class="flex items-center justify-between mb-1">
+        <h3 class="text-xs font-medium text-gray-400">Bed & Panel Preview</h3>
+        <span class="text-[10px] text-gray-500">Units: mm</span>
+    </div>
+    <div class="flex gap-2">
+        <!-- Tool list with demo buttons -->
+        <div class="flex flex-col gap-2 text-sm min-w-[180px]">
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-blue-400 font-medium">Vacuum</span>
+                <button type="button" data-tool="vacuum" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-green-400 font-medium">Polisher</span>
+                <button type="button" data-tool="polisher" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-purple-400 font-medium">Helicopter</span>
+                <button type="button" data-tool="helicopter" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-orange-400 font-medium">Pan</span>
+                <button type="button" data-tool="pan" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-yellow-400 font-medium">Screed</span>
+                <button type="button" data-tool="screed" class="demo-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-xs">demo</button>
+            </div>
+            <!-- Legend -->
+            <div class="mt-2 pt-2 border-t border-gray-700 flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-3 rounded-sm" style="background: #1e3a5f; border: 1px solid #3b82f6;"></div>
+                    <span class="text-xs text-gray-500">Bed</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-3 rounded-sm" style="background: #ffffff; border: 1px solid #9ca3af;"></div>
+                    <span class="text-xs text-gray-500">Panel</span>
+                </div>
+            </div>
+        </div>
+        <!-- SVG visualization -->
+        <div class="flex-1 bg-gray-900 rounded overflow-hidden">
+            <svg id="bed-svg" class="w-full" style="height: 280px;" viewBox="0 0 750 340">
+                <rect id="bed-rect" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+                <rect id="panel-rect" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
+                <g id="coverage-trail"></g>
+                <g id="pattern-path"></g>
+                <g id="tool-circle"></g>
+                <g id="pattern-overlay"></g>
+                <g id="axis-labels"></g>
+                <g id="dimension-labels"></g>
+            </svg>
+        </div>
+        <!-- Metrics column -->
+        <div class="flex flex-col gap-3 min-w-[200px] text-sm">
+            <div class="text-gray-400 font-medium text-sm border-b border-gray-700 pb-1">Metrics</div>
+            <div class="flex flex-col gap-1">
+                <span class="text-xs text-gray-500">Active Tool</span>
+                <span id="demo-tool-name" class="font-medium text-gray-300 text-base">—</span>
+            </div>
+            <div class="flex flex-col gap-1">
+                <span class="text-xs text-gray-500">Duration</span>
+                <span id="demo-duration" class="text-gray-300">—</span>
+            </div>
+            <!-- Timeline slider -->
+            <div id="demo-timeline" class="mt-2 hidden">
+                <div class="flex items-center gap-2">
+                    <button id="demo-play-btn" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300">
+                        <span id="play-icon">▶</span>
+                    </button>
+                    <input type="range" id="demo-slider" min="0" max="1000" value="0" class="flex-1 h-2 bg-gray-700 rounded appearance-none cursor-pointer">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// =============================================================================
+// Tool Demos - Bed & Panel Visualization
+// =============================================================================
+
+function setupBedVisualization() {
+    const svg = document.getElementById('bed-svg');
+    const bedRect = document.getElementById('bed-rect');
+    const panelRect = document.getElementById('panel-rect');
+    const axisLabels = document.getElementById('axis-labels');
+    const dimensionLabels = document.getElementById('dimension-labels');
+    
+    if (!svg || !bedRect || !panelRect) return;
+    
+    const svgWidth = 750;
+    const svgHeight = 340;
+    const margin = { top: 10, right: 15, bottom: 30, left: 40 };
+    const plotWidth = svgWidth - margin.left - margin.right;
+    const plotHeight = svgHeight - margin.top - margin.bottom;
+    
+    function updateVisualization() {
+        const getVal = (name, def) => {
+            const el = document.querySelector(`input[name="${name}"]`);
+            const v = el ? parseFloat(el.value) : NaN;
+            return isNaN(v) ? def : v;
+        };
+        const bedLengthX = getVal('bed_length_x', 12000);
+        const bedWidthY = getVal('bed_width_y', 3300);
+        const panelX = getVal('panel_x', 3000);
+        const panelY = getVal('panel_y', 2000);
+        const panelDatumX = getVal('panel_datum_x', 0);
+        const panelDatumY = getVal('panel_datum_y', 0);
+        
+        const scaleX = plotWidth / bedLengthX;
+        const scaleY = plotHeight / bedWidthY;
+        const scale = Math.min(scaleX, scaleY) * 0.9;
+        
+        const bedDisplayWidth = bedLengthX * scale;
+        const bedDisplayHeight = bedWidthY * scale;
+        const offsetX = margin.left + (plotWidth - bedDisplayWidth) / 2;
+        const offsetY = margin.top + (plotHeight - bedDisplayHeight) / 2;
+        
+        function worldToSvg(wx, wy) {
+            const svgX = offsetX + bedDisplayWidth - (wx * scale);
+            const svgY = offsetY + bedDisplayHeight - (wy * scale);
+            return { x: svgX, y: svgY };
+        }
+        
+        const bedOrigin = worldToSvg(bedLengthX, bedWidthY);
+        bedRect.setAttribute('x', bedOrigin.x);
+        bedRect.setAttribute('y', bedOrigin.y);
+        bedRect.setAttribute('width', bedDisplayWidth);
+        bedRect.setAttribute('height', bedDisplayHeight);
+        
+        const panelOrigin = worldToSvg(panelDatumX + panelX, panelDatumY + panelY);
+        const panelDisplayWidth = panelX * scale;
+        const panelDisplayHeight = panelY * scale;
+        panelRect.setAttribute('x', panelOrigin.x);
+        panelRect.setAttribute('y', panelOrigin.y);
+        panelRect.setAttribute('width', panelDisplayWidth);
+        panelRect.setAttribute('height', panelDisplayHeight);
+        
+        axisLabels.innerHTML = '';
+        dimensionLabels.innerHTML = '';
+        
+        const originSvg = worldToSvg(0, 0);
+        
+        // X axis
+        const xLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        xLine.setAttribute('x1', originSvg.x); xLine.setAttribute('y1', originSvg.y);
+        xLine.setAttribute('x2', offsetX); xLine.setAttribute('y2', originSvg.y);
+        xLine.setAttribute('stroke', '#6b7280'); xLine.setAttribute('stroke-width', '1');
+        axisLabels.appendChild(xLine);
+        
+        // Y axis
+        const yLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        yLine.setAttribute('x1', originSvg.x); yLine.setAttribute('y1', originSvg.y);
+        yLine.setAttribute('x2', originSvg.x); yLine.setAttribute('y2', offsetY);
+        yLine.setAttribute('stroke', '#6b7280'); yLine.setAttribute('stroke-width', '1');
+        axisLabels.appendChild(yLine);
+        
+        // Origin marker
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', originSvg.x); circle.setAttribute('cy', originSvg.y);
+        circle.setAttribute('r', '3'); circle.setAttribute('fill', '#ef4444');
+        axisLabels.appendChild(circle);
+        
+        // Origin label
+        const oLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        oLabel.setAttribute('x', originSvg.x + 6); oLabel.setAttribute('y', originSvg.y + 3);
+        oLabel.setAttribute('fill', '#9ca3af'); oLabel.setAttribute('font-size', '9');
+        oLabel.textContent = '(0,0)';
+        axisLabels.appendChild(oLabel);
+        
+        // X axis ticks
+        const xInt = bedLengthX <= 6000 ? 1000 : 2000;
+        for (let x = xInt; x <= bedLengthX; x += xInt) {
+            const pos = worldToSvg(x, 0);
+            const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            tick.setAttribute('x1', pos.x); tick.setAttribute('y1', pos.y);
+            tick.setAttribute('x2', pos.x); tick.setAttribute('y2', pos.y + 4);
+            tick.setAttribute('stroke', '#6b7280'); tick.setAttribute('stroke-width', '1');
+            axisLabels.appendChild(tick);
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', pos.x); label.setAttribute('y', pos.y + 12);
+            label.setAttribute('fill', '#9ca3af'); label.setAttribute('font-size', '8');
+            label.setAttribute('text-anchor', 'middle');
+            label.textContent = x;
+            axisLabels.appendChild(label);
+        }
+        
+        // Y axis ticks
+        const yInt = bedWidthY <= 3000 ? 500 : 1000;
+        for (let y = yInt; y <= bedWidthY; y += yInt) {
+            const pos = worldToSvg(0, y);
+            const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            tick.setAttribute('x1', pos.x); tick.setAttribute('y1', pos.y);
+            tick.setAttribute('x2', pos.x + 4); tick.setAttribute('y2', pos.y);
+            tick.setAttribute('stroke', '#6b7280'); tick.setAttribute('stroke-width', '1');
+            axisLabels.appendChild(tick);
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', pos.x + 6); label.setAttribute('y', pos.y + 3);
+            label.setAttribute('fill', '#9ca3af'); label.setAttribute('font-size', '8');
+            label.textContent = y;
+            axisLabels.appendChild(label);
+        }
+        
+        // X axis label
+        const xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        xLabel.setAttribute('x', offsetX + bedDisplayWidth / 2);
+        xLabel.setAttribute('y', originSvg.y + 25);
+        xLabel.setAttribute('fill', '#d1d5db'); xLabel.setAttribute('font-size', '10');
+        xLabel.setAttribute('text-anchor', 'middle');
+        xLabel.textContent = 'X (mm) →';
+        axisLabels.appendChild(xLabel);
+        
+        // Bed label
+        const bedLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        bedLabel.setAttribute('x', offsetX + bedDisplayWidth / 2);
+        bedLabel.setAttribute('y', offsetY - 6);
+        bedLabel.setAttribute('fill', '#60a5fa'); bedLabel.setAttribute('font-size', '10');
+        bedLabel.setAttribute('text-anchor', 'middle');
+        bedLabel.textContent = `Bed: ${bedLengthX} × ${bedWidthY}`;
+        dimensionLabels.appendChild(bedLabel);
+        
+        // Panel label
+        const pLabelX = panelOrigin.x + panelDisplayWidth / 2;
+        const pLabelY = panelOrigin.y + panelDisplayHeight / 2;
+        const panelLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        panelLabel.setAttribute('x', pLabelX); panelLabel.setAttribute('y', pLabelY - 4);
+        panelLabel.setAttribute('fill', '#e5e7eb'); panelLabel.setAttribute('font-size', '9');
+        panelLabel.setAttribute('text-anchor', 'middle');
+        panelLabel.textContent = `${panelX} × ${panelY}`;
+        dimensionLabels.appendChild(panelLabel);
+        
+        const datumLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        datumLabel.setAttribute('x', pLabelX); datumLabel.setAttribute('y', pLabelY + 8);
+        datumLabel.setAttribute('fill', '#9ca3af'); datumLabel.setAttribute('font-size', '8');
+        datumLabel.setAttribute('text-anchor', 'middle');
+        datumLabel.textContent = `@ (${panelDatumX}, ${panelDatumY})`;
+        dimensionLabels.appendChild(datumLabel);
+        
+        // Expose worldToSvg for pattern overlay
+        window.bedVisualization = { update: updateVisualization, worldToSvg, scale, offsetX, offsetY, bedDisplayWidth, bedDisplayHeight };
+        
+        // Validation: highlight inputs if panel exceeds bed
+        const panelExceedsX = (panelDatumX + panelX) > bedLengthX;
+        const panelExceedsY = (panelDatumY + panelY) > bedWidthY;
+        
+        const panelXInput = document.querySelector('input[name="panel_x"]');
+        const panelYInput = document.querySelector('input[name="panel_y"]');
+        const panelDatumXInput = document.querySelector('input[name="panel_datum_x"]');
+        const panelDatumYInput = document.querySelector('input[name="panel_datum_y"]');
+        
+        const errorStyle = 'border-color: #ef4444; box-shadow: 0 0 0 1px #ef4444;';
+        const normalStyle = '';
+        
+        if (panelExceedsX) {
+            if (panelXInput) panelXInput.style.cssText = errorStyle;
+            if (panelDatumXInput) panelDatumXInput.style.cssText = errorStyle;
+        } else {
+            if (panelXInput) panelXInput.style.cssText = normalStyle;
+            if (panelDatumXInput) panelDatumXInput.style.cssText = normalStyle;
+        }
+        
+        if (panelExceedsY) {
+            if (panelYInput) panelYInput.style.cssText = errorStyle;
+            if (panelDatumYInput) panelDatumYInput.style.cssText = errorStyle;
+        } else {
+            if (panelYInput) panelYInput.style.cssText = normalStyle;
+            if (panelDatumYInput) panelDatumYInput.style.cssText = normalStyle;
+        }
+        
+        // Show warning message if panel exceeds bed
+        let warningEl = document.getElementById('panel-warning');
+        if (!warningEl) {
+            warningEl = document.createElement('div');
+            warningEl.id = 'panel-warning';
+            warningEl.className = 'text-[10px] text-red-400 mt-1';
+            document.getElementById('bed-visualization').appendChild(warningEl);
+        }
+        
+        if (panelExceedsX || panelExceedsY) {
+            const xMsg = panelExceedsX ? `X: ${panelDatumX + panelX} > ${bedLengthX}` : '';
+            const yMsg = panelExceedsY ? `Y: ${panelDatumY + panelY} > ${bedWidthY}` : '';
+            warningEl.textContent = `⚠ Panel exceeds bed: ${[xMsg, yMsg].filter(Boolean).join(', ')}`;
+            warningEl.classList.remove('hidden');
+        } else {
+            warningEl.classList.add('hidden');
+        }
+        
+        // Debug function for console
+        window.debugBedViz = function() {
+            const data = {
+                inputs: {
+                    bedLengthX, bedWidthY,
+                    panelX, panelY,
+                    panelDatumX, panelDatumY
+                },
+                computed: {
+                    scale,
+                    bedDisplayWidth, bedDisplayHeight,
+                    offsetX, offsetY,
+                    panelDisplayWidth, panelDisplayHeight
+                },
+                worldCoords: {
+                    bedTopLeft: { x: bedLengthX, y: bedWidthY },
+                    bedBottomRight: { x: 0, y: 0 },
+                    panelTopLeft: { x: panelDatumX + panelX, y: panelDatumY + panelY },
+                    panelBottomRight: { x: panelDatumX, y: panelDatumY }
+                },
+                svgCoords: {
+                    bedOrigin: worldToSvg(bedLengthX, bedWidthY),
+                    bedEnd: worldToSvg(0, 0),
+                    panelOrigin: worldToSvg(panelDatumX + panelX, panelDatumY + panelY),
+                    panelEnd: worldToSvg(panelDatumX, panelDatumY)
+                },
+                rectAttrs: {
+                    bed: {
+                        x: bedRect.getAttribute('x'),
+                        y: bedRect.getAttribute('y'),
+                        width: bedRect.getAttribute('width'),
+                        height: bedRect.getAttribute('height')
+                    },
+                    panel: {
+                        x: panelRect.getAttribute('x'),
+                        y: panelRect.getAttribute('y'),
+                        width: panelRect.getAttribute('width'),
+                        height: panelRect.getAttribute('height')
+                    }
+                },
+                validation: {
+                    panelFitsInBed: (panelDatumX + panelX <= bedLengthX) && (panelDatumY + panelY <= bedWidthY),
+                    panelSvgXInBed: parseFloat(panelRect.getAttribute('x')) >= parseFloat(bedRect.getAttribute('x')),
+                    panelSvgYInBed: parseFloat(panelRect.getAttribute('y')) >= parseFloat(bedRect.getAttribute('y'))
+                }
+            };
+            console.table(data.inputs);
+            console.table(data.computed);
+            console.log('World Coords:', data.worldCoords);
+            console.log('SVG Coords:', data.svgCoords);
+            console.log('Rect Attrs:', data.rectAttrs);
+            console.log('Validation:', data.validation);
+            return data;
+        };
+    }
+    
+    updateVisualization();
+    
+    ['bed_length_x', 'bed_width_y', 'panel_x', 'panel_y', 'panel_datum_x', 'panel_datum_y'].forEach(name => {
+        const input = document.querySelector(`input[name="${name}"]`);
+        if (input) input.addEventListener('input', updateVisualization);
+    });
+}
+
+// =============================================================================
+// Demo Animation System
+// =============================================================================
+
+const TOOL_COLORS = {
+    vacuum: '#60a5fa',      // blue-400
+    polisher: '#4ade80',    // green-400
+    helicopter: '#c084fc',  // purple-400
+    pan: '#fb923c',         // orange-400
+    screed: '#facc15',      // yellow-400
+};
+
+const TOOL_DIAMETER = 500;    // mm (polisher)
+const HELI_BLADE_WIDTH = 1150; // mm (from FixedParameters.mod HeliBladeWidth - used for helicopter & pan)
+const SCREED_LENGTH_Y = 3800; // mm (along Y axis)
+const SCREED_WIDTH_X = 120;   // mm (along X axis)
+const VACUUM_LENGTH_Y = 300;  // mm (along Y axis)
+const VACUUM_WIDTH_X = 50;    // mm (along X axis)
+const VACUUM_HANDLE_LENGTH = 250; // mm (matches 250mm offset about axis 6)
+const VACUUM_HANDLE_WIDTH = 30;  // mm (wider for visibility)
+const VACUUM_ROTATION_SPEED = 360; // degrees per second (0.5s for 180°)
+const HELI_BLADE_RPM = 70;    // Default blade rotation speed
+const ANIMATION_SPEED = 1000; // mm/s - speed for visual demo playback
+// Tool speeds will be read from form inputs for duration calculation
+
+let demoState = {
+    active: false,
+    tool: null,
+    points: [],
+    segments: [],      // { startIdx, endIdx, distance, startTime, endTime }
+    totalDuration: 0,
+    currentTime: 0,
+    playing: false,
+    animationFrame: null,
+    lastCoverageTime: 0,
+    coverageGrid: null,  // 2D grid for tracking coverage intensity
+    gridCellSize: 50,    // mm per cell for coverage tracking
+};
+
+function setupDemoButtons() {
+    document.querySelectorAll('.demo-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tool = btn.dataset.tool;
+            await startDemo(tool);
+        });
+    });
+    
+    // Timeline controls
+    const playBtn = document.getElementById('demo-play-btn');
+    const slider = document.getElementById('demo-slider');
+    
+    if (playBtn) {
+        playBtn.addEventListener('click', togglePlayPause);
+    }
+    
+    if (slider) {
+        slider.addEventListener('input', (e) => {
+            if (demoState.active) {
+                pauseDemo();
+                const t = (parseFloat(e.target.value) / 1000) * demoState.totalDuration;
+                demoState.currentTime = t;
+                updateToolPosition(t);
+                updateTimeDisplay(t);
+                updateCoverageToTime(t);
+            }
+        });
+    }
+}
+
+async function startDemo(tool) {
+    // Stop any existing demo
+    stopDemo();
+    
+    // Get current form parameters
+    const getVal = (name, def) => {
+        const el = document.querySelector(`input[name="${name}"]`);
+        const v = el ? parseFloat(el.value) : NaN;
+        return isNaN(v) ? def : v;
+    };
+    const getSelect = (name, def) => {
+        const el = document.querySelector(`select[name="${name}"]`);
+        return el ? el.value : def;
+    };
+    
+    const params = {
+        tool,
+        panel_datum_x: getVal('panel_datum_x', 0),
+        panel_datum_y: getVal('panel_datum_y', 0),
+        panel_x: getVal('panel_x', 3000),
+        panel_y: getVal('panel_y', 2000),
+        bed_length_x: getVal('bed_length_x', 12000),
+        bed_width_y: getVal('bed_width_y', 3300),
+        polisher_workzone: getSelect('polisher_workzone', 'panel'),
+        polisher_step: getVal('polisher_step', 200),
+        polisher_pattern: getSelect('polisher_pattern', 'cross-hatch'),
+        heli_workzone: getSelect('heli_workzone', 'panel'),
+        helicopter_step: getVal('helicopter_step', 150),
+        heli_pattern: getSelect('heli_pattern', 'cross-hatch'),
+        heli_formwork_offset: getVal('heli_formwork_offset', 50),
+        heli_spiral_direction: getSelect('heli_spiral_direction', 'anticlockwise'),
+        heli_blade_speed: parseInt(getSelect('heli_blade_speed', '70')),
+        heli_blade_direction: getSelect('heli_blade_direction', 'FWD'),
+        pan_step: getVal('pan_step', 200),
+        pan_travel_speed: parseInt(getSelect('pan_travel_speed', '100')),
+        vacuum_workzone: getSelect('vacuum_workzone', 'panel'),
+        vacuum_step: getVal('vacuum_step', 400),
+        vacuum_pattern: getSelect('vacuum_pattern', 'cross-hatch'),
+        vacuum_speed: getVal('vacuum_speed', 100),
+        polisher_speed: getVal('polisher_speed', 100),
+        heli_travel_speed: parseInt(getSelect('heli_travel_speed', '40')),
+        vib_screed_speed: getVal('vib_screed_speed', 100),
+    };
+    
+    try {
+        const response = await fetch('/api/toolpath/pattern-points/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params),
+        });
+        const data = await response.json();
+        
+        if (!data.success || !data.points || data.points.length < 2) {
+            console.error('Failed to get pattern points:', data.error);
+            return;
+        }
+        
+        // Get tool speed for actual duration calculation
+        const toolSpeeds = {
+            'vacuum': params.vacuum_speed || 100,
+            'polisher': params.polisher_speed || 100,
+            'helicopter': params.heli_travel_speed || 40,
+            'pan': params.pan_travel_speed || 100,
+            'screed': params.vib_screed_speed || 100,
+        };
+        const toolSpeed = toolSpeeds[tool] || 100;
+        
+        // Calculate segments and timing (including rotation time for vacuum)
+        const points = data.points;
+        const segments = [];
+        let animationTime = 0;  // Time for animation (at ANIMATION_SPEED)
+        let actualTime = 0;     // Time for actual duration estimate (at tool speed)
+        
+        for (let i = 0; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Check if axis_6 changes (rotation needed) - for vacuum tool
+            const axis6Changed = (tool === 'vacuum' && 
+                p1.axis_6 !== null && p2.axis_6 !== null && 
+                p1.axis_6 !== p2.axis_6);
+            
+            // If rotation occurs, add rotation segment first (stationary, rotating)
+            if (axis6Changed) {
+                // Calculate rotation time based on angle difference
+                const rotationDelta = Math.abs(p2.axis_6 - p1.axis_6);
+                const rotationTime = rotationDelta / VACUUM_ROTATION_SPEED;
+                
+                segments.push({
+                    startIdx: i,
+                    endIdx: i,  // Same index - stationary
+                    distance: 0,
+                    startTime: animationTime,
+                    endTime: animationTime + rotationTime,
+                    isRotation: true,
+                    rotateFrom: p1.axis_6,
+                    rotateTo: p2.axis_6,
+                });
+                animationTime += rotationTime;
+                actualTime += rotationTime;
+            }
+            
+            // Calculate travel times - animation uses ANIMATION_SPEED, actual uses tool speed
+            const animTravelTime = dist / ANIMATION_SPEED;
+            const actualTravelTime = dist / toolSpeed;
+            
+            segments.push({
+                startIdx: i,
+                endIdx: i + 1,
+                distance: dist,
+                startTime: animationTime,
+                endTime: animationTime + animTravelTime,
+                isRotation: false,
+            });
+            animationTime += animTravelTime;
+            actualTime += actualTravelTime;
+        }
+        
+        const totalDuration = animationTime;  // Animation duration
+        const actualDuration = actualTime;    // Actual duration at tool speed
+        
+        demoState = {
+            active: true,
+            tool,
+            points,
+            segments,
+            totalDuration,
+            currentTime: 0,
+            playing: false,
+            animationFrame: null,
+            lastCoverageTime: -1,
+            coverageGrid: null,
+            gridCellSize: 50,
+            bladeDirection: params.heli_blade_direction || 'FWD',  // For helicopter blade rotation
+            bladeRPM: params.heli_blade_speed || HELI_BLADE_RPM,
+            bladeAngle: 0,  // Current blade rotation angle
+        };
+        
+        // Initialize coverage grid
+        initCoverageGrid(params.bed_length_x, params.bed_width_y);
+        
+        // Draw path
+        drawPatternPath(points, tool);
+        
+        // Create tool circle
+        createToolCircle(tool);
+        
+        // Show timeline
+        const timeline = document.getElementById('demo-timeline');
+        if (timeline) timeline.classList.remove('hidden');
+        
+        // Update labels
+        const toolNameEl = document.getElementById('demo-tool-name');
+        if (toolNameEl) toolNameEl.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
+        
+        const durationEl = document.getElementById('demo-duration');
+        if (durationEl) {
+            // Show actual duration (at tool speed), not animation duration
+            const mins = Math.floor(actualDuration / 60);
+            const secs = actualDuration % 60;
+            if (mins > 0) {
+                durationEl.textContent = `${mins}m ${secs.toFixed(0)}s`;
+            } else {
+                durationEl.textContent = actualDuration.toFixed(1) + 's';
+            }
+        }
+        
+        // Reset slider
+        const slider = document.getElementById('demo-slider');
+        if (slider) slider.value = 0;
+        
+        updateTimeDisplay(0);
+        updateToolPosition(0);
+        
+        // Auto-play
+        playDemo();
+        
+    } catch (err) {
+        console.error('Demo error:', err);
+    }
+}
+
+function drawPatternPath(points, tool) {
+    const pathGroup = document.getElementById('pattern-path');
+    if (!pathGroup || !window.bedVisualization) return;
+    
+    pathGroup.innerHTML = '';
+    const { worldToSvg } = window.bedVisualization;
+    const color = TOOL_COLORS[tool] || '#fff';
+    
+    // Draw path lines
+    for (let i = 0; i < points.length - 1; i++) {
+        const p1 = worldToSvg(points[i].x, points[i].y);
+        const p2 = worldToSvg(points[i + 1].x, points[i + 1].y);
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', p1.x);
+        line.setAttribute('y1', p1.y);
+        line.setAttribute('x2', p2.x);
+        line.setAttribute('y2', p2.y);
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', '1');
+        line.setAttribute('stroke-opacity', '0.4');
+        pathGroup.appendChild(line);
+    }
+}
+
+function createToolCircle(tool) {
+    const circleGroup = document.getElementById('tool-circle');
+    if (!circleGroup || !window.bedVisualization) return;
+    
+    circleGroup.innerHTML = '';
+    const { scale } = window.bedVisualization;
+    const color = TOOL_COLORS[tool] || '#fff';
+    
+    if (tool === 'screed') {
+        // Screed is a rectangle: 3800mm (Y) x 120mm (X)
+        const width = SCREED_WIDTH_X * scale;
+        const height = SCREED_LENGTH_Y * scale;
+        
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('id', 'demo-tool');
+        rect.setAttribute('width', width);
+        rect.setAttribute('height', height);
+        rect.setAttribute('fill', color);
+        rect.setAttribute('fill-opacity', '0.6');
+        rect.setAttribute('stroke', color);
+        rect.setAttribute('stroke-width', '2');
+        circleGroup.appendChild(rect);
+    } else if (tool === 'vacuum') {
+        // Vacuum is a rectangle with handle - create a group
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('id', 'demo-tool');
+        
+        const bodyWidth = VACUUM_WIDTH_X * scale;
+        const bodyHeight = VACUUM_LENGTH_Y * scale;
+        const handleWidth = VACUUM_HANDLE_WIDTH * scale;
+        const handleHeight = VACUUM_HANDLE_LENGTH * scale;
+        
+        // Main body
+        const body = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        body.setAttribute('id', 'vacuum-body');
+        body.setAttribute('width', bodyWidth);
+        body.setAttribute('height', bodyHeight);
+        body.setAttribute('x', -bodyWidth / 2);
+        body.setAttribute('y', -bodyHeight / 2);
+        body.setAttribute('fill', color);
+        body.setAttribute('fill-opacity', '0.6');
+        body.setAttribute('stroke', color);
+        body.setAttribute('stroke-width', '2');
+        g.appendChild(body);
+        
+        // Handle (on leading edge - positioned for axis_6=0 state, rotation handled by transform)
+        // At axis_6=0: tool faces left (negative X), handle is on right side (trailing edge)
+        // When axis_6=180: group rotates, handle appears on left side
+        // Handle is perpendicular to body: handleHeight along X, handleWidth along Y
+        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        handle.setAttribute('id', 'vacuum-handle');
+        handle.setAttribute('width', handleHeight);  // Length along X
+        handle.setAttribute('height', handleWidth);  // Width along Y
+        handle.setAttribute('x', bodyWidth / 2);  // Right side at axis_6=0
+        handle.setAttribute('y', -handleWidth / 2);
+        handle.setAttribute('fill', color);
+        handle.setAttribute('fill-opacity', '0.8');
+        handle.setAttribute('stroke', color);
+        handle.setAttribute('stroke-width', '1');
+        g.appendChild(handle);
+        
+        circleGroup.appendChild(g);
+    } else if (tool === 'helicopter' || tool === 'pan') {
+        // Helicopter/Pan with rotating blades
+        const diameter = HELI_BLADE_WIDTH;
+        const radius = (diameter / 2) * scale;
+        
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('id', 'demo-tool');
+        
+        // Center hub
+        const hub = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        hub.setAttribute('r', radius * 0.15);
+        hub.setAttribute('fill', color);
+        hub.setAttribute('fill-opacity', '0.8');
+        hub.setAttribute('stroke', color);
+        hub.setAttribute('stroke-width', '2');
+        g.appendChild(hub);
+        
+        // Blades group (will rotate)
+        const bladesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        bladesGroup.setAttribute('id', 'heli-blades');
+        
+        // 4 blades
+        const bladeWidth = radius * 0.12;
+        for (let i = 0; i < 4; i++) {
+            const blade = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            blade.setAttribute('x', -bladeWidth / 2);
+            blade.setAttribute('y', -radius);
+            blade.setAttribute('width', bladeWidth);
+            blade.setAttribute('height', radius);
+            blade.setAttribute('fill', color);
+            blade.setAttribute('fill-opacity', '0.6');
+            blade.setAttribute('stroke', color);
+            blade.setAttribute('stroke-width', '1');
+            blade.setAttribute('transform', `rotate(${i * 90})`);
+            bladesGroup.appendChild(blade);
+        }
+        
+        g.appendChild(bladesGroup);
+        circleGroup.appendChild(g);
+    } else {
+        // Polisher is a circle
+        const radius = (TOOL_DIAMETER / 2) * scale;
+        
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('id', 'demo-tool');
+        circle.setAttribute('r', radius);
+        circle.setAttribute('cx', 0);  // Initial position, will be updated
+        circle.setAttribute('cy', 0);
+        circle.setAttribute('fill', color);
+        circle.setAttribute('fill-opacity', '0.6');
+        circle.setAttribute('stroke', color);
+        circle.setAttribute('stroke-width', '2');
+        circleGroup.appendChild(circle);
+    }
+}
+
+function initCoverageGrid(bedLengthX, bedWidthY) {
+    const cellSize = demoState.gridCellSize;
+    const cols = Math.ceil(bedLengthX / cellSize);
+    const rows = Math.ceil(bedWidthY / cellSize);
+    
+    demoState.coverageGrid = {
+        cols,
+        rows,
+        cellSize,
+        bedLengthX,
+        bedWidthY,
+        cells: new Array(cols * rows).fill(0),
+    };
+    
+    // Clear existing coverage
+    const coverageGroup = document.getElementById('coverage-trail');
+    if (coverageGroup) coverageGroup.innerHTML = '';
+}
+
+function updateCoverage(toolX, toolY, axis6 = 0) {
+    if (!demoState.coverageGrid || !window.bedVisualization) return;
+    
+    const { cols, rows, cellSize, cells } = demoState.coverageGrid;
+    
+    if (demoState.tool === 'screed') {
+        // Screed is a rectangle: 3800mm (Y) x 120mm (X)
+        const halfWidth = SCREED_WIDTH_X / 2;
+        const halfHeight = SCREED_LENGTH_Y / 2;
+        
+        const minCol = Math.max(0, Math.floor((toolX - halfWidth) / cellSize));
+        const maxCol = Math.min(cols - 1, Math.floor((toolX + halfWidth) / cellSize));
+        const minRow = Math.max(0, Math.floor((toolY - halfHeight) / cellSize));
+        const maxRow = Math.min(rows - 1, Math.floor((toolY + halfHeight) / cellSize));
+        
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const idx = row * cols + col;
+                cells[idx]++;
+            }
+        }
+    } else if (demoState.tool === 'vacuum') {
+        // Vacuum is a rectangle: 300mm (Y) x 50mm (X), rotates with axis_6
+        // At axis_6=0: 50mm wide (X), 300mm tall (Y)
+        // At axis_6=90 or -90: 300mm wide (X), 50mm tall (Y)
+        const angle = (axis6 || 0) * Math.PI / 180;
+        const cos = Math.abs(Math.cos(angle));
+        const sin = Math.abs(Math.sin(angle));
+        
+        // Rotated bounding box dimensions
+        const halfWidth = (VACUUM_WIDTH_X * cos + VACUUM_LENGTH_Y * sin) / 2;
+        const halfHeight = (VACUUM_WIDTH_X * sin + VACUUM_LENGTH_Y * cos) / 2;
+        
+        const minCol = Math.max(0, Math.floor((toolX - halfWidth) / cellSize));
+        const maxCol = Math.min(cols - 1, Math.floor((toolX + halfWidth) / cellSize));
+        const minRow = Math.max(0, Math.floor((toolY - halfHeight) / cellSize));
+        const maxRow = Math.min(rows - 1, Math.floor((toolY + halfHeight) / cellSize));
+        
+        // For more accurate coverage, check if cell center is inside rotated rectangle
+        const cosExact = Math.cos(angle);
+        const sinExact = Math.sin(angle);
+        const rectHalfW = VACUUM_WIDTH_X / 2;
+        const rectHalfH = VACUUM_LENGTH_Y / 2;
+        
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const cellCenterX = (col + 0.5) * cellSize;
+                const cellCenterY = (row + 0.5) * cellSize;
+                
+                // Transform cell center to tool-local coordinates (rotate by -angle)
+                const dx = cellCenterX - toolX;
+                const dy = cellCenterY - toolY;
+                const localX = dx * cosExact + dy * sinExact;
+                const localY = -dx * sinExact + dy * cosExact;
+                
+                // Check if inside rectangle
+                if (Math.abs(localX) <= rectHalfW && Math.abs(localY) <= rectHalfH) {
+                    const idx = row * cols + col;
+                    cells[idx]++;
+                }
+            }
+        }
+    } else {
+        // Circular tools - helicopter/pan use HeliBladeWidth, polisher uses TOOL_DIAMETER
+        const diameter = (demoState.tool === 'helicopter' || demoState.tool === 'pan') ? HELI_BLADE_WIDTH : TOOL_DIAMETER;
+        const toolRadius = diameter / 2;
+        
+        const minCol = Math.max(0, Math.floor((toolX - toolRadius) / cellSize));
+        const maxCol = Math.min(cols - 1, Math.floor((toolX + toolRadius) / cellSize));
+        const minRow = Math.max(0, Math.floor((toolY - toolRadius) / cellSize));
+        const maxRow = Math.min(rows - 1, Math.floor((toolY + toolRadius) / cellSize));
+        
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const cellCenterX = (col + 0.5) * cellSize;
+                const cellCenterY = (row + 0.5) * cellSize;
+                const dx = cellCenterX - toolX;
+                const dy = cellCenterY - toolY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist <= toolRadius) {
+                    const idx = row * cols + col;
+                    cells[idx]++;
+                }
+            }
+        }
+    }
+}
+
+function renderCoverage() {
+    if (!demoState.coverageGrid || !window.bedVisualization) return;
+    
+    const coverageGroup = document.getElementById('coverage-trail');
+    if (!coverageGroup) return;
+    
+    coverageGroup.innerHTML = '';
+    
+    const { cols, rows, cellSize, cells } = demoState.coverageGrid;
+    const { worldToSvg, scale } = window.bedVisualization;
+    const color = TOOL_COLORS[demoState.tool] || '#fff';
+    
+    // Find max coverage for normalization
+    const maxCoverage = Math.max(...cells, 1);
+    const svgCellSize = cellSize * scale;
+    
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const idx = row * cols + col;
+            const coverage = cells[idx];
+            
+            if (coverage > 0) {
+                // Calculate opacity: more coverage = more opaque (darker)
+                // Base opacity 0.15, max additional 0.5
+                const normalizedCoverage = coverage / maxCoverage;
+                const opacity = 0.15 + normalizedCoverage * 0.5;
+                
+                const worldX = (col + 1) * cellSize;
+                const worldY = (row + 1) * cellSize;
+                const svgPos = worldToSvg(worldX, worldY);
+                
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', svgPos.x);
+                rect.setAttribute('y', svgPos.y);
+                rect.setAttribute('width', svgCellSize);
+                rect.setAttribute('height', svgCellSize);
+                rect.setAttribute('fill', color);
+                rect.setAttribute('fill-opacity', opacity);
+                coverageGroup.appendChild(rect);
+            }
+        }
+    }
+}
+
+function updateCoverageToTime(targetTime) {
+    // Reset and rebuild coverage up to targetTime
+    if (!demoState.active) return;
+    
+    const { points, segments, gridCellSize } = demoState;
+    
+    // Reinitialize grid
+    const grid = demoState.coverageGrid;
+    if (grid) {
+        grid.cells.fill(0);
+    }
+    
+    // Sample positions along the path up to targetTime
+    const sampleInterval = gridCellSize / 2; // Sample every half cell size in distance
+    let currentAxis6 = points[0]?.axis_6 || 0;
+    
+    for (const seg of segments) {
+        if (seg.startTime > targetTime) break;
+        
+        const p1 = points[seg.startIdx];
+        const p2 = points[seg.endIdx];
+        const segEndTime = Math.min(seg.endTime, targetTime);
+        
+        if (segEndTime <= seg.startTime) continue;
+        
+        const segDuration = seg.endTime - seg.startTime;
+        const segProgress = segDuration > 0 ? (segEndTime - seg.startTime) / segDuration : 1;
+        
+        if (seg.isRotation) {
+            // Rotation segment - update axis_6 but don't move
+            currentAxis6 = seg.rotateFrom + (seg.rotateTo - seg.rotateFrom) * segProgress;
+            // Still add coverage at current position
+            updateCoverage(p1.x, p1.y, currentAxis6);
+        } else {
+            // Movement segment
+            const segDistance = seg.distance * segProgress;
+            
+            // Get axis_6 for this segment (use target point's axis_6)
+            const segAxis6 = p2.axis_6 !== null ? p2.axis_6 : currentAxis6;
+            
+            // Sample along this segment
+            const numSamples = Math.max(1, Math.ceil(segDistance / sampleInterval));
+            for (let i = 0; i <= numSamples; i++) {
+                const t = i / numSamples * segProgress;
+                const x = p1.x + (p2.x - p1.x) * t;
+                const y = p1.y + (p2.y - p1.y) * t;
+                updateCoverage(x, y, segAxis6);
+            }
+            
+            currentAxis6 = segAxis6;
+        }
+    }
+    
+    renderCoverage();
+}
+
+function updateToolPosition(time) {
+    if (!demoState.active || !window.bedVisualization) return;
+    
+    const { points, segments, totalDuration } = demoState;
+    const { worldToSvg } = window.bedVisualization;
+    
+    // Clamp time
+    const t = Math.max(0, Math.min(time, totalDuration));
+    
+    // Find current segment and get position + axis_6
+    let pos = { x: points[0].x, y: points[0].y };
+    let currentAxis6 = points[0].axis_6 || 0;
+    let isRotating = false;
+    let rotationProgress = 0;
+    let rotateFrom = 0;
+    let rotateTo = 0;
+    
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        if (t >= seg.startTime && t <= seg.endTime) {
+            const segDuration = seg.endTime - seg.startTime;
+            const segProgress = segDuration > 0 ? (t - seg.startTime) / segDuration : 0;
+            
+            if (seg.isRotation) {
+                // Rotation segment: tool stays in place, rotates
+                pos = { x: points[seg.startIdx].x, y: points[seg.startIdx].y };
+                isRotating = true;
+                rotationProgress = segProgress;
+                rotateFrom = seg.rotateFrom;
+                rotateTo = seg.rotateTo;
+                
+                // Linear interpolation - shows actual rotation direction
+                // Unwind (e.g., -270° to 0°) = +270° delta = CW rotation
+                // Normal corner (e.g., 180° to 90°) = -90° delta = ACW rotation
+                currentAxis6 = rotateFrom + (rotateTo - rotateFrom) * segProgress;
+            } else {
+                // Movement segment
+                const p1 = points[seg.startIdx];
+                const p2 = points[seg.endIdx];
+                pos.x = p1.x + (p2.x - p1.x) * segProgress;
+                pos.y = p1.y + (p2.y - p1.y) * segProgress;
+                // Use axis_6 from the target point
+                currentAxis6 = p2.axis_6 !== null ? p2.axis_6 : (p1.axis_6 || 0);
+            }
+            break;
+        } else if (t > seg.endTime) {
+            if (seg.isRotation) {
+                pos = { x: points[seg.startIdx].x, y: points[seg.startIdx].y };
+                currentAxis6 = seg.rotateTo;
+            } else {
+                pos = { x: points[seg.endIdx].x, y: points[seg.endIdx].y };
+                currentAxis6 = points[seg.endIdx].axis_6 || 0;
+            }
+        }
+    }
+    
+    const svgPos = worldToSvg(pos.x, pos.y);
+    const toolEl = document.getElementById('demo-tool');
+    if (toolEl) {
+        if (demoState.tool === 'screed') {
+            // Rectangle: position by top-left corner, centered on tool position
+            const { scale } = window.bedVisualization;
+            const width = SCREED_WIDTH_X * scale;
+            const height = SCREED_LENGTH_Y * scale;
+            toolEl.setAttribute('x', svgPos.x - width / 2);
+            toolEl.setAttribute('y', svgPos.y - height / 2);
+        } else if (demoState.tool === 'vacuum') {
+            // Vacuum group: use transform to position and rotate based on axis_6
+            // Rotation is animated during rotation segments
+            const rotation = currentAxis6;
+            toolEl.setAttribute('transform', `translate(${svgPos.x}, ${svgPos.y}) rotate(${rotation})`);
+        } else if (demoState.tool === 'helicopter' || demoState.tool === 'pan') {
+            // Helicopter/Pan group: position with transform (blade rotation handled separately)
+            toolEl.setAttribute('transform', `translate(${svgPos.x}, ${svgPos.y})`);
+        } else {
+            // Circle (polisher): position by center
+            toolEl.setAttribute('cx', svgPos.x);
+            toolEl.setAttribute('cy', svgPos.y);
+        }
+    }
+}
+
+function updateTimeDisplay(time) {
+    // Update slider position only (Time display removed)
+    const slider = document.getElementById('demo-slider');
+    if (slider && demoState.totalDuration > 0) {
+        slider.value = (time / demoState.totalDuration) * 1000;
+    }
+}
+
+function playDemo() {
+    if (!demoState.active) return;
+    
+    demoState.playing = true;
+    const playIcon = document.getElementById('play-icon');
+    if (playIcon) playIcon.textContent = '⏸';
+    
+    let lastTime = performance.now();
+    let lastCoverageUpdate = performance.now();
+    
+    function animate(now) {
+        if (!demoState.playing) return;
+        
+        const delta = (now - lastTime) / 1000;
+        lastTime = now;
+        
+        const prevTime = demoState.currentTime;
+        demoState.currentTime += delta;
+        
+        if (demoState.currentTime >= demoState.totalDuration) {
+            // Pause at end instead of looping
+            demoState.currentTime = demoState.totalDuration;
+            updateToolPosition(demoState.currentTime);
+            updateTimeDisplay(demoState.currentTime);
+            updateCoverageToTime(demoState.currentTime);
+            pauseDemo();
+            return;
+        }
+        
+        updateToolPosition(demoState.currentTime);
+        updateTimeDisplay(demoState.currentTime);
+        
+        // Update helicopter blade rotation
+        if (demoState.tool === 'helicopter' || demoState.tool === 'pan') {
+            updateBladeRotation(delta);
+        }
+        
+        // Update coverage every 50ms for performance
+        if (now - lastCoverageUpdate > 50) {
+            updateCoverageToTime(demoState.currentTime);
+            lastCoverageUpdate = now;
+        }
+        
+        demoState.animationFrame = requestAnimationFrame(animate);
+    }
+    
+    demoState.animationFrame = requestAnimationFrame(animate);
+}
+
+function updateBladeRotation(delta) {
+    const blades = document.getElementById('heli-blades');
+    if (!blades) return;
+    
+    // Calculate rotation speed: RPM to degrees per second
+    // RPM * 360 / 60 = degrees per second
+    const degreesPerSecond = demoState.bladeRPM * 6;
+    
+    // FWD = clockwise (positive rotation in SVG), REV = counter-clockwise (negative)
+    const direction = demoState.bladeDirection === 'FWD' ? 1 : -1;
+    
+    // Update blade angle
+    demoState.bladeAngle += degreesPerSecond * delta * direction;
+    demoState.bladeAngle = demoState.bladeAngle % 360;
+    
+    // Apply rotation
+    blades.setAttribute('transform', `rotate(${demoState.bladeAngle})`);
+}
+
+function pauseDemo() {
+    demoState.playing = false;
+    if (demoState.animationFrame) {
+        cancelAnimationFrame(demoState.animationFrame);
+        demoState.animationFrame = null;
+    }
+    const playIcon = document.getElementById('play-icon');
+    if (playIcon) playIcon.textContent = '▶';
+}
+
+function togglePlayPause() {
+    if (demoState.playing) {
+        pauseDemo();
+    } else {
+        playDemo();
+    }
+}
+
+function stopDemo() {
+    pauseDemo();
+    demoState.active = false;
+    
+    const pathGroup = document.getElementById('pattern-path');
+    if (pathGroup) pathGroup.innerHTML = '';
+    
+    const circleGroup = document.getElementById('tool-circle');
+    if (circleGroup) circleGroup.innerHTML = '';
+    
+    const coverageGroup = document.getElementById('coverage-trail');
+    if (coverageGroup) coverageGroup.innerHTML = '';
+    
+    const timeline = document.getElementById('demo-timeline');
+    if (timeline) timeline.classList.add('hidden');
+}
+
+// Auto-initialize when DOM is ready (if not already called)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setupBedVisualization();
+        setupDemoButtons();
+    });
+} else {
+    // DOM already loaded, initialize now
+    setupBedVisualization();
+    setupDemoButtons();
+}
+</script>

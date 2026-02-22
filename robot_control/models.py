@@ -25,8 +25,9 @@ class ToolPathParameters(models.Model):
     vacuum_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Vacuum pattern")
     vacuum_workzone = models.CharField(default='panel', max_length=20, help_text="Vacuum workzone: panel or bed")
     vacuum_force = models.IntegerField(default=50, help_text="Vacuum target force (N, 10-150)")
-    vacuum_z_range = models.IntegerField(default=30, help_text="Vacuum Z range around offset (+/- mm)")
     vacuum_force_enabled = models.BooleanField(default=False, help_text="Enable force control for vacuum")
+    vacuum_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Vacuum spiral direction: clockwise or anticlockwise")
+    vacuum_formwork_offset = models.IntegerField(default=100, help_text="Vacuum spiral formwork offset from edges (mm)")
     
     # Cross-hatch pattern steps (per tool)
     polisher_step = models.IntegerField(default=450, help_text="Polisher step (mm)")
@@ -39,6 +40,8 @@ class ToolPathParameters(models.Model):
     pan_blade_speed = models.IntegerField(default=70, help_text="Pan blade speed (RPM, 40-140)")
     pan_z_offset = models.IntegerField(default=250, help_text="Pan Z offset (mm, -200 to 200)")
     pan_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Pan pattern")
+    pan_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Pan spiral direction: clockwise or anticlockwise")
+    pan_formwork_offset = models.IntegerField(default=100, help_text="Pan spiral formwork offset from edges (mm)")
     pan_force = models.IntegerField(default=0, help_text="Pan force (N, 0=off, 100-500)")
     pan_force_change = models.IntegerField(default=100, help_text="Pan force change rate (N)")
     pan_pos_supv_dist = models.IntegerField(default=125, help_text="Pan position supervision distance (mm)")
@@ -46,6 +49,7 @@ class ToolPathParameters(models.Model):
     # Helicopter parameters
     heli_travel_speed = models.IntegerField(default=40, help_text="Helicopter travel speed (mm/s)")
     heli_blade_speed = models.IntegerField(default=70, help_text="Helicopter blade speed (RPM)")
+    heli_blade_direction = models.CharField(default='FWD', max_length=10, help_text="Helicopter blade direction: FWD or REV")
     heli_blade_angle = models.IntegerField(default=0, help_text="Helicopter blade angle (degrees, 0-12)")
     heli_force = models.IntegerField(default=200, help_text="Helicopter force (N, 100-500)")
     heli_z_offset = models.IntegerField(default=0, help_text="Helicopter Z offset (mm, -50 to 400)")
@@ -63,20 +67,47 @@ class ToolPathParameters(models.Model):
     polisher_approach_speed = models.IntegerField(default=20, help_text="Polisher approach speed (mm/s)")
     polisher_retract_speed = models.IntegerField(default=50, help_text="Polisher retract speed (mm/s)")
     polisher_pos_supv_dist = models.IntegerField(default=100, help_text="Polisher position supervision distance (mm)")
-    polisher_first_direction = models.CharField(default='x', max_length=10, help_text="Polisher first pass direction: x or y")
     polisher_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Polisher pattern")
     polisher_speed = models.IntegerField(default=100, help_text="Polisher travel speed (mm/s)")
+    polisher_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Polisher spiral direction: clockwise or anticlockwise")
+    polisher_formwork_offset = models.IntegerField(default=100, help_text="Polisher spiral formwork offset from edges (mm)")
     # Vib Screed parameters
     screed_z_offset = models.IntegerField(default=0, help_text="Screed Z offset (mm)")
     vib_screed_speed = models.IntegerField(default=100, help_text="Vibrating screed speed (mm/s)")
     screed_angle_offset = models.IntegerField(default=0, help_text="Screed angle offset (degrees)")
     z_offset = models.IntegerField(default=0, help_text="Z offset (mm) - applies to all workzones")
     
-    # Cross-hatch pattern parameters
+    # Cross-hatch pattern parameters (legacy/global - deprecated, use per-tool params below)
     serpentine_offset_x = models.IntegerField(default=100, help_text="Serpentine X offset from edges (mm)")
     serpentine_offset_y = models.IntegerField(default=100, help_text="Serpentine Y offset from edges (mm)")
     serpentine_direction = models.IntegerField(default=1, help_text="Initial sweep direction: 1=left-to-right, -1=right-to-left")
     serpentine_start_bottom = models.BooleanField(default=False, help_text="Start at bottom (True) or top (False)")
+    
+    # Per-tool cross-hatch parameters (diameter + overhang determine edge offset)
+    # Edge offset = diameter/2 - overhang (tool center position to achieve overhang)
+    # Vacuum
+    vacuum_diameter = models.IntegerField(default=500, help_text="Vacuum tool diameter (mm)")
+    vacuum_overhang = models.IntegerField(default=50, help_text="Vacuum edge overhang (mm)")
+    vacuum_direction = models.IntegerField(default=1, help_text="Vacuum sweep direction: 1=L→R, -1=R→L")
+    vacuum_start_bottom = models.BooleanField(default=True, help_text="Vacuum start at bottom")
+    
+    # Polisher
+    polisher_diameter = models.IntegerField(default=450, help_text="Polisher tool diameter (mm)")
+    polisher_overhang = models.IntegerField(default=50, help_text="Polisher edge overhang (mm)")
+    polisher_direction = models.IntegerField(default=1, help_text="Polisher sweep direction: 1=L→R, -1=R→L")
+    polisher_start_bottom = models.BooleanField(default=True, help_text="Polisher start at bottom")
+    
+    # Helicopter
+    heli_diameter = models.IntegerField(default=1150, help_text="Helicopter tool diameter (mm)")
+    heli_overhang = models.IntegerField(default=50, help_text="Helicopter edge overhang (mm)")
+    heli_direction = models.IntegerField(default=1, help_text="Helicopter sweep direction: 1=L→R, -1=R→L")
+    heli_start_bottom = models.BooleanField(default=True, help_text="Helicopter start at bottom")
+    
+    # Pan
+    pan_diameter = models.IntegerField(default=600, help_text="Pan tool diameter (mm)")
+    pan_overhang = models.IntegerField(default=50, help_text="Pan edge overhang (mm)")
+    pan_direction = models.IntegerField(default=1, help_text="Pan sweep direction: 1=L→R, -1=R→L")
+    pan_start_bottom = models.BooleanField(default=True, help_text="Pan start at bottom")
     
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -107,7 +138,6 @@ class ToolPathParameters(models.Model):
             'vacuum_pattern': self.vacuum_pattern,
             'vacuum_workzone': self.vacuum_workzone,
             'vacuum_force': self.vacuum_force,
-            'vacuum_z_range': self.vacuum_z_range,
             'vacuum_force_enabled': self.vacuum_force_enabled,
             'polisher_step': self.polisher_step,
             'vacuum_step': self.vacuum_step,
@@ -122,6 +152,7 @@ class ToolPathParameters(models.Model):
             'pan_pos_supv_dist': self.pan_pos_supv_dist,
             'heli_travel_speed': self.heli_travel_speed,
             'heli_blade_speed': self.heli_blade_speed,
+            'heli_blade_direction': self.heli_blade_direction,
             'heli_blade_angle': self.heli_blade_angle,
             'heli_force': self.heli_force,
             'heli_z_offset': self.heli_z_offset,
@@ -137,7 +168,6 @@ class ToolPathParameters(models.Model):
             'polisher_approach_speed': self.polisher_approach_speed,
             'polisher_retract_speed': self.polisher_retract_speed,
             'polisher_pos_supv_dist': self.polisher_pos_supv_dist,
-            'polisher_first_direction': self.polisher_first_direction,
             'polisher_pattern': self.polisher_pattern,
             'polisher_speed': self.polisher_speed,
             'screed_z_offset': self.screed_z_offset,
@@ -148,4 +178,28 @@ class ToolPathParameters(models.Model):
             'serpentine_offset_y': self.serpentine_offset_y,
             'serpentine_direction': self.serpentine_direction,
             'serpentine_start_bottom': self.serpentine_start_bottom,
+            # Per-tool cross-hatch parameters (diameter + overhang)
+            'vacuum_diameter': self.vacuum_diameter,
+            'vacuum_overhang': self.vacuum_overhang,
+            'vacuum_direction': self.vacuum_direction,
+            'vacuum_start_bottom': self.vacuum_start_bottom,
+            'polisher_diameter': self.polisher_diameter,
+            'polisher_overhang': self.polisher_overhang,
+            'polisher_direction': self.polisher_direction,
+            'polisher_start_bottom': self.polisher_start_bottom,
+            'heli_diameter': self.heli_diameter,
+            'heli_overhang': self.heli_overhang,
+            'heli_direction': self.heli_direction,
+            'heli_start_bottom': self.heli_start_bottom,
+            'pan_diameter': self.pan_diameter,
+            'pan_overhang': self.pan_overhang,
+            'pan_direction': self.pan_direction,
+            'pan_start_bottom': self.pan_start_bottom,
+            # Per-tool spiral parameters
+            'vacuum_spiral_direction': self.vacuum_spiral_direction,
+            'vacuum_formwork_offset': self.vacuum_formwork_offset,
+            'polisher_spiral_direction': self.polisher_spiral_direction,
+            'polisher_formwork_offset': self.polisher_formwork_offset,
+            'pan_spiral_direction': self.pan_spiral_direction,
+            'pan_formwork_offset': self.pan_formwork_offset,
         }

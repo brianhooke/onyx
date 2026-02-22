@@ -390,6 +390,7 @@ class Tool(ABC):
         Generate RAPID code to execute the pattern points.
         
         This is the core method that converts List[Point] to MoveL/FCPressL commands.
+        Handles axis_6 rotation if specified in points.
         """
         lines = [
             f"        ! ========================================",
@@ -406,18 +407,34 @@ class Tool(ABC):
         if use_fc:
             lines.extend(self._generate_fc_start(params, workzone))
         
+        # Track current axis 6 position for rotation moves
+        current_axis_6 = None
+        
         # Generate moves for each point
         for i, point in enumerate(points):
-            lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
+            axis_6_str = f", axis_6={point.axis_6:.0f}" if point.axis_6 is not None else ""
+            lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]{axis_6_str}")
             lines.append(f"        CurrentX:={point.x:.0f};")
             lines.append(f"        CurrentY:={point.y:.0f};")
-            lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+            
+            # Handle Z based on move type (lifted for rapid, work height for work)
+            if point.move_type == "rapid":
+                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+            else:
+                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+            
             lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
             lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
             lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
             lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
             lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
             lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
+            
+            # Handle axis 6 rotation if specified
+            if point.axis_6 is not None and point.axis_6 != current_axis_6:
+                lines.append(f"        ! Rotate axis 6 to {point.axis_6:.0f} degrees")
+                lines.append(f"        MoveAbsJ [[0,0,0,0,0,{point.axis_6:.0f}],pCurrent.extax]\\\\NoEOffs,v100,z5,{self.config.tooldata}\\\\WObj:=Bed1Wyong;")
+                current_axis_6 = point.axis_6
             
             if point.move_type == "rapid":
                 lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\\\WObj:=Bed1Wyong;")
@@ -601,7 +618,7 @@ class Helicopter(Tool):
             f"        WaitTime 0.5;",
             f"",
             f"        ! Start blade rotation",
-            f"        HeliBladeSpeed {params.get('heli_blade_speed', 70)},\"FWD\";",
+            f"        HeliBladeSpeed {params.get('heli_blade_speed', 70)},\"{params.get('heli_blade_direction', 'FWD')}\";",
             f"        WaitTime 2;",
             f"",
             f"        ! Start force control",
@@ -730,12 +747,17 @@ class Vacuum(Tool):
         pattern = params.get('vacuum_pattern', 'cross-hatch')
         
         if pattern == 'sweep-lift':
+            # Vacuum tool offset: 250mm angled about axis 6, so 180° rotation = 500mm shift
+            tool_offset = params.get('vacuum_tool_offset', 500)
+            axis_6_initial = params.get('vacuum_axis_6_initial', 0)
             return sweep_lift(
                 min_x=workzone['min_x'],
                 max_x=workzone['max_x'],
                 min_y=workzone['min_y'],
                 max_y=workzone['max_y'],
                 step_size=workzone['step_size'],
+                tool_offset=tool_offset,
+                axis_6_initial=axis_6_initial,
             )
         else:
             return cross_hatch(

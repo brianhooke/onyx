@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onyx - Toolpath Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .compact-input { background: #374151; border: 1px solid #4b5563; border-radius: 0.25rem; padding: 0.125rem 0.375rem; color: white; font-size: 0.75rem; width: 4.5rem; text-align: center; }
+        .compact-select { background: #374151; border: 1px solid #4b5563; border-radius: 0.25rem; padding: 0.125rem 0.25rem; color: white; font-size: 0.75rem; width: 4.5rem; }
+        .tool-row:hover { background: #1f2937; }
+        table input, table select { font-size: 11px; }
+        input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 1px rgba(59,130,246,0.3); }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        details:not([open]) .details-arrow { transform: rotate(-90deg); }
+        details[open] .details-arrow { transform: rotate(0deg); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-4 max-w-7xl">
+        <!-- Header -->
+        <div class="mb-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="/" class="text-gray-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </a>
+                <h1 class="text-xl font-bold">Toolpath Generator</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="conn-indicator" class="w-2 h-2 rounded-full bg-gray-500"></span>
+                <span id="conn-status" class="text-gray-400 text-xs">Checking...</span>
+            </div>
+        </div>
+
+        <form id="toolpath-form" class="space-y-2">
+            <!-- Workzones & Pattern Settings - Compact 2-column -->
+            <div class="grid grid-cols-2 gap-2">
+                <!-- Left: Workzones -->
+                <details open class="bg-gray-800 rounded-lg p-3">
+                    <summary class="text-xs font-medium text-gray-400 mb-2 cursor-pointer hover:text-gray-300 list-none flex items-center gap-1">
+                        <span class="transition-transform duration-200 details-arrow">▼</span> Workzones
+                    </summary>
+                    <div class="grid grid-cols-5 gap-x-2 gap-y-1 text-xs">
+                        <div class="text-gray-500"></div>
+                        <div class="text-gray-500">Length/X</div>
+                        <div class="text-gray-500">Width/Y</div>
+                        <div class="text-gray-500">Datum X</div>
+                        <div class="text-gray-500">Datum Y</div>
+                        
+                        <div class="text-gray-400 py-0.5">Bed</div>
+                        <input type="number" name="bed_length_x" value="{{ defaults.bed_length_x }}" class="compact-input">
+                        <input type="number" name="bed_width_y" value="{{ defaults.bed_width_y }}" class="compact-input">
+                        <input type="number" name="bed_datum_x" value="{{ defaults.bed_datum_x }}" class="compact-input">
+                        <input type="number" name="bed_datum_y" value="{{ defaults.bed_datum_y }}" class="compact-input">
+                        
+                        <div class="text-gray-400 py-0.5">Panel</div>
+                        <input type="number" name="panel_x" value="{{ defaults.panel_x }}" class="compact-input">
+                        <input type="number" name="panel_y" value="{{ defaults.panel_y }}" class="compact-input">
+                        <input type="number" name="panel_datum_x" value="{{ defaults.panel_datum_x }}" class="compact-input">
+                        <input type="number" name="panel_datum_y" value="{{ defaults.panel_datum_y }}" class="compact-input">
+                    </div>
+                    <div class="flex items-center gap-3 mt-2 pt-2 border-t border-gray-700">
+                        <span class="text-gray-500 text-xs">Global Z Offset:</span>
+                        <input type="number" name="z_offset" value="{{ defaults.z_offset }}" class="compact-input w-12">
+                        <span class="text-gray-500 text-xs">Panel Z:</span>
+                        <input type="number" name="panel_z" value="150" readonly class="compact-input w-12 bg-gray-800 text-gray-500 cursor-not-allowed">
+                    </div>
+                </details>
+                
+                <!-- Right: Pattern Settings (Per-Tool) -->
+                <details open class="bg-gray-800 rounded-lg p-3">
+                    <summary class="text-xs font-medium text-gray-400 mb-2 cursor-pointer hover:text-gray-300 list-none flex items-center gap-1">
+                        <span class="transition-transform duration-200 details-arrow">▼</span> Pattern Settings (Per-Tool)
+                    </summary>
+                    
+                    <!-- Vacuum X-hatch -->
+                    <details class="mb-1">
+                        <summary class="text-[11px] text-blue-400 cursor-pointer hover:text-blue-300 list-none flex items-center gap-1"><span class="details-arrow">▶</span> Vacuum X-hatch</summary>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 ml-2 text-xs">
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dia:</span>
+                                <input type="number" name="vacuum_diameter" value="{{ defaults.vacuum_diameter }}" class="compact-input w-16" title="Tool diameter (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Overhang:</span>
+                                <input type="number" name="vacuum_overhang" value="{{ defaults.vacuum_overhang }}" class="compact-input w-16" title="Edge overhang (mm)">                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dir:</span>
+                                <select name="vacuum_direction" class="compact-select">
+                                    <option value="1" {% if defaults.vacuum_direction == 1 %}selected{% endif %}>L→R</option>
+                                    <option value="-1" {% if defaults.vacuum_direction == -1 %}selected{% endif %}>R→L</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Start:</span>
+                                <select name="vacuum_start_bottom" class="compact-select">
+                                    <option value="0" {% if not defaults.vacuum_start_bottom %}selected{% endif %}>Top</option>
+                                    <option value="1" {% if defaults.vacuum_start_bottom %}selected{% endif %}>Btm</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+                    
+                    <!-- Polisher X-hatch -->
+                    <details class="mb-1">
+                        <summary class="text-[11px] text-green-400 cursor-pointer hover:text-green-300 list-none flex items-center gap-1"><span class="details-arrow">▶</span> Polisher X-hatch</summary>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 ml-2 text-xs">
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dia:</span>
+                                <input type="number" name="polisher_diameter" value="{{ defaults.polisher_diameter }}" class="compact-input w-16" title="Tool diameter (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Overhang:</span>
+                                <input type="number" name="polisher_overhang" value="{{ defaults.polisher_overhang }}" class="compact-input w-16" title="Edge overhang (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dir:</span>
+                                <select name="polisher_direction" class="compact-select">
+                                    <option value="1" {% if defaults.polisher_direction == 1 %}selected{% endif %}>L→R</option>
+                                    <option value="-1" {% if defaults.polisher_direction == -1 %}selected{% endif %}>R→L</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Start:</span>
+                                <select name="polisher_start_bottom" class="compact-select">
+                                    <option value="0" {% if not defaults.polisher_start_bottom %}selected{% endif %}>Top</option>
+                                    <option value="1" {% if defaults.polisher_start_bottom %}selected{% endif %}>Btm</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+                    
+                    <!-- Helicopter X-hatch & Spiral -->
+                    <details class="mb-1">
+                        <summary class="text-[11px] text-purple-400 cursor-pointer hover:text-purple-300 list-none flex items-center gap-1"><span class="details-arrow">▶</span> Helicopter X-hatch / Spiral</summary>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 ml-2 text-xs">
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dia:</span>
+                                <input type="number" name="heli_diameter" value="{{ defaults.heli_diameter }}" class="compact-input w-16" title="Tool diameter (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Overhang:</span>
+                                <input type="number" name="heli_overhang" value="{{ defaults.heli_overhang }}" class="compact-input w-16" title="Edge overhang (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dir:</span>
+                                <select name="heli_direction" class="compact-select">
+                                    <option value="1" {% if defaults.heli_direction == 1 %}selected{% endif %}>L→R</option>
+                                    <option value="-1" {% if defaults.heli_direction == -1 %}selected{% endif %}>R→L</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Start:</span>
+                                <select name="heli_start_bottom" class="compact-select">
+                                    <option value="0" {% if not defaults.heli_start_bottom %}selected{% endif %}>Top</option>
+                                    <option value="1" {% if defaults.heli_start_bottom %}selected{% endif %}>Btm</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-1 ml-2 text-xs border-t border-gray-700 pt-1">
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Spiral:</span>
+                                <select name="heli_spiral_direction" class="compact-select">
+                                    <option value="anticlockwise" {% if defaults.heli_spiral_direction == 'anticlockwise' %}selected{% endif %}>ACW</option>
+                                    <option value="clockwise" {% if defaults.heli_spiral_direction == 'clockwise' %}selected{% endif %}>CW</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Formwork:</span>
+                                <input type="number" name="heli_formwork_offset" value="{{ defaults.heli_formwork_offset }}" class="compact-input w-16">
+                            </div>
+                        </div>
+                    </details>
+                    
+                    <!-- Pan X-hatch -->
+                    <details class="mb-1">
+                        <summary class="text-[11px] text-orange-400 cursor-pointer hover:text-orange-300 list-none flex items-center gap-1"><span class="details-arrow">▶</span> Pan X-hatch</summary>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 ml-2 text-xs">
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dia:</span>
+                                <input type="number" name="pan_diameter" value="{{ defaults.pan_diameter }}" class="compact-input w-16" title="Tool diameter (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Overhang:</span>
+                                <input type="number" name="pan_overhang" value="{{ defaults.pan_overhang }}" class="compact-input w-16" title="Edge overhang (mm)">
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Dir:</span>
+                                <select name="pan_direction" class="compact-select">
+                                    <option value="1" {% if defaults.pan_direction == 1 %}selected{% endif %}>L→R</option>
+                                    <option value="-1" {% if defaults.pan_direction == -1 %}selected{% endif %}>R→L</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">Start:</span>
+                                <select name="pan_start_bottom" class="compact-select">
+                                    <option value="0" {% if not defaults.pan_start_bottom %}selected{% endif %}>Top</option>
+                                    <option value="1" {% if defaults.pan_start_bottom %}selected{% endif %}>Btm</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+                </details>
+            </div>
+
+            <!-- Tool Parameters Table -->
+            <details open class="bg-gray-800 rounded-lg p-3 overflow-x-auto">
+                <summary class="text-xs font-medium text-gray-400 mb-2 cursor-pointer hover:text-gray-300 list-none flex items-center gap-1">
+                    <span class="transition-transform duration-200 details-arrow">▼</span> Tool Parameters
+                </summary>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-gray-700">
+                            <th class="text-left py-1 px-1 font-medium w-20">Tool</th>
+                            <th class="text-left py-1 px-1 font-medium">Zone</th>
+                            <th class="text-left py-1 px-1 font-medium">Pattern</th>
+                            <th class="text-left py-1 px-1 font-medium">Step (mm)</th>
+                            <th class="text-left py-1 px-1 font-medium">Z Off (mm)</th>
+                            <th class="text-left py-1 px-1 font-medium">Speed (mm/s)</th>
+                            <th class="text-left py-1 px-1 font-medium">Force (N)</th>
+                            <th class="text-left py-1 px-1 font-medium">Blade (rpm)</th>
+                            <th class="text-left py-1 px-1 font-medium">Angle (°)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700/50">
+                        <!-- Vacuum -->
+                        <tr class="tool-row">
+                            <td class="py-1 px-1 text-blue-400 font-medium">Vacuum</td>
+                            <td class="py-1 px-1">
+                                <select name="vacuum_workzone" class="compact-select">
+                                    <option value="panel" {% if defaults.vacuum_workzone == 'panel' %}selected{% endif %}>Panel</option>
+                                    <option value="bed" {% if defaults.vacuum_workzone == 'bed' %}selected{% endif %}>Bed</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1">
+                                <select name="vacuum_pattern" class="compact-select">
+                                    <option value="cross-hatch" {% if defaults.vacuum_pattern == 'cross-hatch' %}selected{% endif %}>X-hatch</option>
+                                    <option value="rectangular_spiral" {% if defaults.vacuum_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
+                                    <option value="sweep-lift" {% if defaults.vacuum_pattern == 'sweep-lift' %}selected{% endif %}>Sweep</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1"><input type="number" name="vacuum_step" value="{{ defaults.vacuum_step }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="vacuum_z_offset" value="{{ defaults.vacuum_z_offset }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="vacuum_speed" value="{{ defaults.vacuum_speed }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="vacuum_force" value="{{ defaults.vacuum_force }}" class="compact-input"></td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                        </tr>
+                        <!-- Polisher -->
+                        <tr class="tool-row">
+                            <td class="py-1 px-1 text-green-400 font-medium">Polisher</td>
+                            <td class="py-1 px-1">
+                                <select name="polisher_workzone" class="compact-select">
+                                    <option value="bed" {% if defaults.polisher_workzone == 'bed' %}selected{% endif %}>Bed</option>
+                                    <option value="panel" {% if defaults.polisher_workzone == 'panel' %}selected{% endif %}>Panel</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1">
+                                <select name="polisher_pattern" class="compact-select">
+                                    <option value="cross-hatch" {% if defaults.polisher_pattern == 'cross-hatch' %}selected{% endif %}>X-hatch</option>
+                                    <option value="rectangular_spiral" {% if defaults.polisher_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1"><input type="number" name="polisher_step" value="{{ defaults.polisher_step }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="polisher_z_offset" value="{{ defaults.polisher_z_offset }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="polisher_speed" value="{{ defaults.polisher_speed }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="polisher_start_force" value="{{ defaults.polisher_start_force }}" class="compact-input" title="Start force"></td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                        </tr>
+                        <!-- Vib Screed -->
+                        <tr class="tool-row">
+                            <td class="py-1 px-1 text-yellow-400 font-medium">Vib Screed</td>
+                            <td class="py-1 px-1 text-gray-500">Panel</td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1"><input type="number" name="screed_z_offset" value="{{ defaults.screed_z_offset }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="vib_screed_speed" value="{{ defaults.vib_screed_speed }}" class="compact-input"></td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1 text-gray-600">—</td>
+                            <td class="py-1 px-1"><input type="number" name="screed_angle_offset" value="{{ defaults.screed_angle_offset }}" class="compact-input" title="Blade angle °"></td>
+                        </tr>
+                        <!-- Pan -->
+                        <tr class="tool-row">
+                            <td class="py-1 px-1 text-orange-400 font-medium">Pan</td>
+                            <td class="py-1 px-1 text-gray-500">Panel</td>
+                            <td class="py-1 px-1">
+                                <select name="pan_pattern" class="compact-select">
+                                    <option value="cross-hatch" {% if defaults.pan_pattern == 'cross-hatch' %}selected{% endif %}>X-hatch</option>
+                                    <option value="rectangular_spiral" {% if defaults.pan_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1"><input type="number" name="pan_step" value="{{ defaults.pan_step }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="pan_z_offset" value="{{ defaults.pan_z_offset }}" class="compact-input"></td>
+                            <td class="py-1 px-1">
+                                <select name="pan_travel_speed" class="compact-select">
+                                    <option value="20">20</option>
+                                    <option value="40">40</option>
+                                    <option value="60">60</option>
+                                    <option value="100" selected>100</option>
+                                    <option value="150">150</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1"><input type="number" name="pan_force" value="{{ defaults.pan_force }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="pan_blade_speed" value="{{ defaults.pan_blade_speed }}" class="compact-input" title="RPM"></td>
+                            </tr>
+                        <!-- Helicopter -->
+                        <tr class="tool-row">
+                            <td class="py-1 px-1 text-purple-400 font-medium">Helicopter</td>
+                            <td class="py-1 px-1 text-gray-500">Panel</td>
+                            <input type="hidden" name="heli_workzone" value="panel">
+                            <td class="py-1 px-1">
+                                <select name="heli_pattern" class="compact-select">
+                                    <option value="cross-hatch" {% if defaults.heli_pattern == 'cross-hatch' %}selected{% endif %}>X-hatch</option>
+                                    <option value="rectangular_spiral" {% if defaults.heli_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1"><input type="number" name="helicopter_step" value="{{ defaults.helicopter_step }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="heli_z_offset" value="{{ defaults.heli_z_offset }}" class="compact-input"></td>
+                            <td class="py-1 px-1">
+                                <select name="heli_travel_speed" class="compact-select">
+                                    <option value="20">20</option>
+                                    <option value="40" {% if defaults.heli_travel_speed == 40 %}selected{% endif %}>40</option>
+                                    <option value="60">60</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1"><input type="number" name="heli_force" value="{{ defaults.heli_force }}" class="compact-input"></td>
+                            <td class="py-1 px-1">
+                                <select name="heli_blade_speed" class="compact-select">
+                                    <option value="70" {% if defaults.heli_blade_speed == 70 %}selected{% endif %}>70</option>
+                                    <option value="100" {% if defaults.heli_blade_speed == 100 %}selected{% endif %}>100</option>
+                                    <option value="140" {% if defaults.heli_blade_speed == 140 %}selected{% endif %}>140</option>
+                                </select>
+                            </td>
+                            <td class="py-1 px-1">
+                                <div class="flex items-center gap-1">
+                                    <input type="number" name="heli_blade_angle" value="{{ defaults.heli_blade_angle }}" class="compact-input w-8" title="Blade angle °">
+                                    <select name="heli_blade_direction" class="compact-select w-12" title="Blade direction">
+                                        <option value="FWD" {% if defaults.heli_blade_direction == 'FWD' %}selected{% endif %}>FWD</option>
+                                        <option value="REV" {% if defaults.heli_blade_direction == 'REV' %}selected{% endif %}>REV</option>
+                                    </select>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <!-- Helicopter advanced (collapsible) -->
+                <details class="mt-2 pt-2 border-t border-gray-700">
+                    <summary class="text-[10px] text-purple-400 cursor-pointer hover:text-purple-300">Helicopter Control ▸</summary>
+                    <div class="flex flex-wrap gap-3 mt-2 text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Spiral Dir:</span>
+                            <select name="heli_spiral_direction" class="compact-select">
+                                <option value="anticlockwise" {% if defaults.heli_spiral_direction == 'anticlockwise' %}selected{% endif %}>ACW</option>
+                                <option value="clockwise" {% if defaults.heli_spiral_direction == 'clockwise' %}selected{% endif %}>CW</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Formwork:</span>
+                            <input type="number" name="heli_formwork_offset" value="{{ defaults.heli_formwork_offset }}" class="compact-input w-16">
+                        </div>
+                    </div>
+                </details>
+                <!-- Polisher advanced (collapsible) -->
+                <details class="mt-2 pt-2 border-t border-gray-700">
+                    <summary class="text-[10px] text-green-400 cursor-pointer hover:text-green-300">Polisher Force Control ▸</summary>
+                    <div class="flex flex-wrap gap-3 mt-2 text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Motion F:</span>
+                            <input type="number" name="polisher_motion_force" value="{{ defaults.polisher_motion_force }}" class="compact-input w-16">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Force Δ:</span>
+                            <input type="number" name="polisher_force_change" value="{{ defaults.polisher_force_change }}" class="compact-input w-16">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Z Range:</span>
+                            <input type="number" name="polisher_pos_supv_dist" value="{{ defaults.polisher_pos_supv_dist }}" class="compact-input w-16">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Approach:</span>
+                            <input type="number" name="polisher_approach_speed" value="{{ defaults.polisher_approach_speed }}" class="compact-input w-16">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Retract:</span>
+                            <input type="number" name="polisher_retract_speed" value="{{ defaults.polisher_retract_speed }}" class="compact-input w-16">
+                        </div>
+                    </div>
+                </details>
+            </details>
+
+            <!-- Actions -->
+            <div class="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
+                <label class="flex items-center gap-2 text-sm text-gray-300">
+                    <input type="checkbox" name="upload_to_irc5" checked class="w-4 h-4 rounded bg-gray-700 border-gray-600">
+                    Upload to IRC5
+                </label>
+                <div class="flex gap-2">
+                    <button type="button" id="save-btn" class="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 rounded text-sm font-medium">Save</button>
+                    <button type="submit" id="generate-btn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Generate & Push
+                    </button>
+                    <button type="button" id="upload-original-btn" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 rounded text-sm font-medium">Original</button>
+                </div>
+            </div>
+
+            {% include "robot_control/tool_demos.html" %}
+
+            <!-- Live Log (compact) -->
+            <div class="bg-gray-800 rounded-lg p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-medium text-gray-400">Live Log</h3>
+                    <span id="live-log-status" class="text-[10px] text-gray-500">Idle</span>
+                </div>
+                <div class="bg-gray-900 rounded h-32 overflow-hidden">
+                    <div class="px-2 py-1 border-b border-gray-800 flex items-center justify-between text-[10px]">
+                        <span class="text-gray-500">Tool:</span>
+                        <span id="live-current-tool" class="text-white font-mono">none</span>
+                    </div>
+                    <div id="live-log-lines" class="h-24 px-2 py-1 overflow-y-auto text-[10px] font-mono text-gray-300 space-y-0.5"></div>
+                </div>
+            </div>
+
+            <!-- Result Panel -->
+            <div id="result-panel" class="hidden bg-gray-800 rounded-lg p-4">
+                <h2 class="text-sm font-semibold mb-2" id="result-title">Result</h2>
+                <div id="result-content" class="text-sm"></div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            checkConnection();
+            setupSaveButton();
+            setupLiveLog();
+            setupBedVisualization();
+        });
+
+        function checkConnection() {
+            fetch('/api/status/').then(r => r.json()).then(data => {
+                const ind = document.getElementById('conn-indicator');
+                const stat = document.getElementById('conn-status');
+                if (data.connected) {
+                    ind.className = 'w-2 h-2 rounded-full bg-green-500';
+                    stat.textContent = 'Connected';
+                } else {
+                    ind.className = 'w-2 h-2 rounded-full bg-red-500';
+                    stat.textContent = 'Disconnected';
+                }
+            }).catch(() => {
+                document.getElementById('conn-indicator').className = 'w-2 h-2 rounded-full bg-red-500';
+                document.getElementById('conn-status').textContent = 'Error';
+            });
+        }
+
+        function setupSaveButton() {
+            document.getElementById('save-btn').addEventListener('click', async () => {
+                const form = document.getElementById('toolpath-form');
+                const formData = new FormData(form);
+                const params = {};
+                formData.forEach((v, k) => params[k] = v);
+                await fetch('/api/toolpath/params/save/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                document.getElementById('save-btn').textContent = 'Saved!';
+                setTimeout(() => document.getElementById('save-btn').textContent = 'Save', 1500);
+            });
+        }
+
+        function setupLiveLog() {
+            const statusEl = document.getElementById('live-log-status');
+            const toolEl = document.getElementById('live-current-tool');
+            const linesEl = document.getElementById('live-log-lines');
+            let seen = new Set();
+
+            async function poll() {
+                try {
+                    const r = await fetch('/api/live-log/?contains=LIVE:');
+                    const data = await r.json();
+                    if (data.current_tool) toolEl.textContent = data.current_tool;
+                    if (Array.isArray(data.lines)) {
+                        data.lines.slice().reverse().forEach(line => {
+                            if (line && !seen.has(line)) {
+                                seen.add(line);
+                                const div = document.createElement('div');
+                                div.textContent = line;
+                                linesEl.appendChild(div);
+                            }
+                        });
+                        while (linesEl.childNodes.length > 100) {
+                            const first = linesEl.firstChild;
+                            if (first) { seen.delete(first.textContent); linesEl.removeChild(first); }
+                        }
+                        if (linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight < 30) {
+                            linesEl.scrollTop = linesEl.scrollHeight;
+                        }
+                    }
+                    statusEl.textContent = 'Live';
+                } catch { statusEl.textContent = 'Error'; }
+            }
+            poll();
+            setInterval(poll, 1000);
+        }
+
+        // setupBedVisualization is now in tool_demos.html
+
+        document.getElementById('toolpath-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('generate-btn');
+            const panel = document.getElementById('result-panel');
+            const title = document.getElementById('result-title');
+            const content = document.getElementById('result-content');
+
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle></svg> Generating...';
+
+            const formData = new FormData(e.target);
+            const params = {};
+            const stringFields = ['vacuum_pattern', 'vacuum_workzone', 'vacuum_spiral_direction', 'polisher_workzone', 'polisher_pattern', 'polisher_spiral_direction', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern', 'pan_spiral_direction'];
+            for (const [k, v] of formData.entries()) {
+                params[k] = k === 'upload_to_irc5' ? true : stringFields.includes(k) ? v : parseInt(v);
+            }
+            if (!formData.has('upload_to_irc5')) params.upload_to_irc5 = false;
+
+            try {
+                const r = await fetch('/api/toolpath/generate/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                const data = await r.json();
+                panel.classList.remove('hidden');
+
+                if (data.success) {
+                    if (data.upload_success) {
+                        title.textContent = '✓ Upload Complete';
+                        title.className = 'text-sm font-semibold mb-2 text-green-400';
+                        content.innerHTML = `<p>Uploaded ${data.uploaded_files?.length || 0} files</p>`;
+                    } else {
+                        title.textContent = '⚠ Generated';
+                        title.className = 'text-sm font-semibold mb-2 text-yellow-400';
+                        content.innerHTML = `<p>${data.upload_error || 'Upload skipped'}</p>`;
+                    }
+                } else {
+                    title.textContent = '✗ Failed';
+                    title.className = 'text-sm font-semibold mb-2 text-red-400';
+                    content.innerHTML = `<p>${data.error}</p>`;
+                }
+            } catch (err) {
+                panel.classList.remove('hidden');
+                title.textContent = '✗ Error';
+                title.className = 'text-sm font-semibold mb-2 text-red-400';
+                content.innerHTML = `<p>${err.message}</p>`;
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Generate & Push';
+        });
+
+        document.getElementById('upload-original-btn').addEventListener('click', async () => {
+            if (!confirm("Upload original programs to IRC5?")) return;
+            const btn = document.getElementById('upload-original-btn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading...';
+            try {
+                const r = await fetch('/api/toolpath/upload-original/', { method: 'POST' });
+                const data = await r.json();
+                const panel = document.getElementById('result-panel');
+                const title = document.getElementById('result-title');
+                const content = document.getElementById('result-content');
+                panel.classList.remove('hidden');
+                if (data.success) {
+                    title.textContent = '✓ Original Uploaded';
+                    title.className = 'text-sm font-semibold mb-2 text-amber-400';
+                    content.innerHTML = `<p>Uploaded ${data.uploaded_files?.length} files</p>`;
+                } else {
+                    title.textContent = '✗ Failed';
+                    content.innerHTML = `<p>${data.error}</p>`;
+                }
+            } catch (err) {
+                alert(err.message);
+            }
+            btn.disabled = false;
+            btn.textContent = 'Original';
+        });
+    </script>
+</body>
+</html>
