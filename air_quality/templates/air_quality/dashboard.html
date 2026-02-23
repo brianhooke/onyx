@@ -1,0 +1,390 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onyx - Air Quality</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-dot.online { background-color: #22c55e; }
+        .status-dot.offline { background-color: #ef4444; }
+        .pm-value { font-weight: 600; font-size: 1.1rem; }
+        .pm-unit { font-size: 0.75rem; color: #6b7280; margin-left: 2px; }
+        .last-seen.stale { color: #f59e0b; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
+        .modal.hidden { display: none; }
+    </style>
+</head>
+<body class="bg-gray-500 text-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Onyx</h1>
+                <p class="text-gray-600">Air Quality Monitoring</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="/" class="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                    </svg>
+                    Robot Control
+                </a>
+                <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <span id="connection-status" class="status-dot online"></span>
+                    <span id="last-update">Last update: --</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensors Table -->
+        <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-200">
+            <h2 class="text-xl font-semibold mb-4">Live Sensor Readings</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">Sensor Name</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">Sensor ID</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">PM1.0</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">PM2.5</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">PM10</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">Last Seen</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sensors-body">
+                        <tr><td colspan="7" class="py-8 text-center text-gray-500">Loading sensors...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <h2 class="text-xl font-semibold">Historical Data</h2>
+                <div class="flex flex-wrap items-center gap-4">
+                    <select id="time-range" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="1">Last Hour</option>
+                        <option value="6">Last 6 Hours</option>
+                        <option value="24" selected>Last 24 Hours</option>
+                        <option value="168">Last Week</option>
+                    </select>
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-1 text-sm">
+                            <input type="checkbox" id="show-pm1" checked class="rounded"> PM1.0
+                        </label>
+                        <label class="flex items-center gap-1 text-sm">
+                            <input type="checkbox" id="show-pm25" checked class="rounded"> PM2.5
+                        </label>
+                        <label class="flex items-center gap-1 text-sm">
+                            <input type="checkbox" id="show-pm10" checked class="rounded"> PM10
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div id="sensor-filters" class="flex flex-wrap gap-3 mb-4 text-sm"></div>
+            <div style="height: 400px;">
+                <canvas id="history-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-semibold mb-4">Edit Sensor Name</h3>
+            <input type="text" id="edit-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4" placeholder="Sensor name">
+            <div class="flex justify-end gap-3">
+                <button id="cancel-edit" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button id="save-edit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/air-quality';
+        const REFRESH_INTERVAL = 5000;
+
+        const SENSOR_COLORS = {
+            'SENSOR_01': '#e53935',
+            'SENSOR_02': '#43a047',
+            'SENSOR_03': '#1e88e5',
+            'SENSOR_04': '#212121',
+            'SENSOR_05': '#8e24aa'
+        };
+
+        function getSensorColor(sensorId) {
+            return SENSOR_COLORS[sensorId] || '#666666';
+        }
+
+        let sensors = [];
+        let chart = null;
+        let editingSensorId = null;
+
+        async function fetchSensors() {
+            try {
+                const response = await fetch(`${API_BASE}/api/sensors/`);
+                if (!response.ok) throw new Error('Failed to fetch sensors');
+                sensors = await response.json();
+                renderSensorsTable();
+                updateSensorFilters();
+                updateConnectionStatus(true);
+                document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Error fetching sensors:', error);
+                updateConnectionStatus(false);
+            }
+        }
+
+        function renderSensorsTable() {
+            const tbody = document.getElementById('sensors-body');
+            
+            if (sensors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No sensors connected yet</td></tr>';
+                return;
+            }
+            
+            const sortedSensors = [...sensors].sort((a, b) => a.id.localeCompare(b.id));
+            tbody.innerHTML = sortedSensors.map(sensor => {
+                const lastSeen = new Date(sensor.last_seen);
+                const isStale = (Date.now() - lastSeen.getTime()) > 60000;
+                
+                return `
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                        <td class="py-3 px-4">
+                            <div class="flex items-center gap-2">
+                                <span style="color: ${getSensorColor(sensor.id)}; font-weight: 600;">${escapeHtml(sensor.display_name)}</span>
+                                <button onclick="openEditModal('${sensor.id}', '${escapeHtml(sensor.display_name)}')" class="text-gray-400 hover:text-gray-600">✏️</button>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-gray-500 text-sm font-mono">${sensor.id}</td>
+                        <td class="py-3 px-4">
+                            <span class="pm-value">${sensor.pm1 !== null ? sensor.pm1.toFixed(1) : '--'}</span>
+                            <span class="pm-unit">µg/m³</span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="pm-value">${sensor.pm25 !== null ? sensor.pm25.toFixed(1) : '--'}</span>
+                            <span class="pm-unit">µg/m³</span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="pm-value">${sensor.pm10 !== null ? sensor.pm10.toFixed(1) : '--'}</span>
+                            <span class="pm-unit">µg/m³</span>
+                        </td>
+                        <td class="py-3 px-4 ${isStale ? 'text-amber-500' : 'text-gray-600'}">
+                            ${formatTimestamp(lastSeen)}
+                        </td>
+                        <td class="py-3 px-4">
+                            <button onclick="resetSensorWifi('${sensor.id}')" 
+                                ${sensor.ip_address ? '' : 'disabled'} 
+                                class="px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg"
+                                title="${sensor.ip_address ? 'Reset WiFi on ' + sensor.ip_address : 'IP unknown'}">
+                                🔄 Reset WiFi
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateSensorFilters() {
+            const container = document.getElementById('sensor-filters');
+            const existingIds = Array.from(container.querySelectorAll('input')).map(i => i.value);
+            
+            sensors.forEach(sensor => {
+                if (!existingIds.includes(sensor.id)) {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center gap-1';
+                    label.innerHTML = `<input type="checkbox" value="${sensor.id}" checked class="rounded"> <span style="color: ${getSensorColor(sensor.id)}; font-weight: 500;">${escapeHtml(sensor.display_name)}</span>`;
+                    label.querySelector('input').addEventListener('change', fetchAndRenderChart);
+                    container.appendChild(label);
+                }
+            });
+        }
+
+        async function fetchAndRenderChart() {
+            const hours = document.getElementById('time-range').value;
+            const showPm1 = document.getElementById('show-pm1').checked;
+            const showPm25 = document.getElementById('show-pm25').checked;
+            const showPm10 = document.getElementById('show-pm10').checked;
+            
+            const selectedSensors = Array.from(
+                document.querySelectorAll('#sensor-filters input:checked')
+            ).map(i => i.value);
+            
+            if (selectedSensors.length === 0) {
+                if (chart) { chart.data.datasets = []; chart.update(); }
+                return;
+            }
+            
+            try {
+                const allReadings = [];
+                for (const sensorId of selectedSensors) {
+                    const response = await fetch(`${API_BASE}/api/readings/history/?hours=${hours}&sensor_id=${sensorId}`);
+                    if (response.ok) {
+                        const readings = await response.json();
+                        allReadings.push({ sensorId, readings });
+                    }
+                }
+                renderChart(allReadings, { showPm1, showPm25, showPm10 });
+            } catch (error) {
+                console.error('Error fetching readings:', error);
+            }
+        }
+
+        function renderChart(allReadings, { showPm1, showPm25, showPm10 }) {
+            const datasets = [];
+            
+            allReadings.forEach(({ sensorId, readings }) => {
+                const sensor = sensors.find(s => s.id === sensorId);
+                const sensorName = sensor ? sensor.display_name : sensorId;
+                const baseColor = getSensorColor(sensorId);
+                
+                const data = readings.map(r => ({
+                    x: new Date(r.timestamp),
+                    pm1: r.pm1,
+                    pm25: r.pm25,
+                    pm10: r.pm10
+                }));
+                
+                if (showPm1) {
+                    datasets.push({
+                        label: `${sensorName} - PM1.0`,
+                        data: data.map(d => ({ x: d.x, y: d.pm1 })),
+                        borderColor: baseColor,
+                        backgroundColor: baseColor + '1a',
+                        tension: 0.3, pointRadius: 1, borderWidth: 2, borderDash: []
+                    });
+                }
+                
+                if (showPm25) {
+                    datasets.push({
+                        label: `${sensorName} - PM2.5`,
+                        data: data.map(d => ({ x: d.x, y: d.pm25 })),
+                        borderColor: baseColor,
+                        backgroundColor: baseColor + '1a',
+                        tension: 0.3, pointRadius: 1, borderWidth: 2, borderDash: [5, 5]
+                    });
+                }
+                
+                if (showPm10) {
+                    datasets.push({
+                        label: `${sensorName} - PM10`,
+                        data: data.map(d => ({ x: d.x, y: d.pm10 })),
+                        borderColor: baseColor,
+                        backgroundColor: baseColor + '1a',
+                        tension: 0.3, pointRadius: 1, borderWidth: 2, borderDash: [2, 2]
+                    });
+                }
+            });
+            
+            if (!chart) {
+                const ctx = document.getElementById('history-chart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        scales: {
+                            x: { type: 'time', time: { displayFormats: { minute: 'HH:mm', hour: 'HH:mm', day: 'MMM d' } } },
+                            y: { title: { display: true, text: 'µg/m³' }, beginAtZero: true }
+                        },
+                        plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 10, font: { size: 11 } } } }
+                    }
+                });
+            } else {
+                chart.data.datasets = datasets;
+                chart.update();
+            }
+        }
+
+        function openEditModal(sensorId, currentName) {
+            editingSensorId = sensorId;
+            document.getElementById('edit-name').value = currentName;
+            document.getElementById('edit-modal').classList.remove('hidden');
+            document.getElementById('edit-name').focus();
+        }
+
+        function closeEditModal() {
+            editingSensorId = null;
+            document.getElementById('edit-modal').classList.add('hidden');
+        }
+
+        async function saveSensorName() {
+            const newName = document.getElementById('edit-name').value.trim();
+            if (!newName || !editingSensorId) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/sensors/${editingSensorId}/`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ display_name: newName })
+                });
+                if (response.ok) {
+                    closeEditModal();
+                    await fetchSensors();
+                    await fetchAndRenderChart();
+                }
+            } catch (error) {
+                console.error('Error updating sensor name:', error);
+            }
+        }
+
+        async function resetSensorWifi(sensorId) {
+            const sensor = sensors.find(s => s.id === sensorId);
+            const name = sensor ? sensor.display_name : sensorId;
+            
+            if (!confirm(`Reset WiFi on ${name}?\n\nThe sensor will restart and broadcast its AP for reconfiguration.`)) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/sensors/${sensorId}/reset-wifi/`, { method: 'POST' });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Reset failed');
+                }
+                alert(`WiFi reset triggered on ${name}.\n\nLook for the AirQuality-AP network to reconfigure.`);
+            } catch (error) {
+                alert(`Failed to reset WiFi: ${error.message}`);
+            }
+        }
+
+        function updateConnectionStatus(online) {
+            document.getElementById('connection-status').className = `status-dot ${online ? 'online' : 'offline'}`;
+        }
+
+        function formatTimestamp(date) {
+            const diff = Date.now() - date.getTime();
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+            return date.toLocaleDateString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.getElementById('cancel-edit').addEventListener('click', closeEditModal);
+        document.getElementById('save-edit').addEventListener('click', saveSensorName);
+        document.getElementById('edit-name').addEventListener('keypress', (e) => { if (e.key === 'Enter') saveSensorName(); });
+        document.getElementById('time-range').addEventListener('change', fetchAndRenderChart);
+        document.getElementById('show-pm1').addEventListener('change', fetchAndRenderChart);
+        document.getElementById('show-pm25').addEventListener('change', fetchAndRenderChart);
+        document.getElementById('show-pm10').addEventListener('change', fetchAndRenderChart);
+
+        fetchSensors();
+        fetchAndRenderChart();
+        setInterval(fetchSensors, REFRESH_INTERVAL);
+        setInterval(fetchAndRenderChart, REFRESH_INTERVAL * 6);
+    </script>
+</body>
+</html>
