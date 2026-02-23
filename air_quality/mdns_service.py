@@ -4,6 +4,7 @@ Advertises as 'onyx-server.local' so sensors can discover the server.
 """
 import socket
 import threading
+import traceback
 from zeroconf import ServiceInfo, Zeroconf
 
 
@@ -41,10 +42,11 @@ class MDNSService:
                 server=f"{self.hostname}.local.",
             )
             
-            self.zeroconf.register_service(self.service_info)
+            self.zeroconf.register_service(self.service_info, allow_name_change=True)
             print(f"mDNS: Advertising as {self.hostname}.local ({local_ip}:{self.port})")
         except Exception as e:
-            print(f"mDNS: Failed to start - {e}")
+            print(f"mDNS: Failed to start - {type(e).__name__}: {repr(e)}")
+            print(traceback.format_exc())
     
     def start(self):
         """Start mDNS advertisement in background thread."""
