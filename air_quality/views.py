@@ -152,16 +152,29 @@ def api_reset_wifi(request, sensor_id):
 @require_http_methods(["POST"])
 def api_flash_firmware(request):
     """Flash firmware to connected ESP32 device."""
-    firmware_path = os.path.expanduser(
-        "~/Library/Mobile Documents/com~apple~CloudDocs/Coding/air_quality_sensor_network"
-    )
+    # Use firmware directory relative to Django project
+    firmware_path = os.path.join(settings.BASE_DIR, 'firmware')
     
     if not os.path.exists(firmware_path):
         return JsonResponse({'error': 'Firmware project not found'}, status=404)
     
+    # Find pio command
+    import shutil
+    pio_cmd = shutil.which('pio') or shutil.which('platformio')
+    if not pio_cmd:
+        # Fallback to common locations
+        for path in ['/usr/local/bin/pio', os.path.expanduser('~/.platformio/penv/bin/pio'),
+                     os.path.expanduser('~/Library/Python/3.9/bin/pio')]:
+            if os.path.exists(path):
+                pio_cmd = path
+                break
+    
+    if not pio_cmd:
+        return JsonResponse({'error': 'PlatformIO not found. Install with: pip install platformio'}, status=404)
+    
     try:
         result = subprocess.run(
-            ["/Users/briansone/Library/Python/3.9/bin/pio", "run", "-t", "upload"],
+            [pio_cmd, "run", "-t", "upload"],
             cwd=firmware_path,
             capture_output=True,
             text=True,

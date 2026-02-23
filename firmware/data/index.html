@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Air Quality Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; text-align: center; background: #f0f2f5; margin:0; padding:20px; color: #1c1e21; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    h2 { margin-top: 0; color: #4b4f56; }
+    .readings-row { display: flex; justify-content: space-around; margin: 20px 0; flex-wrap: wrap; gap: 10px; }
+    .reading-card { flex: 1; min-width: 100px; padding: 15px 10px; border-radius: 12px; }
+    .reading-card.pm1 { background: rgba(255, 99, 132, 0.1); }
+    .reading-card.pm25 { background: rgba(54, 162, 235, 0.1); }
+    .reading-card.pm10 { background: rgba(75, 192, 192, 0.1); }
+    .reading { font-size: 2em; font-weight: 800; display: block; line-height: 1.2; }
+    .reading-card.pm1 .reading { color: rgb(255, 99, 132); }
+    .reading-card.pm25 .reading { color: rgb(54, 162, 235); }
+    .reading-card.pm10 .reading { color: rgb(75, 192, 192); }
+    .unit { font-size: 0.7rem; color: #8d949e; font-weight: 400; }
+    .label { color: #8d949e; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 5px; }
+    .chart-container { margin: 20px 0; height: 250px; }
+    .btn-clean { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: 600; transition: transform 0.1s; width: 100%; margin-top: 10px; }
+    .btn-clean:active { transform: scale(0.98); background: #218838; }
+    .timer-box { background: #e7f3ff; color: #1877f2; padding: 8px; border-radius: 10px; font-size: 0.9em; margin-bottom: 20px; font-weight: 600; }
+    .footer-links { margin-top: 20px; font-size: 0.8em; color: #ccd0d5; }
+    .footer-links a { color: #1877f2; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🌬️ <span id="sensor-id">Air Quality</span></h2>
+    
+    <div id="countdown-box" class="timer-box">
+      Next update in: <span id="timer">5</span>s
+    </div>
+
+    <div class="readings-row">
+      <div class="reading-card pm1">
+        <div class="label">PM1.0</div>
+        <span id="pm1" class="reading">0.0</span>
+        <span class="unit">µg/m³</span>
+      </div>
+      <div class="reading-card pm25">
+        <div class="label">PM2.5</div>
+        <span id="pm25" class="reading">0.0</span>
+        <span class="unit">µg/m³</span>
+      </div>
+      <div class="reading-card pm10">
+        <div class="label">PM10</div>
+        <span id="pm10" class="reading">0.0</span>
+        <span class="unit">µg/m³</span>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="pmChart"></canvas>
+    </div>
+    
+    <button class="btn-clean" onclick="triggerClean()">🌀 Start Fan Cleaning</button>
+    
+    <div class="footer-links">
+      SPS30 Sensor
+    </div>
+  </div>
+
+  <script>
+    const MAX_POINTS = 60;
+    let intervalSecs = 5;
+    let timeLeft = 5;
+    
+    const history = {
+      labels: [],
+      pm1: [],
+      pm25: [],
+      pm10: []
+    };
+
+    const ctx = document.getElementById('pmChart').getContext('2d');
+    const pmChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: history.labels,
+        datasets: [
+          {
+            label: 'PM1.0',
+            data: history.pm1,
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+            tension: 0.3,
+            fill: false,
+            pointRadius: 2
+          },
+          {
+            label: 'PM2.5',
+            data: history.pm25,
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            tension: 0.3,
+            fill: false,
+            pointRadius: 2
+          },
+          {
+            label: 'PM10',
+            data: history.pm10,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            tension: 0.3,
+            fill: false,
+            pointRadius: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+          x: { display: true, title: { display: false } },
+          y: { display: true, title: { display: true, text: 'µg/m³' }, beginAtZero: true }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, padding: 15 } }
+        }
+      }
+    });
+
+    function triggerClean() {
+      if(confirm("Start 10-second high-speed fan cleaning?")) {
+        fetch('/clean');
+      }
+    }
+
+    function addDataPoint(pm1Val, pm25Val, pm10Val) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      history.labels.push(timeStr);
+      history.pm1.push(pm1Val);
+      history.pm25.push(pm25Val);
+      history.pm10.push(pm10Val);
+      
+      if (history.labels.length > MAX_POINTS) {
+        history.labels.shift();
+        history.pm1.shift();
+        history.pm25.shift();
+        history.pm10.shift();
+      }
+      
+      pmChart.update('none');
+    }
+
+    function updateData() {
+      fetch('/data').then(r => r.json()).then(d => {
+        document.getElementById('sensor-id').textContent = d.sensor_id || 'Air Quality';
+        document.getElementById('pm1').textContent = d.pm1.toFixed(1);
+        document.getElementById('pm25').textContent = d.pm25.toFixed(1);
+        document.getElementById('pm10').textContent = d.pm10.toFixed(1);
+        intervalSecs = d.interval;
+        timeLeft = d.interval;
+        
+        addDataPoint(d.pm1, d.pm25, d.pm10);
+      });
+    }
+
+    setInterval(() => {
+      timeLeft--;
+      if (timeLeft <= 0) {
+        updateData();
+        timeLeft = intervalSecs;
+      }
+      document.getElementById('timer').textContent = timeLeft;
+    }, 1000);
+
+    updateData();
+  </script>
+</body>
+</html>
