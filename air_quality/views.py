@@ -3,9 +3,12 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 import json
 import httpx
+import subprocess
+import os
 
 from .models import Sensor, Reading
 
@@ -143,3 +146,41 @@ def api_reset_wifi(request, sensor_id):
     
     except Sensor.DoesNotExist:
         return JsonResponse({'error': 'Sensor not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_flash_firmware(request):
+    """Flash firmware to connected ESP32 device."""
+    firmware_path = os.path.expanduser(
+        "~/Library/Mobile Documents/com~apple~CloudDocs/Coding/air_quality_sensor_network"
+    )
+    
+    if not os.path.exists(firmware_path):
+        return JsonResponse({'error': 'Firmware project not found'}, status=404)
+    
+    try:
+        result = subprocess.run(
+            ["/Users/briansone/Library/Python/3.9/bin/pio", "run", "-t", "upload"],
+            cwd=firmware_path,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        if result.returncode == 0:
+            return JsonResponse({
+                'status': 'ok',
+                'message': 'Firmware flashed successfully',
+                'output': result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout
+            })
+        else:
+            return JsonResponse({
+                'error': 'Flash failed',
+                'output': result.stderr[-2000:] if len(result.stderr) > 2000 else result.stderr
+            }, status=500)
+            
+    except subprocess.TimeoutExpired:
+        return JsonResponse({'error': 'Flash timed out'}, status=504)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

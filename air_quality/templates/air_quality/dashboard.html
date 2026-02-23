@@ -28,6 +28,12 @@
                 <p class="text-gray-600">Air Quality Monitoring</p>
             </div>
             <div class="flex items-center gap-4">
+                <button onclick="flashFirmware()" id="flash-btn" class="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span id="flash-btn-text">Flash Firmware</span>
+                </button>
                 <a href="/" class="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
@@ -84,6 +90,10 @@
                         </label>
                         <label class="flex items-center gap-1 text-sm">
                             <input type="checkbox" id="show-pm10" checked class="rounded"> PM10
+                        </label>
+                        <span class="text-gray-300">|</span>
+                        <label class="flex items-center gap-1 text-sm">
+                            <input type="checkbox" id="filter-zeros" checked class="rounded"> Filter 0.0
                         </label>
                     </div>
                 </div>
@@ -245,12 +255,15 @@
                 const sensorName = sensor ? sensor.display_name : sensorId;
                 const baseColor = getSensorColor(sensorId);
                 
-                const data = readings.map(r => ({
-                    x: new Date(r.timestamp),
-                    pm1: r.pm1,
-                    pm25: r.pm25,
-                    pm10: r.pm10
-                }));
+                const filterZeros = document.getElementById('filter-zeros').checked;
+                const data = readings
+                    .filter(r => !filterZeros || (r.pm1 !== 0 || r.pm25 !== 0 || r.pm10 !== 0))
+                    .map(r => ({
+                        x: new Date(r.timestamp),
+                        pm1: r.pm1,
+                        pm25: r.pm25,
+                        pm10: r.pm10
+                    }));
                 
                 if (showPm1) {
                     datasets.push({
@@ -355,6 +368,31 @@
             }
         }
 
+        async function flashFirmware() {
+            if (!confirm('Flash firmware to connected ESP32?\n\nMake sure a sensor is connected via USB.')) return;
+            
+            const btn = document.getElementById('flash-btn');
+            const btnText = document.getElementById('flash-btn-text');
+            btn.disabled = true;
+            btnText.textContent = 'Flashing...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/flash-firmware/`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Firmware flashed successfully!\n\nConnect to AirQuality-AP to configure WiFi.');
+                } else {
+                    alert(`Flash failed: ${data.error}\n\n${data.output || ''}`);
+                }
+            } catch (error) {
+                alert(`Flash failed: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Flash Firmware';
+            }
+        }
+
         function updateConnectionStatus(online) {
             document.getElementById('connection-status').className = `status-dot ${online ? 'online' : 'offline'}`;
         }
@@ -380,6 +418,7 @@
         document.getElementById('show-pm1').addEventListener('change', fetchAndRenderChart);
         document.getElementById('show-pm25').addEventListener('change', fetchAndRenderChart);
         document.getElementById('show-pm10').addEventListener('change', fetchAndRenderChart);
+        document.getElementById('filter-zeros').addEventListener('change', fetchAndRenderChart);
 
         fetchSensors();
         fetchAndRenderChart();

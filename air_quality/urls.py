@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/sensors/<str:sensor_id>/reset-wifi/', views.api_reset_wifi, name='api_reset_wifi'),
     path('api/readings/', views.api_readings, name='api_readings'),
     path('api/readings/history/', views.api_readings_history, name='api_readings_history'),
+    path('api/flash-firmware/', views.api_flash_firmware, name='api_flash_firmware'),
 ]
