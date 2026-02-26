@@ -22,6 +22,7 @@ from .tools.sequences import generate_seq_bed_clean
 # Paths
 SCRIPT_DIR = Path(__file__).parent
 TEMPLATES_DIR = SCRIPT_DIR / "templates"
+TEMPLATES_TEMP_DIR = SCRIPT_DIR / "templates_temp"  # Staging directory for testing migrations
 
 # Files to copy without modification
 STATIC_FILES = [
@@ -30,6 +31,7 @@ STATIC_FILES = [
     "MainModule.mod",
     "Tools.mod",
     "FCtesting.mod",
+    "Toolstations.mod",  # Safety interlocks for tool station lids
 ]
 
 # ToolPaths.mod is processed separately
@@ -100,7 +102,15 @@ class ToolpathGenerator:
         'serpentine_start_bottom',
     ]
     
-    def __init__(self, params: dict):
+    def __init__(self, params: dict, use_temp_templates: bool = False):
+        """
+        Initialize the generator.
+        
+        Args:
+            params: Dictionary of required parameters from DB
+            use_temp_templates: If True, use templates_temp directory for testing
+                               migrations before committing to production templates
+        """
         # Validate all required parameters are present
         missing = [p for p in self.REQUIRED_PARAMS if p not in params]
         if missing:
@@ -108,6 +118,10 @@ class ToolpathGenerator:
         
         self.params = dict(params)
         self.timestamp = datetime.now().strftime("%d-%b_%H:%M").lower()
+        
+        # Select templates directory
+        self.templates_dir = TEMPLATES_TEMP_DIR if use_temp_templates else TEMPLATES_DIR
+        self.using_temp_templates = use_temp_templates
     
     def generate(self) -> Dict:
         """
@@ -119,16 +133,16 @@ class ToolpathGenerator:
         output_dir = Path(tempfile.mkdtemp(prefix="onyx_rapid_"))
         generated_files: List[str] = []
         
-        # 1. Copy static files
+        # 1. Copy static files (from selected templates directory)
         for filename in STATIC_FILES:
-            src = TEMPLATES_DIR / filename
+            src = self.templates_dir / filename
             dst = output_dir / filename
             if src.exists():
                 shutil.copy2(src, dst)
                 generated_files.append(filename)
         
         # 2. Process ToolPaths.mod
-        toolpaths_src = TEMPLATES_DIR / TOOLPATHS_FILE
+        toolpaths_src = self.templates_dir / TOOLPATHS_FILE
         if toolpaths_src.exists():
             content = toolpaths_src.read_text(encoding='utf-8', errors='ignore')
             content = self._process_toolpaths(content)
@@ -140,6 +154,7 @@ class ToolpathGenerator:
             'files': generated_files,
             'params': self.params,
             'timestamp': self.timestamp,
+            'using_temp_templates': self.using_temp_templates,
         }
     
     def _process_toolpaths(self, content: str) -> str:
