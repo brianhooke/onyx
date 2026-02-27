@@ -32,7 +32,7 @@ def generate_seq_bed_clean(params: dict) -> str:
         
         ! Step 1: Vacuum the bed
         TPWrite "SeqBedClean: Starting vacuum...";
-        Py2Vacuum;
+        Py2Vac;
         TPWrite "SeqBedClean: Vacuum complete";
         
         ! Step 2: Polish the bed

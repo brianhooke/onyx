@@ -152,6 +152,7 @@ MODULE Tools
 
     
     PROC TC_grip(num ToolNo)
+        !TEST FOR NOT PULLING FROM RAM
         StopMove;
         !Turn off any electrical connections
         AllOutputOff;
@@ -160,7 +161,7 @@ MODULE Tools
         !Actuate and check for DI signal
 
         SETDO PN_DO_14,1;
-        WaitDI PN_DI_14,1 \MaxTime:=10;
+        WaitDI PN_DI_14,1;
         SETDO PN_DO_14,0;
         
         TEST ToolNo
@@ -232,7 +233,7 @@ MODULE Tools
         ENDTEST
         
         SetDO PN_DO_24, 1;
-        WaitDI PN_DI_24, 0 \MaxTime:=10;
+        WaitDI PN_DI_24, 0;
         SetDO PN_DO_24, 0;
         
             !Set current tool to specified
@@ -308,7 +309,7 @@ MODULE Tools
     PROC VS_on()
         IF Toolnum=3 THEN
             SetDO PN_DO_18,1;
-            WaitDI PN_DI_18,1 \MaxTime:=30;
+            WaitDI PN_DI_18,1;
         ELSE
             RAISE ERR_VS_DISCONNECT;
         ENDIF
@@ -320,7 +321,7 @@ MODULE Tools
 
     PROC VS_off()
         SetDO PN_DO_18,0;
-        WaitDI PN_DI_18,0 \MaxTime:=5;
+        WaitDI PN_DI_18,0;
     ENDPROC
 
     PROC HeliBladeSpeed(num RPM,string DIRECTION)
@@ -349,16 +350,16 @@ MODULE Tools
 
                 ENDIF
                 SetDO PN_DO_19,1;
-                WaitDI PN_DI_19,1 \MaxTime:=15;
+                WaitDI PN_DI_19,1;
                 WaitTime 0.1;
                 SETAO Local_IO_1_AO1,Avoltage;
             ENDIF
         ELSEIF RPM=0 THEN
             SetDO PN_DO_19,0;
-            WaitDI PN_DI_19,0 \MaxTime:=5;
+            WaitDI PN_DI_19,0;
         ELSE
             SetDO PN_DO_19,0;
-            WaitDI PN_DI_19,1 \MaxTime:=5;
+            WaitDI PN_DI_19,1;
             RAISE ERR_HELI_DISCONNECT;
 
         ENDIF
@@ -370,7 +371,7 @@ MODULE Tools
     
     PROC Heli_Off()
         SetDO PN_DO_19,0;
-        WaitDI PN_DI_19,0 \MaxTime:=15;
+        WaitDI PN_DI_19,0;
     ENDPROC
     
 
@@ -714,7 +715,7 @@ MODULE Tools
     PROC Pol_on()
         IF Toolnum=6 THEN
             SetDO PN_DO_18,1;
-            WaitDI PN_DI_18,1 \MaxTime:=5;
+            WaitDI PN_DI_18,1;
         ELSE
             RAISE ERR_POLISH_DISCONNECT;
         ENDIF
@@ -726,7 +727,7 @@ MODULE Tools
     
     PROC Pol_off()
         SetDO PN_DO_18,0;
-        WaitDI PN_DI_18,0 \MaxTime:=5;
+        WaitDI PN_DI_18,0;
     ENDPROC
     
     PROC Vac_on()

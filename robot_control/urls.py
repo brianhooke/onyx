@@ -25,10 +25,13 @@ urlpatterns = [
     path('toolpath/', views.toolpath_generator, name='toolpath_generator'),
     path('api/toolpath/generate/', views.api_generate_toolpath, name='api_generate_toolpath'),
     path('api/toolpath/upload-original/', views.api_upload_original_progmod, name='api_upload_original_progmod'),
+    path('api/toolpath/pull-irc5/', views.api_pull_irc5_files, name='api_pull_irc5_files'),
     path('api/toolpath/params/', toolpath.api_toolpath_params, name='api_toolpath_params'),
     path('api/toolpath/params/save/', toolpath.api_toolpath_save_params, name='api_toolpath_save_params'),
     path('api/toolpath/pattern-points/', views.api_pattern_points, name='api_pattern_points'),
     path('api/reload-program/', views.api_reload_program, name='api_reload_program'),
     path('api/tool-changer/', views.api_tool_changer, name='api_tool_changer'),
     path('api/activity-log/', views.api_activity_log, name='api_activity_log'),
+    path('api/irc5/force-data/', views.api_force_data, name='api_force_data'),
+    path('api/irc5/start-force-monitor/', views.api_start_force_monitor, name='api_start_force_monitor'),
 ]

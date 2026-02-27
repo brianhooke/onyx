@@ -79,6 +79,309 @@
     </div>
 </div>
 
+<!-- Force Monitoring Display -->
+<div id="force-monitor" class="card p-2 mt-2">
+    <div class="flex items-center justify-between mb-2">
+        <h3 class="text-xs font-medium text-gray-600">Force Monitor (6-Axis)</h3>
+        <div class="flex items-center gap-2">
+            <span id="force-status" class="text-[10px] text-gray-400">Disconnected</span>
+            <button type="button" id="force-live-btn" class="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-[10px] text-blue-600 border border-blue-200">Live Forces</button>
+            <button type="button" id="force-connect-btn" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px] text-gray-600 border border-gray-200">Connect</button>
+        </div>
+    </div>
+    <div class="grid grid-cols-6 gap-2">
+        <!-- Force X -->
+        <div class="flex flex-col items-center p-2 bg-gray-50 rounded border border-gray-200">
+            <span class="text-[10px] text-gray-500 mb-1">Force X</span>
+            <div class="relative w-full h-16 bg-gray-200 rounded overflow-hidden">
+                <div id="force-x-bar" class="absolute bottom-0 left-0 right-0 bg-blue-500 transition-all" style="height: 50%;"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="force-x-val" class="text-xs font-bold text-gray-800">0</span>
+                </div>
+            </div>
+            <span class="text-[10px] text-gray-400 mt-1">N</span>
+        </div>
+        <!-- Force Y -->
+        <div class="flex flex-col items-center p-2 bg-gray-50 rounded border border-gray-200">
+            <span class="text-[10px] text-gray-500 mb-1">Force Y</span>
+            <div class="relative w-full h-16 bg-gray-200 rounded overflow-hidden">
+                <div id="force-y-bar" class="absolute bottom-0 left-0 right-0 bg-green-500 transition-all" style="height: 50%;"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="force-y-val" class="text-xs font-bold text-gray-800">0</span>
+                </div>
+            </div>
+            <span class="text-[10px] text-gray-400 mt-1">N</span>
+        </div>
+        <!-- Force Z -->
+        <div class="flex flex-col items-center p-2 bg-gray-50 rounded border border-gray-200">
+            <span class="text-[10px] text-gray-500 mb-1">Force Z</span>
+            <div class="relative w-full h-16 bg-gray-200 rounded overflow-hidden">
+                <div id="force-z-bar" class="absolute bottom-0 left-0 right-0 bg-purple-500 transition-all" style="height: 50%;"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="force-z-val" class="text-xs font-bold text-gray-800">0</span>
+                </div>
+            </div>
+            <span class="text-[10px] text-gray-400 mt-1">N</span>
+        </div>
+        <!-- Torque X -->
+        <div class="flex flex-col items-center p-2 bg-gray-50 rounded border border-gray-200">
+            <span class="text-[10px] text-gray-500 mb-1">Torque X</span>
+            <div class="relative w-full h-16 bg-gray-200 rounded overflow-hidden">
+                <div id="force-tx-bar" class="absolute bottom-0 left-0 right-0 bg-orange-500 transition-all" style="height: 50%;"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="force-tx-val" class="text-xs font-bold text-gray-800">0</span>
+                </div>
+            </div>
+            <span class="text-[10px] text-gray-400 mt-1">Nm</span>
+        </div>
+        <!-- Torque Y -->
+        <div class="flex flex-col items-center p-2 bg-gray-50 rounded border border-gray-200">
+            <span class="text-[10px] text-gray-500 mb-1">Torque Y</span>
+            <div class="relative w-full h-16 bg-gray-200 rounded overflow-hidden">
+                <div id="force-ty-bar" class="absolute bottom-0 left-0 right-0 bg-pink-500 transition-all" style="height: 50%;"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="force-ty-val" class="text-xs font-bold text-gray-800">0</span>
+                </div>
+            </div>
+            <span class="text-[10px] text-gray-400 mt-1">Nm</span>
+        </div>
+        <!-- Torque Z -->
+        <div class="flex flex-col items-center p-2 bg-gray-50 rounded border border-gray-200">
+            <span class="text-[10px] text-gray-500 mb-1">Torque Z</span>
+            <div class="relative w-full h-16 bg-gray-200 rounded overflow-hidden">
+                <div id="force-tz-bar" class="absolute bottom-0 left-0 right-0 bg-cyan-500 transition-all" style="height: 50%;"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="force-tz-val" class="text-xs font-bold text-gray-800">0</span>
+                </div>
+            </div>
+            <span class="text-[10px] text-gray-400 mt-1">Nm</span>
+        </div>
+    </div>
+    <!-- Force History Graph (mini sparkline) -->
+    <div class="mt-2 pt-2 border-t border-gray-200">
+        <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] text-gray-500">Force Z History</span>
+            <span id="force-z-peak" class="text-[10px] text-gray-400">Peak: 0N</span>
+        </div>
+        <div class="h-8 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+            <svg id="force-history-svg" class="w-full h-full" preserveAspectRatio="none">
+                <polyline id="force-history-line" fill="none" stroke="#8b5cf6" stroke-width="1.5" points=""/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<script>
+// =============================================================================
+// Force Monitor - Real-time 6-axis force display
+// =============================================================================
+
+let forceMonitorState = {
+    connected: false,
+    polling: false,
+    pollInterval: null,
+    history: [],
+    maxHistory: 100,
+    peakForceZ: 0,
+    maxForce: 500,  // Max scale for bar display (N)
+    maxTorque: 50,  // Max scale for torque display (Nm)
+};
+
+function setupForceMonitor() {
+    const connectBtn = document.getElementById('force-connect-btn');
+    if (connectBtn) {
+        connectBtn.addEventListener('click', toggleForceMonitor);
+    }
+    
+    const liveBtn = document.getElementById('force-live-btn');
+    if (liveBtn) {
+        liveBtn.addEventListener('click', startLiveForces);
+    }
+}
+
+async function startLiveForces() {
+    const btn = document.getElementById('force-live-btn');
+    const statusEl = document.getElementById('force-status');
+    
+    if (btn) btn.textContent = 'Starting...';
+    if (btn) btn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/irc5/start-force-monitor/', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            if (statusEl) statusEl.textContent = 'force_monitor() started';
+            if (btn) btn.textContent = 'Running';
+            // Auto-start polling
+            if (!forceMonitorState.polling) {
+                startForceMonitor();
+            }
+        } else {
+            if (statusEl) statusEl.textContent = 'Error: ' + (data.error || 'Failed');
+            if (btn) btn.textContent = 'Live Forces';
+            if (btn) btn.disabled = false;
+        }
+    } catch (err) {
+        if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+        if (btn) btn.textContent = 'Live Forces';
+        if (btn) btn.disabled = false;
+    }
+}
+
+function toggleForceMonitor() {
+    if (forceMonitorState.polling) {
+        stopForceMonitor();
+    } else {
+        startForceMonitor();
+    }
+}
+
+function startForceMonitor() {
+    forceMonitorState.polling = true;
+    forceMonitorState.history = [];
+    forceMonitorState.peakForceZ = 0;
+    
+    const statusEl = document.getElementById('force-status');
+    const btnEl = document.getElementById('force-connect-btn');
+    if (statusEl) statusEl.textContent = 'Connecting...';
+    if (btnEl) btnEl.textContent = 'Stop';
+    
+    // Poll every 100ms (10Hz) - IRC5 updates at 10ms but network latency limits us
+    forceMonitorState.pollInterval = setInterval(pollForceData, 100);
+}
+
+function stopForceMonitor() {
+    forceMonitorState.polling = false;
+    if (forceMonitorState.pollInterval) {
+        clearInterval(forceMonitorState.pollInterval);
+        forceMonitorState.pollInterval = null;
+    }
+    
+    const statusEl = document.getElementById('force-status');
+    const btnEl = document.getElementById('force-connect-btn');
+    if (statusEl) statusEl.textContent = 'Disconnected';
+    if (btnEl) btnEl.textContent = 'Connect';
+}
+
+async function pollForceData() {
+    try {
+        const response = await fetch('/api/irc5/force-data/');
+        const data = await response.json();
+        
+        if (data.success) {
+            forceMonitorState.connected = true;
+            updateForceDisplay(data.forces);
+            
+            const statusEl = document.getElementById('force-status');
+            if (data.source === 'rapid_pers') {
+                // Live feed from force_monitor()
+                if (statusEl) statusEl.textContent = 'Live';
+                statusEl.className = 'text-[10px] text-green-500';
+            } else if (data.errors && data.errors.length > 0) {
+                // AO signals missing
+                if (statusEl) statusEl.textContent = 'AO missing';
+                statusEl.className = 'text-[10px] text-yellow-500';
+                statusEl.title = data.note || data.errors.join(', ');
+            } else {
+                // AO signals working but not live
+                if (statusEl) statusEl.textContent = 'Static (run force_monitor)';
+                statusEl.className = 'text-[10px] text-yellow-500';
+            }
+        } else {
+            const statusEl = document.getElementById('force-status');
+            if (statusEl) statusEl.textContent = 'Error: ' + (data.error || 'Unknown');
+            statusEl.className = 'text-[10px] text-red-400';
+        }
+    } catch (err) {
+        const statusEl = document.getElementById('force-status');
+        if (statusEl) statusEl.textContent = 'Connection failed';
+        statusEl.className = 'text-[10px] text-red-400';
+    }
+}
+
+function updateForceDisplay(forces) {
+    // Update bar charts and values
+    const axes = ['x', 'y', 'z', 'tx', 'ty', 'tz'];
+    const maxValues = {
+        x: forceMonitorState.maxForce,
+        y: forceMonitorState.maxForce,
+        z: forceMonitorState.maxForce,
+        tx: forceMonitorState.maxTorque,
+        ty: forceMonitorState.maxTorque,
+        tz: forceMonitorState.maxTorque,
+    };
+    
+    axes.forEach(axis => {
+        const value = forces[axis] || 0;
+        const max = maxValues[axis];
+        const percentage = Math.min(Math.abs(value) / max * 100, 100);
+        
+        const barEl = document.getElementById(`force-${axis}-bar`);
+        const valEl = document.getElementById(`force-${axis}-val`);
+        
+        if (barEl) barEl.style.height = `${percentage}%`;
+        if (valEl) valEl.textContent = value.toFixed(1);
+        
+        // Color coding: green for low, yellow for medium, red for high
+        if (barEl) {
+            if (percentage > 80) {
+                barEl.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500', 'bg-yellow-500');
+                barEl.classList.add('bg-red-500');
+            } else if (percentage > 50) {
+                barEl.classList.remove('bg-red-500');
+                barEl.classList.add('bg-yellow-500');
+            }
+        }
+    });
+    
+    // Update history for Force Z
+    const forceZ = forces.z || 0;
+    forceMonitorState.history.push(forceZ);
+    if (forceMonitorState.history.length > forceMonitorState.maxHistory) {
+        forceMonitorState.history.shift();
+    }
+    
+    // Track peak
+    if (Math.abs(forceZ) > Math.abs(forceMonitorState.peakForceZ)) {
+        forceMonitorState.peakForceZ = forceZ;
+        const peakEl = document.getElementById('force-z-peak');
+        if (peakEl) peakEl.textContent = `Peak: ${forceZ.toFixed(1)}N`;
+    }
+    
+    // Update sparkline
+    updateForceHistoryGraph();
+}
+
+function updateForceHistoryGraph() {
+    const svg = document.getElementById('force-history-svg');
+    const line = document.getElementById('force-history-line');
+    if (!svg || !line) return;
+    
+    const history = forceMonitorState.history;
+    if (history.length < 2) return;
+    
+    const width = svg.clientWidth || 200;
+    const height = svg.clientHeight || 32;
+    const maxVal = forceMonitorState.maxForce;
+    
+    const points = history.map((val, i) => {
+        const x = (i / (forceMonitorState.maxHistory - 1)) * width;
+        const y = height - ((val + maxVal) / (2 * maxVal)) * height;  // Center at 0
+        return `${x},${y}`;
+    }).join(' ');
+    
+    line.setAttribute('points', points);
+}
+
+// Initialize on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupForceMonitor);
+} else {
+    setupForceMonitor();
+}
+</script>
+
 <script>
 // =============================================================================
 // Tool Demos - Bed & Panel Visualization

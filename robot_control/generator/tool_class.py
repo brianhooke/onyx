@@ -371,7 +371,7 @@ class Tool(ABC):
             f"        TPWrite \"Py2{self.config.name}: Starting\";",
             f"        TPWrite \"========================================\";",
             f"        TPWrite \"Workzone: {workzone['type']}\";",
-            f"        TPWrite \"WorkZ=\" \\\\Num:=WorkZ;",
+            "        TPWrite \"WorkZ=\" \\Num:=WorkZ;",
             f"",
         ]
     
@@ -386,8 +386,8 @@ class Tool(ABC):
             f"        ENDIF",
             f"",
             f"        ! Disable configuration tracking",
-            f"        ConfL\\\\Off;",
-            f"        ConfJ\\\\Off;",
+            "        ConfL\\Off;",
+            "        ConfJ\\Off;",
             f"",
         ]
     
@@ -444,11 +444,11 @@ class Tool(ABC):
             # Handle axis 6 rotation if specified
             if point.axis_6 is not None and point.axis_6 != current_axis_6:
                 lines.append(f"        ! Rotate axis 6 to {point.axis_6:.0f} degrees")
-                lines.append(f"        MoveAbsJ [[0,0,0,0,0,{point.axis_6:.0f}],pCurrent.extax]\\\\NoEOffs,v100,z5,{self.config.tooldata}\\\\WObj:=Bed1Wyong;")
+                lines.append(f"        MoveAbsJ [[0,0,0,0,0,{point.axis_6:.0f}],pCurrent.extax]\\NoEOffs,v100,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
                 current_axis_6 = point.axis_6
             
             if point.move_type == "rapid":
-                lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\\\WObj:=Bed1Wyong;")
+                lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
             else:
                 lines.append(f"        {move_cmd}")
             lines.append(f"")
@@ -467,8 +467,8 @@ class Tool(ABC):
         """Get the move command string."""
         if use_fc:
             force = params.get(f'{self.name.lower()}_force', 100)
-            return f"FCPressL pCurrent,vTravel,{force},fine,{self.config.tooldata}\\\\WObj:=Bed1Wyong;"
-        return f"MoveL pCurrent,vTravel,fine,{self.config.tooldata}\\\\WObj:=Bed1Wyong;"
+            return f"FCPressL pCurrent,vTravel,{force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;"
+        return f"MoveL pCurrent,vTravel,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;"
     
     def _generate_fc_start(self, params: Dict, workzone: Dict) -> List[str]:
         """Generate force control start sequence. Override in FC-capable tools."""
@@ -485,12 +485,12 @@ class Tool(ABC):
             f"",
             f"        ! Lift to safe height",
             f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\\\WObj:=Bed1Wyong);",
-            f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,{self.config.tooldata}\\\\WObj:=Bed1Wyong;",
+            f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
+            f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
             f"",
             f"        ! Re-enable configuration tracking",
-            f"        ConfL\\\\On;",
-            f"        ConfJ\\\\On;",
+            "        ConfL\\On;",
+            "        ConfJ\\On;",
             f"",
             f"        ! Return tool and go home",
             f"        TPWrite \"Py2{self.config.name}: Dropping off tool...\";",
@@ -633,7 +633,7 @@ class Helicopter(Tool):
             f"        WaitTime 2;",
             f"",
             f"        ! Start force control",
-            f"        FCPress1LStart pCurrent,v10,\\\\Fz:={force},15,\\\\ForceChange:={force_change}\\\\PosSupvDist:={pos_supv_dist},z5,tHeli\\\\WObj:=Bed1Wyong;",
+            f"        FCPress1LStart pCurrent,v10,\\Fz:={force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tHeli\\WObj:=Bed1Wyong;",
             f"        bFCActive:=TRUE;",
             f"",
         ]
@@ -643,8 +643,8 @@ class Helicopter(Tool):
             f"",
             f"        ! End force control before lifting",
             f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\\\WObj:=Bed1Wyong);",
-            f"        FCPressEnd Offs(CurrentPos,0,0,50),v50,\\\\DeactOnly,tHeli\\\\WObj:=Bed1Wyong;",
+            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);",
+            f"        FCPressEnd Offs(CurrentPos,0,0,50),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;",
             f"        bFCActive:=FALSE;",
             f"",
         ]
@@ -661,13 +661,13 @@ class Helicopter(Tool):
             f"    ERROR",
             f"        HeliBladeSpeed 0,\"FWD\";",
             f"        IF bFCActive THEN",
-            f"            FCPressEnd Offs(CurrentPos,0,0,100),v50,\\\\DeactOnly,tHeli\\\\WObj:=Bed1Wyong;",
+            f"            FCPressEnd Offs(CurrentPos,0,0,100),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;",
             f"        ENDIF",
         ]
 
 
 class VibratingScreened(Tool):
-    """Vibrating screed for leveling concrete - single pass pattern."""
+    """Vibrating screed for leveling concrete - single pass pattern with force monitoring."""
     
     def __init__(self):
         config = ToolConfig(
@@ -681,6 +681,30 @@ class VibratingScreened(Tool):
             min_safe_z=400,
         )
         super().__init__(config)
+    
+    def _uses_force_monitoring(self, params: Dict) -> bool:
+        """Check if force monitoring is enabled for this tool."""
+        return params.get('vs_force_monitor', False)  # Default disabled
+    
+    def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
+        """Add force monitoring variables for VS."""
+        lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
+        
+        if self._uses_force_monitoring(params):
+            force_limit = params.get('vs_force_limit', 300)
+            lines.extend([
+                f"        ! Force monitoring variables",
+                f"        VAR fcforcevector CurrentForces;",
+                f"        VAR num PeakForceZ := 0;",
+                f"        VAR num ForceLimit := {force_limit};",
+                f"        VAR num ForceReadCount := 0;",
+                f"        VAR clock ForceLogClock;",
+                f"        VAR num LastLogTime := 0;",
+                f"        CONST num ForceLogInterval := 1;  ! Log every 1 second",
+                f"",
+            ])
+        
+        return lines
     
     def _get_tool_width(self) -> float:
         return 700  # Screed blade width
@@ -705,14 +729,120 @@ class VibratingScreened(Tool):
         )
     
     def _generate_pickup_section(self) -> List[str]:
-        """Add vibrating screed power on."""
-        lines = super()._generate_pickup_section()
-        lines.extend([
-            f"        ! Turn on vibrating screed",
-            f"        TPWrite \"Py2VS: Starting screed...\";",
-            f"        VS_on;",
+        """VS pickup - motor turned on later after positioning."""
+        return super()._generate_pickup_section()
+    
+    def _generate_pattern_execution(self, points: List[Point], params: Dict, workzone: Dict) -> List[str]:
+        """Override to turn on motor after positioning at work surface, before lowering.
+        
+        VS tool maintains orientation from pickup (pVSHome3) - no rotation.
+        Uses pVSHome3.rot and pVSHome3.robconf to match VS_Pickup end position.
+        Includes inline force monitoring when enabled.
+        """
+        use_force_monitor = self._uses_force_monitoring(params)
+        
+        lines = [
+            f"        ! ========================================",
+            f"        ! Pattern Execution: {len(points)} points",
+            f"        ! Force Monitoring: {'ENABLED' if use_force_monitor else 'DISABLED'}",
+            f"        ! ========================================",
             f"",
-        ])
+            f"        ! Use VS tool's orientation from pickup end position (pVSHome3)",
+            f"        ! This prevents 180 degree rotation when moving to work surface",
+            f"        pCurrent.rot:=pVSHome3.rot;",
+            f"",
+        ]
+        
+        move_cmd = self._get_move_command(False, params)
+        
+        # Generate moves for each point
+        for i, point in enumerate(points):
+            lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
+            lines.append(f"        CurrentX:={point.x:.0f};")
+            lines.append(f"        CurrentY:={point.y:.0f};")
+            
+            # Handle Z based on move type
+            if point.move_type in ("rapid", "lift"):
+                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+            else:
+                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+            
+            # Use pVSHome3 robconf [1,0,1,0] to match VS_Pickup end position
+            lines.append(f"        pCurrent.robconf:=[1,0,1,0];")
+            lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
+            lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
+            lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+            lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
+            
+            if point.move_type == "rapid":
+                lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+                # Turn on motor after first rapid move (positioned above work surface)
+                if i == 0:
+                    lines.append(f"")
+                    lines.append(f"        ! Turn on vibrating screed after positioning")
+                    lines.append(f"        TPWrite \"Py2VS: Starting screed...\";")
+                    lines.append(f"        VS_on;")
+                    if use_force_monitor:
+                        lines.append(f"        ClkReset ForceLogClock;")
+                        lines.append(f"        ClkStart ForceLogClock;")
+                        lines.append(f"        TPWrite \"LIVE: Force monitoring active\";")
+            else:
+                # Execute move
+                lines.append(f"        {move_cmd}")
+                
+                # Force monitoring after work moves
+                if use_force_monitor:
+                    lines.extend([
+                        f"",
+                        f"        ! Read force after move",
+                        f"        CurrentForces := FCGetForce();",
+                        f"        ForceReadCount := ForceReadCount + 1;",
+                        f"",
+                        f"        ! Track peak force",
+                        f"        IF Abs(CurrentForces.zforce) > PeakForceZ THEN",
+                        f"            PeakForceZ := Abs(CurrentForces.zforce);",
+                        f"        ENDIF",
+                        f"",
+                        f"        ! Update PERS vars and log every 1 second",
+                        f"        IF ClkRead(ForceLogClock) - LastLogTime >= ForceLogInterval THEN",
+                        f"            ! Update ForceMonitor PERS variables for UI",
+                        f"            fm_fx := CurrentForces.xforce;",
+                        f"            fm_fy := CurrentForces.yforce;",
+                        f"            fm_fz := CurrentForces.zforce;",
+                        f"            fm_tx := CurrentForces.xtorque;",
+                        f"            fm_ty := CurrentForces.ytorque;",
+                        f"            fm_tz := CurrentForces.ztorque;",
+                        f"            fm_status := 1;",
+                        f"            TPWrite \"LIVE: Fz=\" \\Num:=CurrentForces.zforce;",
+                        f"            LastLogTime := ClkRead(ForceLogClock);",
+                        f"        ENDIF",
+                        f"",
+                        f"        ! Check force limit",
+                        f"        IF Abs(CurrentForces.zforce) > ForceLimit THEN",
+                        f"            TPWrite \"LIVE: !!! FORCE LIMIT EXCEEDED !!!\";",
+                        f"            TPWrite \"LIVE: Force Z=\" \\Num:=CurrentForces.zforce;",
+                        f"            TPWrite \"Limit: \" \\Num:=ForceLimit;",
+                        f"            VS_off;",
+                        f"            ! Lift to safe height and exit",
+                        f"            CurrentJoints:=CJointT();",
+                        f"            CurrentPos:=CalcRobT(CurrentJoints,tVS\\WObj:=Bed1Wyong);",
+                        f"            MoveL Offs(CurrentPos,0,0,200),v100,z5,tVS\\WObj:=Bed1Wyong;",
+                        f"            RETURN;",
+                        f"        ENDIF",
+                    ])
+            lines.append(f"")
+        
+        # Log final force stats
+        if use_force_monitor:
+            lines.extend([
+                f"        ! ========================================",
+                f"        ! Force monitoring complete",
+                f"        ! ========================================",
+                f"        TPWrite \"Peak Force Z: \" \\Num:=PeakForceZ;",
+                f"        TPWrite \"Total force samples: \" \\Num:=ForceReadCount;",
+                f"",
+            ])
+        
         return lines
     
     def _generate_motor_off(self) -> List[str]:
@@ -720,9 +850,9 @@ class VibratingScreened(Tool):
     
     def _generate_error_cleanup(self) -> List[str]:
         return [
-            f"    ERROR",
-            f"        VS_off;",
-            f"        TPWrite \"Py2VS ERROR: \" \\\\Num:=ERRNO;",
+            "    ERROR",
+            "        VS_off;",
+            "        TPWrite \"Py2VS ERROR: \" \\Num:=ERRNO;",
         ]
 
 
@@ -804,9 +934,9 @@ class Vacuum(Tool):
     
     def _generate_error_cleanup(self) -> List[str]:
         return [
-            f"    ERROR",
-            f"        Vac_off;",
-            f"        TPWrite \"Py2Vac ERROR: \" \\\\Num:=ERRNO;",
+            "    ERROR",
+            "        Vac_off;",
+            "        TPWrite \"Py2Vac ERROR: \" \\Num:=ERRNO;",
         ]
 
 
@@ -854,11 +984,11 @@ class Polisher(Tool):
             f"        Pol_on;",
             f"",
             f"        ! Force control calibration",
-            f"        WaitTime\\\\inpos,0.1;",
+            f"        WaitTime\\inpos,0.1;",
             f"        FCCalib PolishLoad;",
             f"",
             f"        ! Start force control",
-            f"        FCPress1LStart pCurrent,v{approach_speed},\\\\Fz:={start_force},15,\\\\ForceChange:={force_change}\\\\PosSupvDist:={pos_supv_dist},z5,tPolish\\\\WObj:=Bed1Wyong;",
+            f"        FCPress1LStart pCurrent,v{approach_speed},\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tPolish\\WObj:=Bed1Wyong;",
             f"        bFCActive:=TRUE;",
             f"",
         ]
@@ -869,8 +999,8 @@ class Polisher(Tool):
             f"",
             f"        ! End force control",
             f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,tPolish\\\\WObj:=Bed1Wyong);",
-            f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\\\DeactOnly,tPolish\\\\WObj:=Bed1Wyong;",
+            f"        CurrentPos:=CalcRobT(CurrentJoints,tPolish\\WObj:=Bed1Wyong);",
+            f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\DeactOnly,tPolish\\WObj:=Bed1Wyong;",
             f"        bFCActive:=FALSE;",
             f"",
         ]
@@ -880,9 +1010,9 @@ class Polisher(Tool):
     
     def _generate_error_cleanup(self) -> List[str]:
         return [
-            f"    ERROR",
-            f"        Pol_off;",
-            f"        TPWrite \"Py2Polish ERROR: \" \\\\Num:=ERRNO;",
+            "    ERROR",
+            "        Pol_off;",
+            "        TPWrite \"Py2Polish ERROR: \" \\Num:=ERRNO;",
         ]
 
 
@@ -924,8 +1054,8 @@ class Pan(Tool):
         lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
         pan_force = params.get('pan_force', 0)
         lines.insert(-1, f"        VAR num PanForce:={pan_force};")
+        lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
         if self._uses_force_control(params):
-            lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
             lines.insert(-1, f"        VAR fcforcevector myForceVector;")
         return lines
     
@@ -945,8 +1075,8 @@ class Pan(Tool):
             f"        HeliBlade_Angle 0;",
             f"",
             f"        ! Disable configuration tracking",
-            f"        ConfL\\\\Off;",
-            f"        ConfJ\\\\Off;",
+            "        ConfL\\Off;",
+            "        ConfJ\\Off;",
             f"",
         ]
     
@@ -966,7 +1096,7 @@ class Pan(Tool):
             f"        WaitTime 2;",
             f"",
             f"        ! Start force control",
-            f"        FCPress1LStart pCurrent,v10,\\\\Fz:={force},15,\\\\ForceChange:={force_change}\\\\PosSupvDist:={pos_supv_dist},z5,tHeli\\\\WObj:=Bed1Wyong;",
+            f"        FCPress1LStart pCurrent,v10,\\Fz:={force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tHeli\\WObj:=Bed1Wyong;",
             f"        bFCActive:=TRUE;",
             f"",
         ]
@@ -976,8 +1106,8 @@ class Pan(Tool):
             f"",
             f"        ! End force control",
             f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\\\WObj:=Bed1Wyong);",
-            f"        FCPressEnd Offs(CurrentPos,0,0,50),v50,\\\\DeactOnly,tHeli\\\\WObj:=Bed1Wyong;",
+            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);",
+            f"        FCPressEnd Offs(CurrentPos,0,0,50),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;",
             f"        bFCActive:=FALSE;",
             f"",
         ]
@@ -996,12 +1126,12 @@ class Pan(Tool):
             f"",
             f"        ! Lift to safe height",
             f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\\\WObj:=Bed1Wyong);",
-            f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,tHeli\\\\WObj:=Bed1Wyong;",
+            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);",
+            f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,tHeli\\WObj:=Bed1Wyong;",
             f"",
             f"        ! Re-enable configuration tracking",
-            f"        ConfL\\\\On;",
-            f"        ConfJ\\\\On;",
+            "        ConfL\\On;",
+            "        ConfJ\\On;",
             f"",
             f"        ! Return tool and go home",
             f"        TPWrite \"Py2Pan: Dropping off helicopter...\";",
@@ -1020,7 +1150,7 @@ class Pan(Tool):
             f"    ERROR",
             f"        HeliBladeSpeed 0,\"FWD\";",
             f"        IF bFCActive THEN",
-            f"            FCPressEnd Offs(CurrentPos,0,0,100),v50,\\\\DeactOnly,tHeli\\\\WObj:=Bed1Wyong;",
+            f"            FCPressEnd Offs(CurrentPos,0,0,100),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;",
             f"        ENDIF",
         ]
 

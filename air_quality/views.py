@@ -9,6 +9,8 @@ import json
 import httpx
 import subprocess
 import os
+import sys
+import shutil
 
 from .models import Sensor, Reading
 
@@ -158,27 +160,30 @@ def api_flash_firmware(request):
     if not os.path.exists(firmware_path):
         return JsonResponse({'error': 'Firmware project not found'}, status=404)
     
-    # Find pio command
-    import shutil
-    pio_cmd = shutil.which('pio') or shutil.which('platformio')
-    if not pio_cmd:
-        # Fallback to common locations
-        for path in ['/usr/local/bin/pio', os.path.expanduser('~/.platformio/penv/bin/pio'),
-                     os.path.expanduser('~/Library/Python/3.9/bin/pio')]:
-            if os.path.exists(path):
-                pio_cmd = path
-                break
-    
-    if not pio_cmd:
-        return JsonResponse({'error': 'PlatformIO not found. Install with: pip install platformio'}, status=404)
+    # Find PlatformIO executable. Prefer `pio` on PATH, but fall back to the current
+    # interpreter's module execution (works when installed inside this venv).
+    pio_path = shutil.which('pio')
+    if pio_path:
+        cmd = [pio_path]
+    else:
+        try:
+            import platformio  # noqa: F401
+            cmd = [sys.executable, '-m', 'platformio']
+        except Exception:
+            return JsonResponse(
+                {'error': 'PlatformIO not found. Install with: pip install platformio'},
+                status=404,
+            )
+
+    firmware_dir = firmware_path
     
     try:
         result = subprocess.run(
-            [pio_cmd, "run", "-t", "upload"],
-            cwd=firmware_path,
+            cmd + ['run', '-t', 'upload'],
+            cwd=firmware_dir,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=180
         )
         
         if result.returncode == 0:

@@ -223,6 +223,48 @@ class IRC5Client:
             pass
         return modules
     
+    def get_module_text(self, module_name, task='T_ROB1'):
+        """
+        Get the text content of a loaded RAPID module from controller memory.
+        
+        This retrieves the module as currently loaded in RAM, not from disk.
+        Any unsaved changes in the controller will be included.
+        
+        Args:
+            module_name: Name of the module (without .mod extension)
+            task: Task name (default T_ROB1)
+        
+        Returns:
+            dict with 'success', 'text', 'error'
+        """
+        try:
+            # Try the text/range endpoint to get full module text from RAM
+            # Using large range to get entire module (row 1 to 10000, col 1 to end)
+            response = self._get(
+                f"/rw/rapid/tasks/{task}/modules/{module_name}/text/range"
+                f"?startrow=1&startcol=1&endrow=10000&endcol=-1"
+            )
+            # Parse the text from the XML response
+            root = ET.fromstring(response.text)
+            for elem in root.iter():
+                if elem.get('class') == 'text':
+                    return {
+                        'success': True,
+                        'text': elem.text if elem.text else '',
+                        'error': None
+                    }
+            return {
+                'success': False,
+                'text': None,
+                'error': 'No text element found in response'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'text': None,
+                'error': str(e)
+            }
+    
     def set_program_pointer(self, task='T_ROB1', module='MainModule', routine='main'):
         """Set program pointer to specific routine."""
         self._post("/rw/rapid/execution?action=requestmastership")
@@ -364,6 +406,25 @@ class IRC5Client:
                 return {'status': 'not_running'}
         except Exception as e:
             return {'status': 'error', 'error': str(e)}
+    
+    def call_rapid_proc(self, module, proc_name, task='T_ROB1'):
+        """
+        Call a RAPID procedure via RWS service call.
+        Note: This requires the controller to be in AUTO mode and program running.
+        """
+        try:
+            # Use RWS service call endpoint
+            url = f"/rw/rapid/symbol/RAPID/{task}/{module}/{proc_name}/call"
+            response = self.session.post(
+                f"{self.base_url}{url}",
+                auth=self.auth,
+                verify=False,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            return response.status_code == 200 or response.status_code == 204
+        except Exception as e:
+            print(f"Error calling RAPID proc: {e}")
+            return False
     
     # =========================================================================
     # Event Log / Alarms
@@ -601,14 +662,15 @@ class IRC5Client:
             root = ET.fromstring(response.text)
             for elem in root.iter():
                 if elem.get('class') == 'fs-file':
-                    file_info = {}
-                    for child in elem.iter():
-                        cls = child.get('class')
-                        if cls == 'fs-filename':
-                            file_info['name'] = child.text
-                        elif cls == 'fs-filesize':
-                            file_info['size'] = child.text
-                    if file_info.get('name'):
+                    # Filename is in the 'title' attribute of the li element
+                    filename = elem.get('title')
+                    if filename:
+                        file_info = {'name': filename}
+                        # Also get size if available
+                        for child in elem.iter():
+                            cls = child.get('class')
+                            if cls == 'fs-size':
+                                file_info['size'] = child.text
                         files.append(file_info)
             return files
         except Exception as e:
@@ -839,6 +901,94 @@ class IRC5Client:
             'uploaded': uploaded,
             'failed': failed,
             'program_name': program_name
+        }
+    
+    def download_all_modules(self, local_dir, task='T_ROB1'):
+        """
+        Download all RAPID modules from the LOADED program (RAM) to a local directory.
+        
+        This retrieves modules as currently loaded in controller memory, including
+        any unsaved changes the engineer may have made.
+        
+        Falls back to fileservice (disk) if RAM access fails.
+        
+        Args:
+            local_dir: Local directory to save files
+            task: Task name (default T_ROB1)
+        
+        Returns:
+            dict with 'success', 'downloaded', 'failed' lists, 'program_name', 'source'
+        """
+        import os
+        downloaded = []
+        failed = []
+        source = 'ram'  # Track where we got the files from
+        
+        # Get program name
+        program_name = self.get_loaded_program_name(task)
+        if program_name is None:
+            return {
+                'success': False,
+                'downloaded': [],
+                'failed': [{'name': 'all', 'error': 'Could not detect loaded program name'}],
+                'program_name': None,
+                'source': None
+            }
+        
+        # Clear the local directory first
+        if os.path.exists(local_dir):
+            import shutil
+            shutil.rmtree(local_dir)
+        os.makedirs(local_dir, exist_ok=True)
+        
+        # Get list of .mod files from fileservice (we need the names)
+        remote_path = f'$HOME/{program_name}'
+        files = self.get_file_list(remote_path)
+        
+        # Filter to just .mod files
+        mod_files = []
+        for f in files:
+            name = f.get('name', '') if isinstance(f, dict) else str(f)
+            if name.lower().endswith('.mod'):
+                mod_files.append(name)
+        
+        if not mod_files:
+            return {
+                'success': False,
+                'downloaded': [],
+                'failed': [{'name': 'all', 'error': f'No .mod files found in {remote_path}'}],
+                'program_name': program_name,
+                'source': None
+            }
+        
+        # Try to download each module's text from RAM first
+        for mod_file in mod_files:
+            module_name = mod_file.replace('.mod', '').replace('.MOD', '')
+            
+            # Try RAM access first via text/range endpoint
+            result = self.get_module_text(module_name, task)
+            
+            if result['success'] and result['text']:
+                # Got it from RAM - save to local file
+                local_path = os.path.join(local_dir, mod_file)
+                with open(local_path, 'w', encoding='utf-8') as f:
+                    f.write(result['text'])
+                downloaded.append(mod_file)
+            else:
+                # RAM access failed - fall back to fileservice (disk)
+                source = 'disk'  # Mark that we fell back
+                backup_result = self.backup_rapid_module(mod_file, local_dir, task, program_name)
+                if backup_result['success']:
+                    downloaded.append(mod_file)
+                else:
+                    failed.append({'name': mod_file, 'error': result.get('error', 'Unknown error')})
+        
+        return {
+            'success': len(failed) == 0,
+            'downloaded': downloaded,
+            'failed': failed,
+            'program_name': program_name,
+            'source': source
         }
     
     def get_tool_changer_status(self):

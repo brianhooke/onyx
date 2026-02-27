@@ -401,9 +401,29 @@ def api_generate_toolpath(request):
                     params[key] = int(data[key])
         
         upload_to_irc5 = data.get('upload_to_irc5', True)
+        use_temp_templates = data.get('use_temp_templates', False)  # Legacy mode
+        use_irc5_templates = data.get('use_irc5_templates', True)  # New workflow: use pulled IRC5 files
         
-        # Generate modules
-        generator = ToolpathGenerator(params)
+        # Step 1: Pull latest files from IRC5 before generating
+        pull_result = None
+        if use_irc5_templates:
+            client = IRC5Client()
+            conn_test = client.test_connection()
+            if conn_test['connected']:
+                pull_result = client.download_all_modules(str(IRC5_PULL_DIR))
+                if not pull_result['success']:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f"Failed to pull IRC5 files: {pull_result.get('failed', [])}"
+                    })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'IRC5 not connected - cannot pull latest files'
+                })
+        
+        # Step 2: Generate modules (IRC5 templates mode = only generate ToolPaths.mod)
+        generator = ToolpathGenerator(params, use_temp_templates=use_temp_templates, use_irc5_templates=use_irc5_templates)
         result = generator.generate()
         
         response_data = {
@@ -412,6 +432,10 @@ def api_generate_toolpath(request):
             'params': result['params'],
             'timestamp': result['timestamp'],
         }
+        
+        # Include pull info in response
+        if pull_result:
+            response_data['pulled_files'] = pull_result.get('downloaded', [])
         
         # Upload to IRC5 if requested
         if upload_to_irc5:
@@ -567,6 +591,45 @@ def api_upload_original_progmod(request):
             'backup_dir': str(backup_subdir),
             'source_dir': str(original_progmod),
             'upload_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# Directory for pulling IRC5 files
+IRC5_PULL_DIR = Path(__file__).parent / 'generator' / 'templates_from_irc5'
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_pull_irc5_files(request):
+    """
+    Pull all .mod files from the IRC5 controller to templates_from_irc5 folder.
+    This clears the folder first, then downloads all current modules.
+    """
+    try:
+        client = IRC5Client()
+        
+        # Check connection first
+        conn_test = client.test_connection()
+        if not conn_test['connected']:
+            return JsonResponse({
+                'success': False,
+                'error': 'IRC5 not connected'
+            })
+        
+        # Download all modules to templates_from_irc5
+        result = client.download_all_modules(str(IRC5_PULL_DIR))
+        
+        return JsonResponse({
+            'success': result['success'],
+            'program_name': result.get('program_name'),
+            'downloaded_files': result.get('downloaded', []),
+            'failed_files': result.get('failed', []),
+            'source': result.get('source'),  # 'ram' or 'disk'
+            'local_dir': str(IRC5_PULL_DIR),
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
         
     except Exception as e:
@@ -785,5 +848,101 @@ def api_reload_program(request):
         
         result = client.reload_program()
         return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def api_force_data(request):
+    """
+    Get real-time force data from IRC5 analog outputs.
+    
+    The ForceMonitor.mod on IRC5 writes force values to analog outputs:
+    - AO_Force_X, AO_Force_Y, AO_Force_Z (forces in N)
+    - AO_Force_TX, AO_Force_TY, AO_Force_TZ (torques in Nm)
+    """
+    client = IRC5Client()
+    
+    try:
+        conn_test = client.test_connection()
+        if not conn_test['connected']:
+            return JsonResponse({'success': False, 'error': 'IRC5 not connected'})
+        
+        # Read force values from analog outputs
+        force_signals = {
+            'x': 'AO_Force_X',
+            'y': 'AO_Force_Y',
+            'z': 'AO_Force_Z',
+            'tx': 'AO_Force_TX',
+            'ty': 'AO_Force_TY',
+            'tz': 'AO_Force_TZ',
+        }
+        
+        # Try reading PERS variables first (requires force_monitor() running)
+        ft_data = client.get_force_torque()
+        if ft_data and ft_data.get('status') == 'ok':
+            return JsonResponse({
+                'success': True,
+                'forces': {
+                    'x': ft_data['fx'],
+                    'y': ft_data['fy'],
+                    'z': ft_data['fz'],
+                    'tx': ft_data['tx'],
+                    'ty': ft_data['ty'],
+                    'tz': ft_data['tz'],
+                },
+                'source': 'rapid_pers',
+                'timestamp': datetime.now().isoformat(),
+            })
+        
+        # Fallback to AO signals
+        forces = {}
+        errors = []
+        for key, signal_name in force_signals.items():
+            try:
+                value = client.get_signal(signal_name)
+                if value is not None:
+                    forces[key] = float(value)
+                else:
+                    forces[key] = 0.0
+                    errors.append(f"{signal_name}: not found")
+            except Exception as e:
+                forces[key] = 0.0
+                errors.append(f"{signal_name}: {str(e)}")
+        
+        return JsonResponse({
+            'success': True,
+            'forces': forces,
+            'source': 'ao_signals',
+            'timestamp': datetime.now().isoformat(),
+            'errors': errors if errors else None,
+            'note': 'Run force_monitor() on IRC5 for live feed'
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+def api_start_force_monitor(request):
+    """Start the force_monitor() proc on IRC5 for continuous force reading."""
+    client = IRC5Client()
+    
+    try:
+        conn_test = client.test_connection()
+        if not conn_test['connected']:
+            return JsonResponse({'success': False, 'error': 'IRC5 not connected'})
+        
+        # Call force_monitor proc in ForceMonitor module
+        result = client.call_rapid_proc('ForceMonitor', 'force_monitor')
+        
+        if result:
+            return JsonResponse({
+                'success': True,
+                'message': 'force_monitor() started'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Failed to start force_monitor()'
+            })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

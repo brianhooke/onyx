@@ -23,6 +23,7 @@ from .tools.sequences import generate_seq_bed_clean
 SCRIPT_DIR = Path(__file__).parent
 TEMPLATES_DIR = SCRIPT_DIR / "templates"
 TEMPLATES_TEMP_DIR = SCRIPT_DIR / "templates_temp"  # Staging directory for testing migrations
+TEMPLATES_FROM_IRC5_DIR = SCRIPT_DIR / "templates_from_irc5"  # Pulled from IRC5 controller
 
 # Files to copy without modification
 STATIC_FILES = [
@@ -102,7 +103,7 @@ class ToolpathGenerator:
         'serpentine_start_bottom',
     ]
     
-    def __init__(self, params: dict, use_temp_templates: bool = False):
+    def __init__(self, params: dict, use_temp_templates: bool = False, use_irc5_templates: bool = True):
         """
         Initialize the generator.
         
@@ -110,6 +111,8 @@ class ToolpathGenerator:
             params: Dictionary of required parameters from DB
             use_temp_templates: If True, use templates_temp directory for testing
                                migrations before committing to production templates
+            use_irc5_templates: If True (default), use templates_from_irc5 directory
+                               and only generate ToolPaths.mod (engineer workflow)
         """
         # Validate all required parameters are present
         missing = [p for p in self.REQUIRED_PARAMS if p not in params]
@@ -119,8 +122,14 @@ class ToolpathGenerator:
         self.params = dict(params)
         self.timestamp = datetime.now().strftime("%d-%b_%H:%M").lower()
         
-        # Select templates directory
-        self.templates_dir = TEMPLATES_TEMP_DIR if use_temp_templates else TEMPLATES_DIR
+        # Select templates directory (priority: irc5 > temp > default)
+        self.use_irc5_templates = use_irc5_templates
+        if use_irc5_templates and TEMPLATES_FROM_IRC5_DIR.exists():
+            self.templates_dir = TEMPLATES_FROM_IRC5_DIR
+        elif use_temp_templates:
+            self.templates_dir = TEMPLATES_TEMP_DIR
+        else:
+            self.templates_dir = TEMPLATES_DIR
         self.using_temp_templates = use_temp_templates
     
     def generate(self) -> Dict:
@@ -133,15 +142,18 @@ class ToolpathGenerator:
         output_dir = Path(tempfile.mkdtemp(prefix="onyx_rapid_"))
         generated_files: List[str] = []
         
-        # 1. Copy static files (from selected templates directory)
-        for filename in STATIC_FILES:
-            src = self.templates_dir / filename
-            dst = output_dir / filename
-            if src.exists():
-                shutil.copy2(src, dst)
-                generated_files.append(filename)
+        # When using IRC5 templates, ONLY generate ToolPaths.mod
+        # (other files stay on IRC5 as engineer maintains them)
+        if not self.use_irc5_templates:
+            # Legacy mode: Copy static files (from selected templates directory)
+            for filename in STATIC_FILES:
+                src = self.templates_dir / filename
+                dst = output_dir / filename
+                if src.exists():
+                    shutil.copy2(src, dst)
+                    generated_files.append(filename)
         
-        # 2. Process ToolPaths.mod
+        # Process ToolPaths.mod (always done)
         toolpaths_src = self.templates_dir / TOOLPATHS_FILE
         if toolpaths_src.exists():
             content = toolpaths_src.read_text(encoding='utf-8', errors='ignore')
@@ -155,6 +167,8 @@ class ToolpathGenerator:
             'params': self.params,
             'timestamp': self.timestamp,
             'using_temp_templates': self.using_temp_templates,
+            'using_irc5_templates': self.use_irc5_templates,
+            'templates_dir': str(self.templates_dir),
         }
     
     def _process_toolpaths(self, content: str) -> str:
@@ -204,6 +218,7 @@ class ToolpathGenerator:
     ! ========== PY2 GENERATED PROCEDURES ==========
     ! Generated: {self.timestamp}
     ! Do not edit manually - regenerate via web interface
+    
 {new_mainmenu}
 
 {py2main_proc}
@@ -245,18 +260,20 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Polish,2:Vac,3:Pan,4:Screed,5:BedClean";
+        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
         
         TEST iChoice
         CASE 1:
-            Py2Polish;
+            Py2Heli;
         CASE 2:
-            Py2Vacuum;
+            Py2Polish;
         CASE 3:
-            Py2Pan;
+            Py2Vac;
         CASE 4:
-            Py2VibScreed;
+            Py2Pan;
         CASE 5:
+            Py2VS;
+        CASE 6:
             SeqBedClean;
         DEFAULT:
             TPWrite "Invalid choice";
