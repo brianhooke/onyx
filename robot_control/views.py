@@ -646,7 +646,7 @@ def api_toolpath_defaults(request):
 @csrf_exempt
 def api_pattern_points(request):
     """Get pattern points for a tool given current parameters."""
-    from .generator.patterns import cross_hatch, rectangular_spiral, sweep_lift, single_pass
+    from .generator.patterns import cross_hatch, rectangular_spiral, sweep_lift, single_pass, trowel_perimeter
     
     try:
         data = json.loads(request.body)
@@ -710,6 +710,13 @@ def api_pattern_points(request):
                 'diameter': 0,
                 'overhang': 0,
             },
+            'trowel': {
+                'workzone': 'panel',
+                'step': data.get('trowel_step', 300),
+                'pattern': 'trowel-perimeter',
+                'diameter': 450,
+                'overhang': 0,
+            },
         }
         
         config = tool_config.get(tool, tool_config['polisher'])
@@ -743,7 +750,19 @@ def api_pattern_points(request):
         xhatch_max_y = max_y - edge_offset
         
         # Generate pattern points
-        if pattern_type in ('rectangular-spiral', 'rectangular_spiral'):
+        if pattern_type == 'trowel-perimeter':
+            trowel_width = 150
+            points = trowel_perimeter(
+                min_x=min_x, max_x=max_x, min_y=min_y, max_y=max_y,
+                trowel_length=450,
+                trowel_width=trowel_width,
+                overshoot=trowel_width + 100,
+                pass1_rotation=float(data.get('trowel_pass_1_rotation', 45)),
+                pass1_plough_angle=float(data.get('trowel_pass_1_angle', 0)),
+                pass2_rotation=float(data.get('trowel_pass_2_rotation', 45)),
+                pass2_plough_angle=float(data.get('trowel_pass_2_angle', 0)),
+            )
+        elif pattern_type in ('rectangular-spiral', 'rectangular_spiral'):
             points = rectangular_spiral(
                 min_x=min_x, max_x=max_x, min_y=min_y, max_y=max_y,
                 step_size=step,
@@ -778,7 +797,7 @@ def api_pattern_points(request):
             )
         
         # Convert to list of dicts (include axis_6 if present)
-        result = [{'x': p.x, 'y': p.y, 'move_type': p.move_type, 'axis_6': p.axis_6} for p in points]
+        result = [{'x': p.x, 'y': p.y, 'move_type': p.move_type, 'axis_4': p.axis_4, 'axis_6': p.axis_6} for p in points]
         
         return JsonResponse({'success': True, 'points': result, 'tool': tool})
     except Exception as e:

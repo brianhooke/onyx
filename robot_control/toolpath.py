@@ -50,7 +50,11 @@ def api_toolpath_save_params(request):
             'polisher_approach_speed', 'polisher_retract_speed', 'polisher_pos_supv_dist',
             'screed_z_offset', 'vib_screed_speed', 'screed_angle_offset', 'screed_edge_offset',
             'z_offset', 'hard_y_offset',
-            'serpentine_offset_x', 'serpentine_offset_y', 'serpentine_direction', 'serpentine_start_bottom'
+            'serpentine_offset_x', 'serpentine_offset_y', 'serpentine_direction', 'serpentine_start_bottom',
+            'trowel_z_offset', 'trowel_speed', 'trowel_force',
+            'trowel_pass_1_angle', 'trowel_pass_1_rotation', 'trowel_pass_2_angle', 'trowel_pass_2_rotation',
+            'trowel_step', 'trowel_diameter', 'trowel_overhang', 'trowel_spiral_direction', 'trowel_formwork_offset',
+            'trowel_direction', 'trowel_start_bottom',
         ]
         
         string_fields = [
@@ -58,8 +62,9 @@ def api_toolpath_save_params(request):
             'polisher_workzone', 'polisher_pattern', 'polisher_spiral_direction',
             'pan_pattern', 'pan_spiral_direction',
             'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'heli_blade_direction',
+            'trowel_spiral_direction',
         ]
-        bool_fields = ['serpentine_start_bottom', 'vacuum_force_enabled', 'vacuum_start_bottom', 'polisher_start_bottom', 'pan_start_bottom', 'heli_start_bottom']
+        bool_fields = ['serpentine_start_bottom', 'vacuum_force_enabled', 'vacuum_start_bottom', 'polisher_start_bottom', 'pan_start_bottom', 'heli_start_bottom', 'trowel_start_bottom']
         
         for field in field_names:
             if field in data:

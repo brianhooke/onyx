@@ -33,7 +33,7 @@ Key design decisions:
 from dataclasses import dataclass, field
 from typing import Optional, List, Literal, Dict, Any
 from abc import ABC, abstractmethod
-from .patterns import Point, PatternConfig, generate_pattern, cross_hatch, rectangular_spiral, sweep_lift, single_pass
+from .patterns import Point, PatternConfig, generate_pattern, cross_hatch, rectangular_spiral, sweep_lift, single_pass, trowel_perimeter
 from .tools.utils import get_track_limits
 
 
@@ -1155,6 +1155,92 @@ class Pan(Tool):
         ]
 
 
+class Trowel(Tool):
+    """Trowel tool - perimeter path with 450mm x 150mm rectangular contact, optional force control."""
+    
+    def __init__(self):
+        # Trowel uses tool_num=7 (placeholder - update when physical tool is configured)
+        config = ToolConfig(
+            tool_num=7,
+            name="Trowel",
+            tooldata="tTrowel",
+            pickup_pos=ToolPosition("pTrowel", approach_offset=(0, 0, 100)),
+            dropoff_pos=ToolPosition("ptTrowel", approach_offset=(0, 0, 100), depart_offset=(0, 0, 500)),
+            min_safe_z=300,
+        )
+        super().__init__(config)
+    
+    def _get_tool_width(self) -> float:
+        return 150  # Trowel short edge (perpendicular to travel)
+    
+    def _get_pattern_points(self, params: Dict[str, Any]) -> List[Point]:
+        """Trowel uses perimeter pattern - travels around workspace edges."""
+        workzone = self._get_workzone_params(params)
+        trowel_width = 150
+        overshoot = trowel_width + 100  # 250mm past each corner
+        return trowel_perimeter(
+            min_x=workzone['datum_x'],
+            max_x=workzone['datum_x'] + workzone['length_x'],
+            min_y=workzone['datum_y'],
+            max_y=workzone['datum_y'] + workzone['width_y'],
+            trowel_length=450,
+            trowel_width=trowel_width,
+            overshoot=overshoot,
+        )
+    
+    def _get_workzone_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Trowel always uses panel workzone."""
+        datum_x = params['panel_datum_x']
+        datum_y = params['panel_datum_y']
+        length_x = params['panel_x']
+        width_y = params['panel_y']
+        base_z = params['panel_z']
+        
+        hard_y_offset = params.get('hard_y_offset', 0)
+        panel_max_y = datum_y + width_y
+        effective_max_y = min(panel_max_y, hard_y_offset) if hard_y_offset > 0 else panel_max_y
+        effective_width_y = effective_max_y - datum_y
+        
+        z_offset = params.get('z_offset', 0) + params.get('trowel_z_offset', 0)
+        step_size = params.get('trowel_step', 300)
+        
+        return {
+            'type': 'panel',
+            'datum_x': datum_x,
+            'datum_y': datum_y,
+            'length_x': length_x,
+            'width_y': effective_width_y,
+            'min_x': datum_x,
+            'max_x': datum_x + length_x,
+            'min_y': datum_y,
+            'max_y': effective_max_y,
+            'work_z': base_z + z_offset,
+            'safe_z': base_z + z_offset + 200,
+            'step_size': step_size,
+            'tool_width': 150,
+        }
+    
+    def _uses_force_control(self, params: Dict) -> bool:
+        return params.get('trowel_force', 0) > 0
+    
+    def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
+        lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
+        if self._uses_force_control(params):
+            trowel_force = params.get('trowel_force', 0)
+            lines.insert(-1, f"        VAR num TrowelForce:={trowel_force};")
+            lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
+        return lines
+    
+    def _generate_motor_off(self) -> List[str]:
+        return []  # Trowel has no motor
+    
+    def _generate_error_cleanup(self) -> List[str]:
+        return [
+            "    ERROR",
+            "        TPWrite \"Py2Trowel ERROR: \" \\Num:=ERRNO;",
+        ]
+
+
 # =============================================================================
 # Tool Registry - Single source of truth for all tools
 # =============================================================================
@@ -1166,6 +1252,7 @@ TOOLS = {
     'vacuum': Vacuum(),
     'polisher': Polisher(),
     'pan': Pan(),
+    'trowel': Trowel(),
 }
 
 # Also index by tool number for backward compatibility

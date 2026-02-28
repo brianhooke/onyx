@@ -30,6 +30,10 @@
                 <span class="text-amber-600 font-medium">Screed</span>
                 <button type="button" data-tool="screed" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
             </div>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-rose-600 font-medium">Trowel</span>
+                <button type="button" data-tool="trowel" class="demo-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs border border-gray-200">demo</button>
+            </div>
             <!-- Legend -->
             <div class="mt-2 pt-2 border-t border-gray-200 flex flex-col gap-1">
                 <div class="flex items-center gap-2">
@@ -44,9 +48,21 @@
         </div>
         <!-- SVG visualization -->
         <div class="flex-1 bg-gray-100 rounded overflow-hidden border border-gray-200">
-            <svg id="bed-svg" class="w-full" style="height: 300px;" viewBox="0 0 750 300">
-                <rect id="bed-rect" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
-                <rect id="panel-rect" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
+            <svg id="bed-svg" class="w-full" style="height: 400px;" viewBox="0 0 750 400">
+                <g id="bed-group">
+                    <polygon id="bed-side-back" fill="#0f2540" stroke="#2563eb" stroke-width="1"/>
+                    <polygon id="bed-side-left" fill="#162d4a" stroke="#2563eb" stroke-width="1"/>
+                    <polygon id="bed-side-front" fill="#0f2540" stroke="#2563eb" stroke-width="1"/>
+                    <polygon id="bed-side-right" fill="#162d4a" stroke="#2563eb" stroke-width="1"/>
+                    <polygon id="bed-top" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+                </g>
+                <g id="panel-group">
+                    <polygon id="panel-side-back" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+                    <polygon id="panel-side-left" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
+                    <polygon id="panel-side-front" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+                    <polygon id="panel-side-right" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
+                    <polygon id="panel-top" fill="#ffffff" stroke="#9ca3af" stroke-width="1"/>
+                </g>
                 <g id="coverage-trail"></g>
                 <g id="pattern-path"></g>
                 <g id="tool-circle"></g>
@@ -389,18 +405,27 @@ if (document.readyState === 'loading') {
 
 function setupBedVisualization() {
     const svg = document.getElementById('bed-svg');
-    const bedRect = document.getElementById('bed-rect');
-    const panelRect = document.getElementById('panel-rect');
     const axisLabels = document.getElementById('axis-labels');
     const dimensionLabels = document.getElementById('dimension-labels');
     
-    if (!svg || !bedRect || !panelRect) return;
+    if (!svg) return;
     
     const svgWidth = 750;
-    const svgHeight = 300;
-    const margin = { top: 10, right: 10, bottom: 10, left: 10 };
+    const svgHeight = 400;
+    const margin = { top: 20, right: 20, bottom: 20, left: 20 };
     const plotWidth = svgWidth - margin.left - margin.right;
     const plotHeight = svgHeight - margin.top - margin.bottom;
+    
+    // Isometric projection constants
+    // X axis goes upper-left, Y axis goes upper-right, Z goes straight up
+    // Viewing from front-right at ~45° elevation
+    const ISO_COS = Math.cos(Math.PI / 6); // 0.866 - horizontal spread
+    const ISO_SIN = Math.sin(Math.PI / 6); // 0.5 - vertical component
+    const BED_THICKNESS = 280; // Bed height (mm)
+    const LIFT_HEIGHT = 250; // Tool lift height above work surface (mm)
+    
+    // View rotation angle around Z axis (degrees, modified by mouse drag)
+    let viewAngle = 0;
     
     function updateVisualization() {
         const getVal = (name, def) => {
@@ -414,54 +439,184 @@ function setupBedVisualization() {
         const panelY = getVal('panel_y', 2000);
         const panelDatumX = getVal('panel_datum_x', 0);
         const panelDatumY = getVal('panel_datum_y', 0);
+        const panelZHeight = getVal('panel_z', 150); // Panel thickness from form input
         
-        const scaleX = plotWidth / bedLengthX;
-        const scaleY = plotHeight / bedWidthY;
-        const scale = Math.min(scaleX, scaleY) * 0.9;
+        // View rotation: rotate world coords around Z axis before projecting
+        const va_rad = viewAngle * Math.PI / 180;
+        const cosVA = Math.cos(va_rad);
+        const sinVA = Math.sin(va_rad);
         
-        const bedDisplayWidth = bedLengthX * scale;
-        const bedDisplayHeight = bedWidthY * scale;
-        const offsetX = margin.left + (plotWidth - bedDisplayWidth) / 2;
-        const offsetY = margin.top + (plotHeight - bedDisplayHeight) / 2;
+        // Compute bounding box of isometric projection at current viewAngle
+        const bedCorners = [[0,0], [bedLengthX,0], [0,bedWidthY], [bedLengthX,bedWidthY]];
+        const maxToolZ = panelZHeight + LIFT_HEIGHT + 500;
+        const zLevels = [-BED_THICKNESS, 0, maxToolZ];
         
-        function worldToSvg(wx, wy) {
-            const svgX = offsetX + bedDisplayWidth - (wx * scale);
-            const svgY = offsetY + bedDisplayHeight - (wy * scale);
-            return { x: svgX, y: svgY };
+        const projCorners = [];
+        for (const [bx, by] of bedCorners) {
+            const rx = bx * cosVA - by * sinVA;
+            const ry = bx * sinVA + by * cosVA;
+            for (const z of zLevels) {
+                projCorners.push({
+                    x: (-rx * ISO_COS + ry * ISO_COS),
+                    y: (-rx * ISO_SIN - ry * ISO_SIN - z)
+                });
+            }
         }
         
-        const bedOrigin = worldToSvg(bedLengthX, bedWidthY);
-        bedRect.setAttribute('x', bedOrigin.x);
-        bedRect.setAttribute('y', bedOrigin.y);
-        bedRect.setAttribute('width', bedDisplayWidth);
-        bedRect.setAttribute('height', bedDisplayHeight);
+        const minPX = Math.min(...projCorners.map(c => c.x));
+        const maxPX = Math.max(...projCorners.map(c => c.x));
+        const minPY = Math.min(...projCorners.map(c => c.y));
+        const maxPY = Math.max(...projCorners.map(c => c.y));
         
-        const panelOrigin = worldToSvg(panelDatumX + panelX, panelDatumY + panelY);
-        const panelDisplayWidth = panelX * scale;
-        const panelDisplayHeight = panelY * scale;
-        panelRect.setAttribute('x', panelOrigin.x);
-        panelRect.setAttribute('y', panelOrigin.y);
-        panelRect.setAttribute('width', panelDisplayWidth);
-        panelRect.setAttribute('height', panelDisplayHeight);
+        const projWidth = maxPX - minPX;
+        const projHeight = maxPY - minPY;
         
+        const scaleX = plotWidth / projWidth;
+        const scaleY = plotHeight / projHeight;
+        const scale = Math.min(scaleX, scaleY) * 0.85;
+        
+        // Center the projection in the SVG
+        const centerX = svgWidth / 2 - ((minPX + maxPX) / 2) * scale;
+        const centerY = svgHeight / 2 - ((minPY + maxPY) / 2) * scale;
+        
+        // Core isometric projection: world (wx, wy, wz) → SVG (x, y)
+        // Rotates world XY by viewAngle before projecting
+        function worldToSvg3D(wx, wy, wz) {
+            const rx = wx * cosVA - wy * sinVA;
+            const ry = wx * sinVA + wy * cosVA;
+            return {
+                x: (-rx * ISO_COS + ry * ISO_COS) * scale + centerX,
+                y: (-rx * ISO_SIN - ry * ISO_SIN - wz) * scale + centerY
+            };
+        }
+        
+        // 2D convenience (z=0) - compatible with existing demo code
+        function worldToSvg(wx, wy) {
+            return worldToSvg3D(wx, wy, 0);
+        }
+        
+        // Helper: set polygon points from array of {x,y}
+        function setPolygon(el, pts) {
+            if (!el) return;
+            el.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
+        }
+        
+        // --- Face visibility based on viewAngle ---
+        // View direction in rotated frame is (1,1). A face with world-normal (nx,ny)
+        // is visible when dot(rotatedNormal, viewDir) < 0.
+        const showFront = (sinVA - cosVA) < 0;   // Y=min face
+        const showBack  = (cosVA - sinVA) < 0;   // Y=max face
+        const showRight = (cosVA + sinVA) > 0;    // X=min face
+        const showLeft  = (cosVA + sinVA) < 0;    // X=max face
+        
+        // Helper: draw a box (bed or panel) with correct face visibility and depth order
+        function drawBox(groupEl, prefix, x0, y0, x1, y1, zTop, zBot) {
+            const faces = [
+                { id: `${prefix}-side-front`, pts: () => [
+                    worldToSvg3D(x0, y0, zTop), worldToSvg3D(x1, y0, zTop),
+                    worldToSvg3D(x1, y0, zBot), worldToSvg3D(x0, y0, zBot)
+                ], visible: showFront, depth: 0 * cosVA + (-y0) * sinVA + (-y0) * cosVA },
+                { id: `${prefix}-side-back`, pts: () => [
+                    worldToSvg3D(x1, y1, zTop), worldToSvg3D(x0, y1, zTop),
+                    worldToSvg3D(x0, y1, zBot), worldToSvg3D(x1, y1, zBot)
+                ], visible: showBack, depth: 0 },
+                { id: `${prefix}-side-right`, pts: () => [
+                    worldToSvg3D(x0, y1, zTop), worldToSvg3D(x0, y0, zTop),
+                    worldToSvg3D(x0, y0, zBot), worldToSvg3D(x0, y1, zBot)
+                ], visible: showRight, depth: 0 },
+                { id: `${prefix}-side-left`, pts: () => [
+                    worldToSvg3D(x1, y0, zTop), worldToSvg3D(x1, y1, zTop),
+                    worldToSvg3D(x1, y1, zBot), worldToSvg3D(x1, y0, zBot)
+                ], visible: showLeft, depth: 0 },
+                { id: `${prefix}-top`, pts: () => [
+                    worldToSvg3D(x0, y0, zTop), worldToSvg3D(x1, y0, zTop),
+                    worldToSvg3D(x1, y1, zTop), worldToSvg3D(x0, y1, zTop)
+                ], visible: true, depth: -Infinity }, // always last (on top)
+            ];
+            
+            // Compute depth for sorting: center of each face projected onto view direction
+            for (const f of faces) {
+                if (f.id.includes('-top')) continue;
+                // Face center in rotated frame → depth = rx + ry
+                let cx, cy;
+                if (f.id.includes('-front')) { cx = (x0+x1)/2; cy = y0; }
+                else if (f.id.includes('-back')) { cx = (x0+x1)/2; cy = y1; }
+                else if (f.id.includes('-right')) { cx = x0; cy = (y0+y1)/2; }
+                else { cx = x1; cy = (y0+y1)/2; }
+                const rx = cx * cosVA - cy * sinVA;
+                const ry = cx * sinVA + cy * cosVA;
+                f.depth = rx + ry; // higher = further from viewer = draw first
+            }
+            
+            // Sort: higher depth first (drawn first = behind), top always last
+            faces.sort((a, b) => {
+                if (a.id.includes('-top')) return 1;
+                if (b.id.includes('-top')) return -1;
+                return b.depth - a.depth;
+            });
+            
+            // Reorder elements and set visibility
+            for (const f of faces) {
+                const el = document.getElementById(f.id);
+                if (!el) continue;
+                if (f.visible) {
+                    setPolygon(el, f.pts());
+                    el.style.display = '';
+                } else {
+                    el.style.display = 'none';
+                }
+                groupEl.appendChild(el); // moves to end = drawn on top
+            }
+        }
+        
+        // --- Draw bed as 3D slab ---
+        const bedZ = 0;
+        const bedZBottom = -BED_THICKNESS;
+        const bedGroup = document.getElementById('bed-group');
+        drawBox(bedGroup, 'bed', 0, 0, bedLengthX, bedWidthY, bedZ, bedZBottom);
+        
+        // --- Draw panel as 3D slab on top of bed ---
+        const panelZ = panelZHeight;
+        const panelZBottom = 0;
+        const px0 = panelDatumX;
+        const py0 = panelDatumY;
+        const px1 = panelDatumX + panelX;
+        const py1 = panelDatumY + panelY;
+        const panelGroup = document.getElementById('panel-group');
+        drawBox(panelGroup, 'panel', px0, py0, px1, py1, panelZ, panelZBottom);
+        
+        // --- Axis labels ---
         axisLabels.innerHTML = '';
         dimensionLabels.innerHTML = '';
         
         const originSvg = worldToSvg(0, 0);
         
-        // X axis
+        // X axis line (goes upper-left)
+        const xEnd = worldToSvg(bedLengthX * 0.15, 0);
         const xLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         xLine.setAttribute('x1', originSvg.x); xLine.setAttribute('y1', originSvg.y);
-        xLine.setAttribute('x2', offsetX); xLine.setAttribute('y2', originSvg.y);
-        xLine.setAttribute('stroke', '#6b7280'); xLine.setAttribute('stroke-width', '1');
+        xLine.setAttribute('x2', xEnd.x); xLine.setAttribute('y2', xEnd.y);
+        xLine.setAttribute('stroke', '#ef4444'); xLine.setAttribute('stroke-width', '1.5');
+        xLine.setAttribute('marker-end', 'none');
         axisLabels.appendChild(xLine);
+        const xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        xLabel.setAttribute('x', xEnd.x - 5); xLabel.setAttribute('y', xEnd.y - 5);
+        xLabel.setAttribute('fill', '#ef4444'); xLabel.setAttribute('font-size', '10'); xLabel.setAttribute('font-weight', 'bold');
+        xLabel.textContent = 'X';
+        axisLabels.appendChild(xLabel);
         
-        // Y axis
+        // Y axis line (goes upper-right)
+        const yEnd = worldToSvg(0, bedWidthY * 0.3);
         const yLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         yLine.setAttribute('x1', originSvg.x); yLine.setAttribute('y1', originSvg.y);
-        yLine.setAttribute('x2', originSvg.x); yLine.setAttribute('y2', offsetY);
-        yLine.setAttribute('stroke', '#6b7280'); yLine.setAttribute('stroke-width', '1');
+        yLine.setAttribute('x2', yEnd.x); yLine.setAttribute('y2', yEnd.y);
+        yLine.setAttribute('stroke', '#22c55e'); yLine.setAttribute('stroke-width', '1.5');
         axisLabels.appendChild(yLine);
+        const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        yLabel.setAttribute('x', yEnd.x + 5); yLabel.setAttribute('y', yEnd.y - 5);
+        yLabel.setAttribute('fill', '#22c55e'); yLabel.setAttribute('font-size', '10'); yLabel.setAttribute('font-weight', 'bold');
+        yLabel.textContent = 'Y';
+        axisLabels.appendChild(yLabel);
         
         // Origin marker
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -471,50 +626,43 @@ function setupBedVisualization() {
         
         // Origin label
         const oLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        oLabel.setAttribute('x', originSvg.x + 6); oLabel.setAttribute('y', originSvg.y + 3);
+        oLabel.setAttribute('x', originSvg.x + 6); oLabel.setAttribute('y', originSvg.y + 12);
         oLabel.setAttribute('fill', '#9ca3af'); oLabel.setAttribute('font-size', '9');
         oLabel.textContent = '(0,0)';
         axisLabels.appendChild(oLabel);
         
-        // Panel label
-        const pLabelX = panelOrigin.x + panelDisplayWidth / 2;
-        const pLabelY = panelOrigin.y + panelDisplayHeight / 2;
+        // Panel dimension label (centered on panel top face)
+        const panelCenter = worldToSvg3D((px0 + px1) / 2, (py0 + py1) / 2, panelZ);
         const panelLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        panelLabel.setAttribute('x', pLabelX); panelLabel.setAttribute('y', pLabelY - 4);
-        panelLabel.setAttribute('fill', '#e5e7eb'); panelLabel.setAttribute('font-size', '9');
+        panelLabel.setAttribute('x', panelCenter.x); panelLabel.setAttribute('y', panelCenter.y);
+        panelLabel.setAttribute('fill', '#6b7280'); panelLabel.setAttribute('font-size', '9');
         panelLabel.setAttribute('text-anchor', 'middle');
         panelLabel.textContent = `${panelX} × ${panelY}`;
         dimensionLabels.appendChild(panelLabel);
         
-        // Hard Y Offset line
+        // Hard Y Offset line (isometric)
         const hardYOffset = getVal('hard_y_offset', 0);
         if (hardYOffset > 0) {
-            const hardYPos = worldToSvg(0, hardYOffset);
-            const lineStartX = worldToSvg(bedLengthX + 1000, 0).x;
-            const lineEndX = worldToSvg(-1000, 0).x;
+            const hy0 = worldToSvg(0, hardYOffset);
+            const hy1 = worldToSvg(bedLengthX, hardYOffset);
             
             const hardYLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            hardYLine.setAttribute('x1', lineStartX);
-            hardYLine.setAttribute('y1', hardYPos.y);
-            hardYLine.setAttribute('x2', lineEndX);
-            hardYLine.setAttribute('y2', hardYPos.y);
+            hardYLine.setAttribute('x1', hy0.x); hardYLine.setAttribute('y1', hy0.y);
+            hardYLine.setAttribute('x2', hy1.x); hardYLine.setAttribute('y2', hy1.y);
             hardYLine.setAttribute('stroke', '#f97316');
             hardYLine.setAttribute('stroke-width', '2');
             hardYLine.setAttribute('stroke-dasharray', '8,4');
             dimensionLabels.appendChild(hardYLine);
             
             const hardYLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            hardYLabel.setAttribute('x', lineStartX + 5);
-            hardYLabel.setAttribute('y', hardYPos.y - 4);
-            hardYLabel.setAttribute('fill', '#f97316');
-            hardYLabel.setAttribute('font-size', '9');
-            hardYLabel.setAttribute('text-anchor', 'start');
-            hardYLabel.textContent = `Hard Y Offset (${hardYOffset}mm)`;
+            hardYLabel.setAttribute('x', hy0.x + 5); hardYLabel.setAttribute('y', hy0.y - 4);
+            hardYLabel.setAttribute('fill', '#f97316'); hardYLabel.setAttribute('font-size', '9');
+            hardYLabel.textContent = `Hard Y (${hardYOffset})`;
             dimensionLabels.appendChild(hardYLabel);
         }
         
-        // Expose worldToSvg for pattern overlay
-        window.bedVisualization = { update: updateVisualization, worldToSvg, scale, offsetX, offsetY, bedDisplayWidth, bedDisplayHeight };
+        // Expose for pattern overlay and demos
+        window.bedVisualization = { update: updateVisualization, worldToSvg, worldToSvg3D, scale, centerX, centerY, ISO_COS, ISO_SIN, panelZ, LIFT_HEIGHT, viewAngle };
         
         // Validation: highlight inputs if panel exceeds bed
         const panelExceedsX = (panelDatumX + panelX) > bedLengthX;
@@ -556,73 +704,75 @@ function setupBedVisualization() {
         if (panelExceedsX || panelExceedsY) {
             const xMsg = panelExceedsX ? `X: ${panelDatumX + panelX} > ${bedLengthX}` : '';
             const yMsg = panelExceedsY ? `Y: ${panelDatumY + panelY} > ${bedWidthY}` : '';
-            warningEl.textContent = `⚠ Panel exceeds bed: ${[xMsg, yMsg].filter(Boolean).join(', ')}`;
+            warningEl.textContent = `Panel exceeds bed: ${[xMsg, yMsg].filter(Boolean).join(', ')}`;
             warningEl.classList.remove('hidden');
         } else {
             warningEl.classList.add('hidden');
         }
-        
-        // Debug function for console
-        window.debugBedViz = function() {
-            const data = {
-                inputs: {
-                    bedLengthX, bedWidthY,
-                    panelX, panelY,
-                    panelDatumX, panelDatumY
-                },
-                computed: {
-                    scale,
-                    bedDisplayWidth, bedDisplayHeight,
-                    offsetX, offsetY,
-                    panelDisplayWidth, panelDisplayHeight
-                },
-                worldCoords: {
-                    bedTopLeft: { x: bedLengthX, y: bedWidthY },
-                    bedBottomRight: { x: 0, y: 0 },
-                    panelTopLeft: { x: panelDatumX + panelX, y: panelDatumY + panelY },
-                    panelBottomRight: { x: panelDatumX, y: panelDatumY }
-                },
-                svgCoords: {
-                    bedOrigin: worldToSvg(bedLengthX, bedWidthY),
-                    bedEnd: worldToSvg(0, 0),
-                    panelOrigin: worldToSvg(panelDatumX + panelX, panelDatumY + panelY),
-                    panelEnd: worldToSvg(panelDatumX, panelDatumY)
-                },
-                rectAttrs: {
-                    bed: {
-                        x: bedRect.getAttribute('x'),
-                        y: bedRect.getAttribute('y'),
-                        width: bedRect.getAttribute('width'),
-                        height: bedRect.getAttribute('height')
-                    },
-                    panel: {
-                        x: panelRect.getAttribute('x'),
-                        y: panelRect.getAttribute('y'),
-                        width: panelRect.getAttribute('width'),
-                        height: panelRect.getAttribute('height')
-                    }
-                },
-                validation: {
-                    panelFitsInBed: (panelDatumX + panelX <= bedLengthX) && (panelDatumY + panelY <= bedWidthY),
-                    panelSvgXInBed: parseFloat(panelRect.getAttribute('x')) >= parseFloat(bedRect.getAttribute('x')),
-                    panelSvgYInBed: parseFloat(panelRect.getAttribute('y')) >= parseFloat(bedRect.getAttribute('y'))
-                }
-            };
-            console.table(data.inputs);
-            console.table(data.computed);
-            console.log('World Coords:', data.worldCoords);
-            console.log('SVG Coords:', data.svgCoords);
-            console.log('Rect Attrs:', data.rectAttrs);
-            console.log('Validation:', data.validation);
-            return data;
-        };
     }
     
     updateVisualization();
     
-    ['bed_length_x', 'bed_width_y', 'panel_x', 'panel_y', 'panel_datum_x', 'panel_datum_y'].forEach(name => {
+    ['bed_length_x', 'bed_width_y', 'panel_x', 'panel_y', 'panel_datum_x', 'panel_datum_y', 'hard_y_offset', 'panel_z'].forEach(name => {
         const input = document.querySelector(`input[name="${name}"]`);
         if (input) input.addEventListener('input', updateVisualization);
+    });
+    
+    // --- View rotation: mouse drag to orbit around Z axis ---
+    svg.style.cursor = 'grab';
+    let isDragging = false;
+    let lastMouseX = 0;
+    
+    function onViewChange() {
+        updateVisualization();
+        // Re-render path and coverage if a demo is active
+        if (demoState && demoState.active && demoState.points) {
+            drawPatternPath(demoState.points, demoState.tool);
+            renderCoverage();
+        }
+    }
+    
+    svg.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return; // left button only
+        isDragging = true;
+        lastMouseX = e.clientX;
+        svg.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - lastMouseX;
+        lastMouseX = e.clientX;
+        viewAngle += dx * 0.5; // 0.5 degrees per pixel
+        onViewChange();
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        svg.style.cursor = 'grab';
+    });
+    
+    // Touch support for mobile
+    svg.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            isDragging = true;
+            lastMouseX = e.touches[0].clientX;
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (!isDragging || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - lastMouseX;
+        lastMouseX = e.touches[0].clientX;
+        viewAngle += dx * 0.5;
+        onViewChange();
+    });
+    
+    document.addEventListener('touchend', () => {
+        isDragging = false;
     });
 }
 
@@ -636,6 +786,7 @@ const TOOL_COLORS = {
     helicopter: '#c084fc',  // purple-400
     pan: '#fb923c',         // orange-400
     screed: '#facc15',      // yellow-400
+    trowel: '#fb7185',      // rose-400
 };
 
 // Tool diameters - read from form inputs (fall back to defaults)
@@ -650,6 +801,7 @@ function getToolDiameter(tool) {
         case 'polisher': return getVal('polisher_diameter', 450);
         case 'helicopter': return getVal('heli_diameter', 1150);
         case 'pan': return getVal('pan_diameter', 600);
+        case 'trowel': return getVal('trowel_diameter', 450);
         default: return 500;
     }
 }
@@ -752,6 +904,12 @@ async function startDemo(tool) {
         vib_screed_speed: getVal('vib_screed_speed', 100),
         hard_y_offset: getVal('hard_y_offset', 0),
         screed_edge_offset: getVal('screed_edge_offset', 200),
+        trowel_speed: getVal('trowel_speed', 100),
+        trowel_step: getVal('trowel_step', 300),
+        trowel_pass_1_angle: getVal('trowel_pass_1_angle', 0),
+        trowel_pass_1_rotation: getVal('trowel_pass_1_rotation', 45),
+        trowel_pass_2_angle: getVal('trowel_pass_2_angle', 0),
+        trowel_pass_2_rotation: getVal('trowel_pass_2_rotation', 45),
     };
     
     try {
@@ -774,6 +932,7 @@ async function startDemo(tool) {
             'helicopter': params.heli_travel_speed || 40,
             'pan': params.pan_travel_speed || 100,
             'screed': params.vib_screed_speed || 100,
+            'trowel': params.trowel_speed || 100,
         };
         const toolSpeed = toolSpeeds[tool] || 100;
         
@@ -783,6 +942,24 @@ async function startDemo(tool) {
         let animationTime = 0;  // Time for animation (at ANIMATION_SPEED)
         let actualTime = 0;     // Time for actual duration estimate (at tool speed)
         
+        // Pre-compute Z height for each point based on move_type context:
+        // "lift" = at lifted height, "rapid" after "lift" = still lifted, otherwise on surface
+        const { panelZ: _pz, LIFT_HEIGHT: _lh } = window.bedVisualization || {};
+        const surfaceZ = _pz || 0;
+        const liftedZ = surfaceZ + (_lh || 250);
+        for (let i = 0; i < points.length; i++) {
+            const mt = points[i].move_type;
+            if (mt === 'lift') {
+                points[i]._z = liftedZ;
+            } else if (mt === 'rapid' && i > 0 && (points[i - 1].move_type === 'lift' || points[i - 1].move_type === 'rapid')) {
+                points[i]._z = liftedZ; // rapid transit after lift stays at height
+            } else {
+                points[i]._z = surfaceZ; // "work" or initial "rapid" = on surface
+            }
+        }
+        
+        const Z_TRANSITION_TIME = 0.3; // seconds for lift/descend animation
+        
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
             const p2 = points[i + 1];
@@ -790,20 +967,19 @@ async function startDemo(tool) {
             const dy = p2.y - p1.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             
-            // Check if axis_6 changes (rotation needed) - for vacuum tool
-            const axis6Changed = (tool === 'vacuum' && 
+            // Check if axis_6 changes (rotation needed) - for vacuum and trowel tools
+            const axis6Changed = ((tool === 'vacuum' || tool === 'trowel') && 
                 p1.axis_6 !== null && p2.axis_6 !== null && 
                 p1.axis_6 !== p2.axis_6);
             
             // If rotation occurs, add rotation segment first (stationary, rotating)
             if (axis6Changed) {
-                // Calculate rotation time based on angle difference
                 const rotationDelta = Math.abs(p2.axis_6 - p1.axis_6);
                 const rotationTime = rotationDelta / VACUUM_ROTATION_SPEED;
                 
                 segments.push({
                     startIdx: i,
-                    endIdx: i,  // Same index - stationary
+                    endIdx: i,
                     distance: 0,
                     startTime: animationTime,
                     endTime: animationTime + rotationTime,
@@ -815,9 +991,15 @@ async function startDemo(tool) {
                 actualTime += rotationTime;
             }
             
-            // Calculate travel times - animation uses ANIMATION_SPEED, actual uses tool speed
-            const animTravelTime = dist / ANIMATION_SPEED;
+            // Calculate travel times
+            let animTravelTime = dist / ANIMATION_SPEED;
             const actualTravelTime = dist / toolSpeed;
+            
+            // Give zero-distance Z-transitions a minimum duration for smooth animation
+            const zChanged = (p1._z !== undefined && p2._z !== undefined && p1._z !== p2._z);
+            if (dist === 0 && zChanged) {
+                animTravelTime = Z_TRANSITION_TIME;
+            }
             
             segments.push({
                 startIdx: i,
@@ -900,13 +1082,28 @@ function drawPatternPath(points, tool) {
     if (!pathGroup || !window.bedVisualization) return;
     
     pathGroup.innerHTML = '';
-    const { worldToSvg } = window.bedVisualization;
+    const { worldToSvg, worldToSvg3D, panelZ, LIFT_HEIGHT } = window.bedVisualization;
     const color = TOOL_COLORS[tool] || '#fff';
     
-    // Draw path lines
+    // Helper: get Z height for a point based on move_type
+    function pointZ(p) {
+        if (p.move_type === 'lift' || p.move_type === 'rapid') {
+            return (panelZ || 0) + (LIFT_HEIGHT || 100);
+        }
+        return panelZ || 0; // "work" = on panel surface
+    }
+    
+    // Draw path lines at correct Z heights
     for (let i = 0; i < points.length - 1; i++) {
-        const p1 = worldToSvg(points[i].x, points[i].y);
-        const p2 = worldToSvg(points[i + 1].x, points[i + 1].y);
+        const pa = points[i];
+        const pb = points[i + 1];
+        const z1 = pointZ(pa);
+        const z2 = pointZ(pb);
+        const p1 = worldToSvg3D ? worldToSvg3D(pa.x, pa.y, z1) : worldToSvg(pa.x, pa.y);
+        const p2 = worldToSvg3D ? worldToSvg3D(pb.x, pb.y, z2) : worldToSvg(pb.x, pb.y);
+        
+        const isLifted = (pa.move_type === 'lift' || pa.move_type === 'rapid' ||
+                          pb.move_type === 'lift' || pb.move_type === 'rapid');
         
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', p1.x);
@@ -914,8 +1111,11 @@ function drawPatternPath(points, tool) {
         line.setAttribute('x2', p2.x);
         line.setAttribute('y2', p2.y);
         line.setAttribute('stroke', color);
-        line.setAttribute('stroke-width', '1');
-        line.setAttribute('stroke-opacity', '0.4');
+        line.setAttribute('stroke-width', isLifted ? '0.5' : '1');
+        line.setAttribute('stroke-opacity', isLifted ? '0.25' : '0.4');
+        if (isLifted) {
+            line.setAttribute('stroke-dasharray', '4,3');
+        }
         pathGroup.appendChild(line);
     }
 }
@@ -1021,6 +1221,47 @@ function createToolCircle(tool) {
         
         g.appendChild(bladesGroup);
         circleGroup.appendChild(g);
+    } else if (tool === 'trowel') {
+        // 3D Trowel: 150×450×3mm plate + 63mm dia × 500mm shaft
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('id', 'demo-tool');
+        
+        // Plate front side face (3mm thick visible edge) - drawn first (behind everything)
+        const plateSide = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        plateSide.setAttribute('id', 'trowel-plate-side');
+        plateSide.setAttribute('fill', '#e11d48');
+        plateSide.setAttribute('fill-opacity', '0.7');
+        plateSide.setAttribute('stroke', color);
+        plateSide.setAttribute('stroke-width', '0.5');
+        g.appendChild(plateSide);
+        
+        // Plate top face (colored parallelogram)
+        const plateTop = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        plateTop.setAttribute('id', 'trowel-plate-top');
+        plateTop.setAttribute('fill', color);
+        plateTop.setAttribute('fill-opacity', '0.8');
+        plateTop.setAttribute('stroke', color);
+        plateTop.setAttribute('stroke-width', '1.5');
+        g.appendChild(plateTop);
+        
+        // Shaft body (vertical silhouette polygon) - drawn after plate so it appears in front
+        const shaftBody = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        shaftBody.setAttribute('id', 'trowel-shaft');
+        shaftBody.setAttribute('fill', '#9ca3af');
+        shaftBody.setAttribute('fill-opacity', '0.9');
+        shaftBody.setAttribute('stroke', '#6b7280');
+        shaftBody.setAttribute('stroke-width', '1');
+        g.appendChild(shaftBody);
+        
+        // Shaft top ellipse cap - drawn last (on top of everything)
+        const shaftCap = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        shaftCap.setAttribute('id', 'trowel-shaft-cap');
+        shaftCap.setAttribute('fill', '#d1d5db');
+        shaftCap.setAttribute('stroke', '#6b7280');
+        shaftCap.setAttribute('stroke-width', '1');
+        g.appendChild(shaftCap);
+        
+        circleGroup.appendChild(g);
     } else {
         // Polisher is a circle
         const diameter = getToolDiameter(tool);
@@ -1077,6 +1318,46 @@ function updateCoverage(toolX, toolY, axis6 = 0) {
             for (let row = minRow; row <= maxRow; row++) {
                 const idx = row * cols + col;
                 cells[idx]++;
+            }
+        }
+    } else if (demoState.tool === 'trowel') {
+        // Trowel is a rectangle: 450mm (long edge) x 150mm (short edge), rotated by axis_6
+        const angle = (axis6 || 0) * Math.PI / 180;
+        const cos = Math.abs(Math.cos(angle));
+        const sin = Math.abs(Math.sin(angle));
+        const trowelL = 450;
+        const trowelW = 150;
+        
+        // Rotated bounding box for broad-phase
+        const halfWidth = (trowelL * cos + trowelW * sin) / 2;
+        const halfHeight = (trowelL * sin + trowelW * cos) / 2;
+        
+        const minCol = Math.max(0, Math.floor((toolX - halfWidth) / cellSize));
+        const maxCol = Math.min(cols - 1, Math.floor((toolX + halfWidth) / cellSize));
+        const minRow = Math.max(0, Math.floor((toolY - halfHeight) / cellSize));
+        const maxRow = Math.min(rows - 1, Math.floor((toolY + halfHeight) / cellSize));
+        
+        // Exact rotated rectangle test
+        const cosExact = Math.cos(angle);
+        const sinExact = Math.sin(angle);
+        const rectHalfL = trowelL / 2;
+        const rectHalfW = trowelW / 2;
+        
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const cellCenterX = (col + 0.5) * cellSize;
+                const cellCenterY = (row + 0.5) * cellSize;
+                
+                // Transform cell center to tool-local coordinates (rotate by -angle)
+                const dx = cellCenterX - toolX;
+                const dy = cellCenterY - toolY;
+                const localX = dx * cosExact + dy * sinExact;
+                const localY = -dx * sinExact + dy * cosExact;
+                
+                if (Math.abs(localX) <= rectHalfL && Math.abs(localY) <= rectHalfW) {
+                    const idx = row * cols + col;
+                    cells[idx]++;
+                }
             }
         }
     } else if (demoState.tool === 'vacuum') {
@@ -1156,12 +1437,12 @@ function renderCoverage() {
     coverageGroup.innerHTML = '';
     
     const { cols, rows, cellSize, cells } = demoState.coverageGrid;
-    const { worldToSvg, scale } = window.bedVisualization;
+    const { worldToSvg3D, panelZ } = window.bedVisualization;
     const color = TOOL_COLORS[demoState.tool] || '#fff';
+    const z = panelZ || 0; // Draw coverage on top of panel surface
     
     // Find max coverage for normalization
     const maxCoverage = Math.max(...cells, 1);
-    const svgCellSize = cellSize * scale;
     
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -1169,23 +1450,26 @@ function renderCoverage() {
             const coverage = cells[idx];
             
             if (coverage > 0) {
-                // Calculate opacity: more coverage = more opaque (darker)
-                // Base opacity 0.15, max additional 0.5
                 const normalizedCoverage = coverage / maxCoverage;
                 const opacity = 0.15 + normalizedCoverage * 0.5;
                 
-                const worldX = (col + 1) * cellSize;
-                const worldY = (row + 1) * cellSize;
-                const svgPos = worldToSvg(worldX, worldY);
+                // Isometric parallelogram cell: project 4 corners at panel surface Z
+                const wx0 = col * cellSize;
+                const wy0 = row * cellSize;
+                const wx1 = (col + 1) * cellSize;
+                const wy1 = (row + 1) * cellSize;
                 
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', svgPos.x);
-                rect.setAttribute('y', svgPos.y);
-                rect.setAttribute('width', svgCellSize);
-                rect.setAttribute('height', svgCellSize);
-                rect.setAttribute('fill', color);
-                rect.setAttribute('fill-opacity', opacity);
-                coverageGroup.appendChild(rect);
+                const p0 = worldToSvg3D(wx0, wy0, z);
+                const p1 = worldToSvg3D(wx1, wy0, z);
+                const p2 = worldToSvg3D(wx1, wy1, z);
+                const p3 = worldToSvg3D(wx0, wy1, z);
+                
+                const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                poly.setAttribute('points',
+                    `${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`);
+                poly.setAttribute('fill', color);
+                poly.setAttribute('fill-opacity', opacity);
+                coverageGroup.appendChild(poly);
             }
         }
     }
@@ -1247,6 +1531,125 @@ function updateCoverageToTime(targetTime) {
     renderCoverage();
 }
 
+function updateTrowel3D(wx, wy, axis6, wz, axis4) {
+    // Compute 3D isometric positions for trowel plate + shaft
+    // wz = Z height of the plate center (panel surface + any lift)
+    // axis4 = plough angle: tilt about the tool's local Y axis (degrees)
+    if (!window.bedVisualization) return;
+    const { worldToSvg3D, scale, ISO_COS, ISO_SIN } = window.bedVisualization;
+    
+    const theta = axis6 * Math.PI / 180;
+    const cos_t = Math.cos(theta);
+    const sin_t = Math.sin(theta);
+    
+    // Axis 4 tilt about local Y axis (plough angle)
+    const a4_rad = (axis4 || 0) * Math.PI / 180;
+    const sin_a4 = Math.sin(a4_rad);
+    const cos_a4 = Math.cos(a4_rad);
+    
+    // --- Plate: 450mm × 150mm × 3mm ---
+    const halfL = 225;  // half of 450mm (long edge = local X)
+    const halfW = 75;   // half of 150mm (short edge = local Y)
+    
+    // Each corner at local (dx, dy) gets Z offset from tilt about local Y:
+    //   z_offset = dx * sin(axis4)  (positive axis4 raises the +X local end)
+    // Rotate corner offsets by axis_6 to world coords
+    function rot(dx, dy) {
+        return { x: wx + dx * cos_t - dy * sin_t, y: wy + dx * sin_t + dy * cos_t };
+    }
+    function cornerZ(dx) {
+        return dx * sin_a4;
+    }
+    
+    const c0 = rot(-halfL, -halfW);  const cz0 = cornerZ(-halfL);
+    const c1 = rot( halfL, -halfW);  const cz1 = cornerZ( halfL);
+    const c2 = rot( halfL,  halfW);  const cz2 = cornerZ( halfL);
+    const c3 = rot(-halfL,  halfW);  const cz3 = cornerZ(-halfL);
+    
+    const plateThick = 3;
+    
+    // Plate top face (each corner at its own Z)
+    const pt0 = worldToSvg3D(c0.x, c0.y, wz + plateThick + cz0);
+    const pt1 = worldToSvg3D(c1.x, c1.y, wz + plateThick + cz1);
+    const pt2 = worldToSvg3D(c2.x, c2.y, wz + plateThick + cz2);
+    const pt3 = worldToSvg3D(c3.x, c3.y, wz + plateThick + cz3);
+    
+    const plateTopEl = document.getElementById('trowel-plate-top');
+    if (plateTopEl) {
+        plateTopEl.setAttribute('points',
+            `${pt0.x},${pt0.y} ${pt1.x},${pt1.y} ${pt2.x},${pt2.y} ${pt3.x},${pt3.y}`);
+        // Visual indicator: plate darkens when tilted (ploughing)
+        const tiltAmount = Math.abs(axis4 || 0) / 90;
+        plateTopEl.setAttribute('fill-opacity', 0.8 - tiltAmount * 0.4);
+    }
+    
+    // Plate front side face: find the two corners with highest SVG Y (closest to viewer)
+    const cornersTop = [
+        { c: c0, z: wz + plateThick + cz0, svgY: pt0.y },
+        { c: c1, z: wz + plateThick + cz1, svgY: pt1.y },
+        { c: c2, z: wz + plateThick + cz2, svgY: pt2.y },
+        { c: c3, z: wz + plateThick + cz3, svgY: pt3.y },
+    ];
+    const czArr = [cz0, cz1, cz2, cz3];
+    cornersTop.sort((a, b) => b.svgY - a.svgY);
+    const frontA = cornersTop[0];
+    const frontB = cornersTop[1];
+    
+    const sf0 = worldToSvg3D(frontA.c.x, frontA.c.y, frontA.z);
+    const sf1 = worldToSvg3D(frontB.c.x, frontB.c.y, frontB.z);
+    const sf2 = worldToSvg3D(frontB.c.x, frontB.c.y, frontB.z - plateThick);
+    const sf3 = worldToSvg3D(frontA.c.x, frontA.c.y, frontA.z - plateThick);
+    
+    const plateSideEl = document.getElementById('trowel-plate-side');
+    if (plateSideEl) {
+        plateSideEl.setAttribute('points',
+            `${sf0.x},${sf0.y} ${sf1.x},${sf1.y} ${sf2.x},${sf2.y} ${sf3.x},${sf3.y}`);
+    }
+    
+    // --- Shaft: 63mm diameter × 500mm tall cylinder, tilted by axis_4 ---
+    const shaftR = 31.5;
+    const shaftH = 500;
+    
+    // Shaft base at plate center top (wz + plateThick, no tilt offset at center)
+    const shaftBaseZ = wz + plateThick;
+    // Shaft top: displaced along local X by shaftH * sin(a4), Z by shaftH * cos(a4)
+    const shaftTopLocalDx = shaftH * sin_a4;
+    const shaftTopDz = shaftH * cos_a4;
+    // Rotate local X offset to world coords
+    const shaftTopWx = wx + shaftTopLocalDx * cos_t;
+    const shaftTopWy = wy + shaftTopLocalDx * sin_t;
+    const shaftTopZ = shaftBaseZ + shaftTopDz;
+    
+    // Cylinder silhouette: perpendicular to isometric view direction
+    const INV_SQRT2 = 0.7071;
+    const perpX = shaftR * INV_SQRT2;
+    const perpY = shaftR * INV_SQRT2;
+    
+    const sA_bot = worldToSvg3D(wx + perpX, wy - perpY, shaftBaseZ);
+    const sA_top = worldToSvg3D(shaftTopWx + perpX, shaftTopWy - perpY, shaftTopZ);
+    const sB_bot = worldToSvg3D(wx - perpX, wy + perpY, shaftBaseZ);
+    const sB_top = worldToSvg3D(shaftTopWx - perpX, shaftTopWy + perpY, shaftTopZ);
+    
+    const shaftEl = document.getElementById('trowel-shaft');
+    if (shaftEl) {
+        shaftEl.setAttribute('points',
+            `${sA_bot.x},${sA_bot.y} ${sA_top.x},${sA_top.y} ${sB_top.x},${sB_top.y} ${sB_bot.x},${sB_bot.y}`);
+    }
+    
+    // Shaft top ellipse cap
+    const capCenter = worldToSvg3D(shaftTopWx, shaftTopWy, shaftTopZ);
+    const capRx = shaftR * Math.SQRT2 * ISO_COS * scale;
+    const capRy = shaftR * Math.SQRT2 * ISO_SIN * scale;
+    
+    const capEl = document.getElementById('trowel-shaft-cap');
+    if (capEl) {
+        capEl.setAttribute('cx', capCenter.x);
+        capEl.setAttribute('cy', capCenter.y);
+        capEl.setAttribute('rx', capRx);
+        capEl.setAttribute('ry', capRy);
+    }
+}
+
 function updateToolPosition(time) {
     if (!demoState.active || !window.bedVisualization) return;
     
@@ -1259,6 +1662,8 @@ function updateToolPosition(time) {
     // Find current segment and get position + axis_6
     let pos = { x: points[0].x, y: points[0].y };
     let currentAxis6 = points[0].axis_6 || 0;
+    let currentAxis4 = points[0].axis_4 || 0;
+    let currentMoveType = points[0].move_type || 'work';
     let isRotating = false;
     let rotationProgress = 0;
     let rotateFrom = 0;
@@ -1273,32 +1678,38 @@ function updateToolPosition(time) {
             if (seg.isRotation) {
                 // Rotation segment: tool stays in place, rotates
                 pos = { x: points[seg.startIdx].x, y: points[seg.startIdx].y };
+                currentMoveType = points[seg.startIdx].move_type || 'work';
+                currentAxis4 = points[seg.startIdx].axis_4 || 0;
                 isRotating = true;
                 rotationProgress = segProgress;
                 rotateFrom = seg.rotateFrom;
                 rotateTo = seg.rotateTo;
                 
-                // Linear interpolation - shows actual rotation direction
-                // Unwind (e.g., -270° to 0°) = +270° delta = CW rotation
-                // Normal corner (e.g., 180° to 90°) = -90° delta = ACW rotation
                 currentAxis6 = rotateFrom + (rotateTo - rotateFrom) * segProgress;
             } else {
-                // Movement segment
+                // Movement segment: interpolate axis_4 smoothly
                 const p1 = points[seg.startIdx];
                 const p2 = points[seg.endIdx];
                 pos.x = p1.x + (p2.x - p1.x) * segProgress;
                 pos.y = p1.y + (p2.y - p1.y) * segProgress;
-                // Use axis_6 from the target point
                 currentAxis6 = p2.axis_6 !== null ? p2.axis_6 : (p1.axis_6 || 0);
+                const a4_1 = p1.axis_4 || 0;
+                const a4_2 = p2.axis_4 || 0;
+                currentAxis4 = a4_1 + (a4_2 - a4_1) * segProgress;
+                currentMoveType = p2.move_type || 'work';
             }
             break;
         } else if (t > seg.endTime) {
             if (seg.isRotation) {
                 pos = { x: points[seg.startIdx].x, y: points[seg.startIdx].y };
                 currentAxis6 = seg.rotateTo;
+                currentAxis4 = points[seg.startIdx].axis_4 || 0;
+                currentMoveType = points[seg.startIdx].move_type || 'work';
             } else {
                 pos = { x: points[seg.endIdx].x, y: points[seg.endIdx].y };
                 currentAxis6 = points[seg.endIdx].axis_6 || 0;
+                currentAxis4 = points[seg.endIdx].axis_4 || 0;
+                currentMoveType = points[seg.endIdx].move_type || 'work';
             }
         }
     }
@@ -1318,6 +1729,34 @@ function updateToolPosition(time) {
             // Rotation is animated during rotation segments
             const rotation = currentAxis6;
             toolEl.setAttribute('transform', `translate(${svgPos.x}, ${svgPos.y}) rotate(${rotation})`);
+        } else if (demoState.tool === 'trowel') {
+            // 3D Trowel: interpolate Z smoothly using pre-computed _z values
+            const { panelZ } = window.bedVisualization;
+            let toolZ = panelZ || 0;
+            for (let si = 0; si < segments.length; si++) {
+                const seg = segments[si];
+                if (t >= seg.startTime && t <= seg.endTime) {
+                    const segDuration = seg.endTime - seg.startTime;
+                    const segProgress = segDuration > 0 ? (t - seg.startTime) / segDuration : 1;
+                    if (seg.isRotation) {
+                        toolZ = points[seg.startIdx]._z || toolZ;
+                    } else {
+                        const z1 = points[seg.startIdx]._z;
+                        const z2 = points[seg.endIdx]._z;
+                        if (z1 !== undefined && z2 !== undefined) {
+                            toolZ = z1 + (z2 - z1) * segProgress;
+                        }
+                    }
+                    break;
+                } else if (t > seg.endTime) {
+                    if (seg.isRotation) {
+                        toolZ = points[seg.startIdx]._z || toolZ;
+                    } else {
+                        toolZ = points[seg.endIdx]._z || toolZ;
+                    }
+                }
+            }
+            updateTrowel3D(pos.x, pos.y, currentAxis6, toolZ, currentAxis4);
         } else if (demoState.tool === 'helicopter' || demoState.tool === 'pan') {
             // Helicopter/Pan group: position with transform (blade rotation handled separately)
             toolEl.setAttribute('transform', `translate(${svgPos.x}, ${svgPos.y})`);

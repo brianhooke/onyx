@@ -143,6 +143,18 @@
                                     </select>
                                 </td>
                             </tr>
+                            <tr class="tool-row">
+                                <td class="py-1 px-1 text-rose-600 font-bold">Trowel</td>
+                                <td class="py-1 px-1 border-l border-gray-100 pl-2"><input type="number" name="trowel_diameter" value="{{ defaults.trowel_diameter }}" class="compact-input w-16"></td>
+                                <td class="py-1 px-1"><input type="number" name="trowel_overhang" value="{{ defaults.trowel_overhang }}" class="compact-input w-16"></td>
+                                <td class="py-1 px-1"><input type="number" name="trowel_step" value="{{ defaults.trowel_step }}" class="compact-input w-16"></td>
+                                <td class="py-1 px-1 border-l border-gray-100 pl-2">
+                                    <select name="trowel_spiral_direction" class="compact-select w-24">
+                                        <option value="anticlockwise" {% if defaults.trowel_spiral_direction == 'anticlockwise' %}selected{% endif %}>anticlockwise</option>
+                                        <option value="clockwise" {% if defaults.trowel_spiral_direction == 'clockwise' %}selected{% endif %}>clockwise</option>
+                                    </select>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </details>
@@ -309,6 +321,27 @@
                                     </select>
                                     <span class="text-gray-500">FW:</span>
                                     <input type="number" name="heli_formwork_offset" value="{{ defaults.heli_formwork_offset }}" class="compact-input w-14" title="Formwork offset">
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Trowel -->
+                        <tr class="tool-row">
+                            <td class="py-1 px-1 text-rose-600 font-bold">Trowel</td>
+                            <td class="py-1 px-1 text-gray-500">Panel</td>
+                            <td class="py-1 px-1 text-gray-500">Trowel</td>
+                            <td class="py-1 px-1"><input type="number" name="trowel_z_offset" value="{{ defaults.trowel_z_offset }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="trowel_speed" value="{{ defaults.trowel_speed }}" class="compact-input"></td>
+                            <td class="py-1 px-1"><input type="number" name="trowel_force" value="{{ defaults.trowel_force }}" class="compact-input"></td>
+                            <td class="py-1 px-1 border-l border-gray-100 pl-3">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    <span class="text-gray-500">P1∠:</span>
+                                    <input type="number" name="trowel_pass_1_angle" value="{{ defaults.trowel_pass_1_angle }}" class="compact-input w-12" title="Pass 1 angle (°)">
+                                    <span class="text-gray-500">P1↻:</span>
+                                    <input type="number" name="trowel_pass_1_rotation" value="{{ defaults.trowel_pass_1_rotation }}" class="compact-input w-12" title="Pass 1 rotation (°)">
+                                    <span class="text-gray-500">P2∠:</span>
+                                    <input type="number" name="trowel_pass_2_angle" value="{{ defaults.trowel_pass_2_angle }}" class="compact-input w-12" title="Pass 2 angle (°)">
+                                    <span class="text-gray-500">P2↻:</span>
+                                    <input type="number" name="trowel_pass_2_rotation" value="{{ defaults.trowel_pass_2_rotation }}" class="compact-input w-12" title="Pass 2 rotation (°)">
                                 </div>
                             </td>
                         </tr>

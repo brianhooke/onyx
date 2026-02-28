@@ -31,11 +31,14 @@ class Point:
     x: float
     y: float
     move_type: Literal["rapid", "work", "lift", "place"]  # rapid=fast positioning, work=process move, lift/place=vacuum transitions
+    axis_4: Optional[float] = None  # Axis 4 plough angle in degrees (trowel tilt for ploughing, None = unchanged)
     axis_5: Optional[float] = None  # Axis 5 tilt angle in degrees (vacuum pipe tilts towards max_x/far end of bed, None = unchanged)
     axis_6: Optional[float] = None  # Axis 6 rotation in degrees (None = unchanged)
     
     def __repr__(self) -> str:
         extras = []
+        if self.axis_4 is not None:
+            extras.append(f"axis_4={self.axis_4:.0f}")
         if self.axis_5 is not None:
             extras.append(f"axis_5={self.axis_5:.0f}")
         if self.axis_6 is not None:
@@ -754,6 +757,129 @@ def single_pass(
         Point(end_x, y_position, "work"),    # End of pass
         Point(end_x + approach_offset, y_position, "rapid"),  # Depart
     ]
+    return points
+
+
+def _trowel_pass(
+    min_x: float, max_x: float, min_y: float, max_y: float,
+    trowel_length: float, trowel_width: float, overshoot: float,
+    rotation: float, plough_angle: float, direction: str = 'ccw',
+) -> List[Point]:
+    """
+    Generate a single perimeter pass for the trowel tool.
+    
+    Args:
+        rotation: Base axis_6 rotation in degrees
+        plough_angle: Axis 4 tilt angle in degrees (0 = level)
+        direction: 'cw' (clockwise) or 'ccw' (anticlockwise) when viewed from above
+    """
+    import math
+    points: List[Point] = []
+    pa = -plough_angle
+    rot = -rotation
+    rot_rad = math.radians(rot)
+    
+    # Offset from panel edge to tool center so trowel corner just touches boundary
+    # X-extent and Y-extent differ when rotation != 45°
+    offset_x = (trowel_length / 2) * abs(math.cos(rot_rad)) + (trowel_width / 2) * abs(math.sin(rot_rad))
+    offset_y = (trowel_length / 2) * abs(math.sin(rot_rad)) + (trowel_width / 2) * abs(math.cos(rot_rad))
+    
+    y_top    = max_y - offset_y
+    y_bottom = min_y + offset_y
+    x_right  = max_x - offset_x
+    x_left   = min_x + offset_x
+    ov = overshoot
+    
+    # Define edges: (start_x, start_y, end_x, end_y, axis_6)
+    # axis_6 = rotation + travel_direction_angle
+    if direction == 'cw':
+        # CW: Top(+X) → Right(-Y) → Bottom(-X) → Left(+Y)
+        edges = [
+            (min_x,   y_top,    max_x+ov, y_top,      rot),
+            (x_right, max_y,    x_right,  min_y-ov,   rot - 90),
+            (max_x,   y_bottom, min_x-ov, y_bottom,   rot - 180),
+            (x_left,  min_y,    x_left,   max_y+ov,   rot - 270),
+        ]
+    else:
+        # CCW: Left(-Y) → Bottom(+X) → Right(+Y) → Top(-X)
+        edges = [
+            (x_left,  max_y,    x_left,   min_y-ov,   rot - 90),
+            (min_x,   y_bottom, max_x+ov, y_bottom,   rot),
+            (x_right, min_y,    x_right,  max_y+ov,   rot + 90),
+            (max_x,   y_top,    min_x-ov, y_top,      rot + 180),
+        ]
+    
+    for i, (sx, sy, ex, ey, a6) in enumerate(edges):
+        if i == 0:
+            # First edge: rapid to start, then instant axis_4 transition
+            points.append(Point(sx, sy, "rapid", axis_4=0.0, axis_6=a6))
+            points.append(Point(sx, sy, "work",  axis_4=pa,  axis_6=a6))
+        
+        # Work along edge (with overshoot past corner)
+        points.append(Point(ex, ey, "work", axis_4=pa, axis_6=a6))
+        # Lift at overshoot position
+        points.append(Point(ex, ey, "lift", axis_4=0.0, axis_6=a6))
+        
+        # Transit to next edge start (if not last edge)
+        if i < len(edges) - 1:
+            next_sx, next_sy, _, _, next_a6 = edges[i + 1]
+            points.append(Point(next_sx, next_sy, "rapid", axis_4=0.0, axis_6=next_a6))
+            points.append(Point(next_sx, next_sy, "work",  axis_4=pa,  axis_6=next_a6))
+    
+    return points
+
+
+def trowel_perimeter(
+    min_x: float,
+    max_x: float,
+    min_y: float,
+    max_y: float,
+    trowel_length: float = 450,
+    trowel_width: float = 150,
+    overshoot: float = 250,
+    pass1_rotation: float = 45.0,
+    pass1_plough_angle: float = 0.0,
+    pass2_rotation: float = 45.0,
+    pass2_plough_angle: float = 0.0,
+) -> List[Point]:
+    """
+    Generate a two-pass perimeter path for the trowel tool.
+    
+    Pass 1 travels anticlockwise, Pass 2 travels clockwise.
+    Each pass has its own axis_6 rotation and axis_4 plough angle.
+    
+    At each corner the trowel overshoots past the edge, then lifts,
+    rotates, and rapids to the next edge start.
+    
+    Args:
+        min_x, max_x, min_y, max_y: Workspace boundaries
+        trowel_length: Long edge of the trowel (mm), default 450
+        trowel_width: Short edge of the trowel (mm), default 150
+        overshoot: How far past each corner to travel (mm), default 250 (width+100)
+        pass1_rotation: Axis 6 rotation for pass 1 (degrees), default 45
+        pass1_plough_angle: Axis 4 plough angle for pass 1 (degrees), default 0
+        pass2_rotation: Axis 6 rotation for pass 2 (degrees), default 45
+        pass2_plough_angle: Axis 4 plough angle for pass 2 (degrees), default 0
+    
+    Returns:
+        List of Points for the two-pass perimeter path
+    """
+    points: List[Point] = []
+    
+    # Pass 1: anticlockwise
+    points.extend(_trowel_pass(
+        min_x, max_x, min_y, max_y,
+        trowel_length, trowel_width, overshoot,
+        pass1_rotation, pass1_plough_angle, direction='ccw',
+    ))
+    
+    # Pass 2: clockwise
+    points.extend(_trowel_pass(
+        min_x, max_x, min_y, max_y,
+        trowel_length, trowel_width, overshoot,
+        pass2_rotation, pass2_plough_angle, direction='cw',
+    ))
+    
     return points
 
 

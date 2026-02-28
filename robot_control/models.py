@@ -112,6 +112,22 @@ class ToolPathParameters(models.Model):
     pan_direction = models.IntegerField(default=1, help_text="Pan sweep direction: 1=L→R, -1=R→L")
     pan_start_bottom = models.BooleanField(default=True, help_text="Pan start at bottom")
     
+    # Trowel parameters
+    trowel_z_offset = models.IntegerField(default=0, help_text="Trowel Z offset (mm)")
+    trowel_speed = models.IntegerField(default=100, help_text="Trowel travel speed (mm/s)")
+    trowel_force = models.IntegerField(default=0, help_text="Trowel force (N, 0=off)")
+    trowel_pass_1_angle = models.IntegerField(default=0, help_text="Trowel pass 1 angle (degrees)")
+    trowel_pass_1_rotation = models.IntegerField(default=0, help_text="Trowel pass 1 rotation (degrees)")
+    trowel_pass_2_angle = models.IntegerField(default=0, help_text="Trowel pass 2 angle (degrees)")
+    trowel_pass_2_rotation = models.IntegerField(default=0, help_text="Trowel pass 2 rotation (degrees)")
+    trowel_step = models.IntegerField(default=300, help_text="Trowel step (mm)")
+    trowel_diameter = models.IntegerField(default=450, help_text="Trowel tool diameter (mm)")
+    trowel_overhang = models.IntegerField(default=50, help_text="Trowel edge overhang (mm)")
+    trowel_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Trowel spiral direction")
+    trowel_formwork_offset = models.IntegerField(default=100, help_text="Trowel spiral formwork offset (mm)")
+    trowel_direction = models.IntegerField(default=1, help_text="Trowel sweep direction: 1=L→R, -1=R→L")
+    trowel_start_bottom = models.BooleanField(default=True, help_text="Trowel start at bottom")
+    
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
@@ -208,4 +224,19 @@ class ToolPathParameters(models.Model):
             'polisher_formwork_offset': self.polisher_formwork_offset,
             'pan_spiral_direction': self.pan_spiral_direction,
             'pan_formwork_offset': self.pan_formwork_offset,
+            # Trowel parameters
+            'trowel_z_offset': self.trowel_z_offset,
+            'trowel_speed': self.trowel_speed,
+            'trowel_force': self.trowel_force,
+            'trowel_pass_1_angle': self.trowel_pass_1_angle,
+            'trowel_pass_1_rotation': self.trowel_pass_1_rotation,
+            'trowel_pass_2_angle': self.trowel_pass_2_angle,
+            'trowel_pass_2_rotation': self.trowel_pass_2_rotation,
+            'trowel_step': self.trowel_step,
+            'trowel_diameter': self.trowel_diameter,
+            'trowel_overhang': self.trowel_overhang,
+            'trowel_spiral_direction': self.trowel_spiral_direction,
+            'trowel_formwork_offset': self.trowel_formwork_offset,
+            'trowel_direction': self.trowel_direction,
+            'trowel_start_bottom': self.trowel_start_bottom,
         }

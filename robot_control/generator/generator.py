@@ -184,6 +184,7 @@ class ToolpathGenerator:
         py2vacuum_proc = TOOLS['vacuum'].generate_procedure(self.params)
         py2pan_proc = TOOLS['pan'].generate_procedure(self.params)
         py2vib_screed_proc = TOOLS['vib_screed'].generate_procedure(self.params)
+        py2trowel_proc = TOOLS['trowel'].generate_procedure(self.params)
         seq_bed_clean_proc = generate_seq_bed_clean(self.params)
         
         # Generate the main Py2 menu procedure
@@ -233,6 +234,8 @@ class ToolpathGenerator:
 
 {py2vib_screed_proc}
 
+{py2trowel_proc}
+
 {seq_bed_clean_proc}
     
     ! ========== END PY2 GENERATED PROCEDURES ==========
@@ -260,7 +263,7 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
+        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:Trowel,7:BedClean";
         
         TEST iChoice
         CASE 1:
@@ -274,6 +277,8 @@ class ToolpathGenerator:
         CASE 5:
             Py2VS;
         CASE 6:
+            Py2Trowel;
+        CASE 7:
             SeqBedClean;
         DEFAULT:
             TPWrite "Invalid choice";
