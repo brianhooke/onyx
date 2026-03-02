@@ -725,10 +725,14 @@ function setupBedVisualization() {
     
     function onViewChange() {
         updateVisualization();
-        // Re-render path and coverage if a demo is active
+        // Re-render path, coverage, and tool position if a demo is active
         if (demoState && demoState.active && demoState.points) {
             drawPatternPath(demoState.points, demoState.tool);
             renderCoverage();
+        }
+        // Re-project the trowel tool directly using saved args (avoids scope issues)
+        if (window._lastTrowelArgs && demoState && demoState.active && demoState.tool === 'trowel') {
+            updateTrowel3D(...window._lastTrowelArgs);
         }
     }
     
@@ -1222,45 +1226,9 @@ function createToolCircle(tool) {
         g.appendChild(bladesGroup);
         circleGroup.appendChild(g);
     } else if (tool === 'trowel') {
-        // 3D Trowel: 150×450×3mm plate + 63mm dia × 500mm shaft
+        // 3D Trowel: empty group — faces are dynamically created by updateTrowel3D
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.setAttribute('id', 'demo-tool');
-        
-        // Plate front side face (3mm thick visible edge) - drawn first (behind everything)
-        const plateSide = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        plateSide.setAttribute('id', 'trowel-plate-side');
-        plateSide.setAttribute('fill', '#e11d48');
-        plateSide.setAttribute('fill-opacity', '0.7');
-        plateSide.setAttribute('stroke', color);
-        plateSide.setAttribute('stroke-width', '0.5');
-        g.appendChild(plateSide);
-        
-        // Plate top face (colored parallelogram)
-        const plateTop = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        plateTop.setAttribute('id', 'trowel-plate-top');
-        plateTop.setAttribute('fill', color);
-        plateTop.setAttribute('fill-opacity', '0.8');
-        plateTop.setAttribute('stroke', color);
-        plateTop.setAttribute('stroke-width', '1.5');
-        g.appendChild(plateTop);
-        
-        // Shaft body (vertical silhouette polygon) - drawn after plate so it appears in front
-        const shaftBody = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        shaftBody.setAttribute('id', 'trowel-shaft');
-        shaftBody.setAttribute('fill', '#9ca3af');
-        shaftBody.setAttribute('fill-opacity', '0.9');
-        shaftBody.setAttribute('stroke', '#6b7280');
-        shaftBody.setAttribute('stroke-width', '1');
-        g.appendChild(shaftBody);
-        
-        // Shaft top ellipse cap - drawn last (on top of everything)
-        const shaftCap = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-        shaftCap.setAttribute('id', 'trowel-shaft-cap');
-        shaftCap.setAttribute('fill', '#d1d5db');
-        shaftCap.setAttribute('stroke', '#6b7280');
-        shaftCap.setAttribute('stroke-width', '1');
-        g.appendChild(shaftCap);
-        
         circleGroup.appendChild(g);
     } else {
         // Polisher is a circle
@@ -1532,121 +1500,102 @@ function updateCoverageToTime(targetTime) {
 }
 
 function updateTrowel3D(wx, wy, axis6, wz, axis4) {
-    // Compute 3D isometric positions for trowel plate + shaft
-    // wz = Z height of the plate center (panel surface + any lift)
-    // axis4 = plough angle: tilt about the tool's local Y axis (degrees)
+    // Save args so onViewChange can re-render the tool at the same position
+    window._lastTrowelArgs = [wx, wy, axis6, wz, axis4];
+    
     if (!window.bedVisualization) return;
-    const { worldToSvg3D, scale, ISO_COS, ISO_SIN } = window.bedVisualization;
+    const { worldToSvg3D } = window.bedVisualization;
+    const group = document.getElementById('demo-tool');
+    if (!group) return;
     
-    const theta = axis6 * Math.PI / 180;
-    const cos_t = Math.cos(theta);
-    const sin_t = Math.sin(theta);
+    // --- Transform setup ---
+    const a6 = axis6 * Math.PI / 180;
+    const cos6 = Math.cos(a6), sin6 = Math.sin(a6);
+    const a4 = (axis4 || 0) * Math.PI / 180;
+    const cos4 = Math.cos(a4), sin4 = Math.sin(a4);
     
-    // Axis 4 tilt about local Y axis (plough angle)
-    const a4_rad = (axis4 || 0) * Math.PI / 180;
-    const sin_a4 = Math.sin(a4_rad);
-    const cos_a4 = Math.cos(a4_rad);
-    
-    // --- Plate: 450mm × 150mm × 3mm ---
-    const halfL = 225;  // half of 450mm (long edge = local X)
-    const halfW = 75;   // half of 150mm (short edge = local Y)
-    
-    // Each corner at local (dx, dy) gets Z offset from tilt about local Y:
-    //   z_offset = dx * sin(axis4)  (positive axis4 raises the +X local end)
-    // Rotate corner offsets by axis_6 to world coords
-    function rot(dx, dy) {
-        return { x: wx + dx * cos_t - dy * sin_t, y: wy + dx * sin_t + dy * cos_t };
-    }
-    function cornerZ(dx) {
-        return dx * sin_a4;
+    // Local → World: tilt around local Y (axis_4), rotate around Z (axis_6), translate
+    function L2W(lx, ly, lz) {
+        const tx = lx * cos4 + lz * sin4;
+        const tz = -lx * sin4 + lz * cos4;
+        return [tx * cos6 - ly * sin6 + wx, tx * sin6 + ly * cos6 + wy, tz + wz];
     }
     
-    const c0 = rot(-halfL, -halfW);  const cz0 = cornerZ(-halfL);
-    const c1 = rot( halfL, -halfW);  const cz1 = cornerZ( halfL);
-    const c2 = rot( halfL,  halfW);  const cz2 = cornerZ( halfL);
-    const c3 = rot(-halfL,  halfW);  const cz3 = cornerZ(-halfL);
+    // --- Define all 3D faces ---
+    const halfL = 225, halfW = 75, pT = 3;   // plate: 450×150×3mm
+    const shaftR = 31.5, shaftH = 500;        // shaft: ø63×500mm
+    const faces = [];
     
-    const plateThick = 3;
+    // Plate box — 6 faces (outward-normal CCW winding)
+    // Top (+Z)
+    faces.push({ v: [[-halfL,-halfW,pT],[-halfL,halfW,pT],[halfL,halfW,pT],[halfL,-halfW,pT]], fill:'#dc2626', stroke:'#991b1b' });
+    // Bottom (-Z)
+    faces.push({ v: [[-halfL,halfW,0],[-halfL,-halfW,0],[halfL,-halfW,0],[halfL,halfW,0]], fill:'#7f1d1d', stroke:'#7f1d1d' });
+    // Front (-Y)
+    faces.push({ v: [[-halfL,-halfW,0],[halfL,-halfW,0],[halfL,-halfW,pT],[-halfL,-halfW,pT]], fill:'#b91c1c', stroke:'#991b1b' });
+    // Back (+Y)
+    faces.push({ v: [[halfL,halfW,0],[-halfL,halfW,0],[-halfL,halfW,pT],[halfL,halfW,pT]], fill:'#b91c1c', stroke:'#991b1b' });
+    // Leading edge (+X) — orange to show tool direction
+    faces.push({ v: [[halfL,-halfW,0],[halfL,halfW,0],[halfL,halfW,pT],[halfL,-halfW,pT]], fill:'#f97316', stroke:'#ea580c' });
+    // Trailing edge (-X)
+    faces.push({ v: [[-halfL,halfW,0],[-halfL,-halfW,0],[-halfL,-halfW,pT],[-halfL,halfW,pT]], fill:'#ef4444', stroke:'#991b1b' });
     
-    // Plate top face (each corner at its own Z)
-    const pt0 = worldToSvg3D(c0.x, c0.y, wz + plateThick + cz0);
-    const pt1 = worldToSvg3D(c1.x, c1.y, wz + plateThick + cz1);
-    const pt2 = worldToSvg3D(c2.x, c2.y, wz + plateThick + cz2);
-    const pt3 = worldToSvg3D(c3.x, c3.y, wz + plateThick + cz3);
+    // Shaft octagonal prism — 8 sides + top cap
+    const octN = 8;
+    const oct = [];
+    for (let i = 0; i < octN; i++) {
+        const ang = i * 2 * Math.PI / octN;
+        oct.push([shaftR * Math.cos(ang), shaftR * Math.sin(ang)]);
+    }
+    for (let i = 0; i < octN; i++) {
+        const j = (i + 1) % octN;
+        faces.push({
+            v: [[oct[i][0],oct[i][1],pT],[oct[j][0],oct[j][1],pT],[oct[j][0],oct[j][1],pT+shaftH],[oct[i][0],oct[i][1],pT+shaftH]],
+            fill: '#9ca3af', stroke: '#6b7280'
+        });
+    }
+    // Shaft top cap (CCW from above)
+    faces.push({
+        v: oct.map(o => [o[0], o[1], pT + shaftH]),
+        fill: '#d1d5db', stroke: '#6b7280'
+    });
     
-    const plateTopEl = document.getElementById('trowel-plate-top');
-    if (plateTopEl) {
-        plateTopEl.setAttribute('points',
-            `${pt0.x},${pt0.y} ${pt1.x},${pt1.y} ${pt2.x},${pt2.y} ${pt3.x},${pt3.y}`);
-        // Visual indicator: plate darkens when tilted (ploughing)
-        const tiltAmount = Math.abs(axis4 || 0) / 90;
-        plateTopEl.setAttribute('fill-opacity', 0.8 - tiltAmount * 0.4);
+    // --- Transform, project, cull, sort ---
+    const visible = [];
+    for (const face of faces) {
+        const pts = face.v.map(v => {
+            const w = L2W(v[0], v[1], v[2]);
+            return worldToSvg3D(w[0], w[1], w[2]);
+        });
+        
+        // Back-face culling: signed area < 0 = front-facing in SVG (Y-down)
+        let area = 0;
+        for (let i = 0; i < pts.length; i++) {
+            const j = (i + 1) % pts.length;
+            area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+        }
+        if (area >= 0) continue; // back-facing, skip
+        
+        // Depth: average SVG Y (lower = farther from viewer)
+        const avgY = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        visible.push({ pts, avgY, fill: face.fill, stroke: face.stroke });
     }
     
-    // Plate front side face: find the two corners with highest SVG Y (closest to viewer)
-    const cornersTop = [
-        { c: c0, z: wz + plateThick + cz0, svgY: pt0.y },
-        { c: c1, z: wz + plateThick + cz1, svgY: pt1.y },
-        { c: c2, z: wz + plateThick + cz2, svgY: pt2.y },
-        { c: c3, z: wz + plateThick + cz3, svgY: pt3.y },
-    ];
-    const czArr = [cz0, cz1, cz2, cz3];
-    cornersTop.sort((a, b) => b.svgY - a.svgY);
-    const frontA = cornersTop[0];
-    const frontB = cornersTop[1];
+    // Painter's algorithm: sort ascending by avgY (farthest first)
+    visible.sort((a, b) => a.avgY - b.avgY);
     
-    const sf0 = worldToSvg3D(frontA.c.x, frontA.c.y, frontA.z);
-    const sf1 = worldToSvg3D(frontB.c.x, frontB.c.y, frontB.z);
-    const sf2 = worldToSvg3D(frontB.c.x, frontB.c.y, frontB.z - plateThick);
-    const sf3 = worldToSvg3D(frontA.c.x, frontA.c.y, frontA.z - plateThick);
+    // --- Render: clear old faces, create new in sorted order ---
+    const old = group.querySelectorAll('.trowel-face');
+    for (let i = old.length - 1; i >= 0; i--) old[i].remove();
     
-    const plateSideEl = document.getElementById('trowel-plate-side');
-    if (plateSideEl) {
-        plateSideEl.setAttribute('points',
-            `${sf0.x},${sf0.y} ${sf1.x},${sf1.y} ${sf2.x},${sf2.y} ${sf3.x},${sf3.y}`);
-    }
-    
-    // --- Shaft: 63mm diameter × 500mm tall cylinder, tilted by axis_4 ---
-    const shaftR = 31.5;
-    const shaftH = 500;
-    
-    // Shaft base at plate center top (wz + plateThick, no tilt offset at center)
-    const shaftBaseZ = wz + plateThick;
-    // Shaft top: displaced along local X by shaftH * sin(a4), Z by shaftH * cos(a4)
-    const shaftTopLocalDx = shaftH * sin_a4;
-    const shaftTopDz = shaftH * cos_a4;
-    // Rotate local X offset to world coords
-    const shaftTopWx = wx + shaftTopLocalDx * cos_t;
-    const shaftTopWy = wy + shaftTopLocalDx * sin_t;
-    const shaftTopZ = shaftBaseZ + shaftTopDz;
-    
-    // Cylinder silhouette: perpendicular to isometric view direction
-    const INV_SQRT2 = 0.7071;
-    const perpX = shaftR * INV_SQRT2;
-    const perpY = shaftR * INV_SQRT2;
-    
-    const sA_bot = worldToSvg3D(wx + perpX, wy - perpY, shaftBaseZ);
-    const sA_top = worldToSvg3D(shaftTopWx + perpX, shaftTopWy - perpY, shaftTopZ);
-    const sB_bot = worldToSvg3D(wx - perpX, wy + perpY, shaftBaseZ);
-    const sB_top = worldToSvg3D(shaftTopWx - perpX, shaftTopWy + perpY, shaftTopZ);
-    
-    const shaftEl = document.getElementById('trowel-shaft');
-    if (shaftEl) {
-        shaftEl.setAttribute('points',
-            `${sA_bot.x},${sA_bot.y} ${sA_top.x},${sA_top.y} ${sB_top.x},${sB_top.y} ${sB_bot.x},${sB_bot.y}`);
-    }
-    
-    // Shaft top ellipse cap
-    const capCenter = worldToSvg3D(shaftTopWx, shaftTopWy, shaftTopZ);
-    const capRx = shaftR * Math.SQRT2 * ISO_COS * scale;
-    const capRy = shaftR * Math.SQRT2 * ISO_SIN * scale;
-    
-    const capEl = document.getElementById('trowel-shaft-cap');
-    if (capEl) {
-        capEl.setAttribute('cx', capCenter.x);
-        capEl.setAttribute('cy', capCenter.y);
-        capEl.setAttribute('rx', capRx);
-        capEl.setAttribute('ry', capRy);
+    for (const f of visible) {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.classList.add('trowel-face');
+        poly.setAttribute('points', f.pts.map(p => `${p.x},${p.y}`).join(' '));
+        poly.setAttribute('fill', f.fill);
+        poly.setAttribute('stroke', f.stroke);
+        poly.setAttribute('stroke-width', '0.5');
+        group.appendChild(poly);
     }
 }
 
