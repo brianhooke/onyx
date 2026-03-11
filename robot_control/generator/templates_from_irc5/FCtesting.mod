@@ -53,50 +53,6 @@ MODULE FCtesting
         TPWrite "Z-torque: "\Num:=myForceVector.ztorque;
     ENDPROC
 
-    !Heli_Pickup;
-    !Stop;
-    !HeliDropOffFC;
-    PROC HeliDropOffFC()
-
-        FCCalib TestLoad;
-        MoveJ ptHeliLid,v500,fine,tHeli;
-        HeliBladeSpeed 0,"FWD";
-        !HeliBox_Open;
-        !Open lid
-        MoveJ Offs(ptHeli,100,0,800),v500,z5,tHeli;
-        MoveJ Offs(ptHeli,0,0,100),v500,z5,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        MoveJ Offs(ptHeli,0,0,80),v50,z5,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        MoveJ Offs(ptHeli,0,0,60),v50,z5,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        MoveJ Offs(ptHeli,0,0,40),v50,z5,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        MoveJ Offs(ptHeli,0,0,20),v50,z5,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        MoveJ Offs(ptHeli,0,0,10),v50,z5,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        MoveL ptHeli,v30,fine,tHeli;
-        WaitTime\inpos,1;
-        ReadForces;
-        Stop;
-        Heli_Stepper_Home;
-        TC_release;
-        MoveL Offs(pHeli,0,0,50),v50,z5,tTCMaster;
-        MoveJ pHTSHome,v1500,z50,tTCMaster;
-    ENDPROC
 
     PROC TcMasterFCTest()
         VAR fcboxvol my_supv_box:=[-10000,10000,-10000,10000,-10000,10000];
@@ -202,9 +158,9 @@ MODULE FCtesting
     ENDPROC
 
     PROC Polish()
-
+        UpdateToolNum;
         IF ToolNum<>6 THEN
-            Home;
+            Home TRUE;
             Polish_Pickup;
         ELSE
             CurrentJoints:=CJointT();
@@ -357,9 +313,9 @@ MODULE FCtesting
     ENDPROC
 
     PROC HeliFC(num HeliStartX,num HeliStartY,num HeliEndX,speeddata HeliTrvSpd,num HeliBldSpeed,num HeliAngle,num HeliForce,loaddata HeliLD)
-
+        UpdateToolNum;
         IF ToolNum<>2 THEN
-            Home;
+            Home TRUE;
             Heli_Pickup;
         ENDIF
 
@@ -407,8 +363,9 @@ MODULE FCtesting
     PROC HeliFCDummy(num HeliStartX,num HeliStartY,num HeliEndX,speeddata HeliTrvSpd)
         VAR num DummyZ:=200;
         !Vertical height offset
+        UpdateToolNum;
         IF ToolNum<>2 THEN
-            Home;
+            Home TRUE;
             Heli_Pickup;
         ENDIF
 

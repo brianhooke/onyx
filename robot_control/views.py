@@ -395,7 +395,7 @@ def api_generate_toolpath(request):
             if key in data and data[key] is not None:
                 if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern'):
                     params[key] = str(data[key])
-                elif key == 'serpentine_start_bottom':
+                elif key in ('serpentine_start_bottom', 'polisher_dual_hatch'):
                     params[key] = bool(int(data[key])) if data[key] != '' else False
                 else:
                     params[key] = int(data[key])

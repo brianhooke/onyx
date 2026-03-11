@@ -63,6 +63,7 @@ class ToolpathGenerator:
         'vacuum_workzone',
         'vacuum_force',
         'vacuum_force_enabled',
+        'vacuum_axis_5',
         'polisher_step',
         'vacuum_step',
         'pan_step',
@@ -93,6 +94,7 @@ class ToolpathGenerator:
         'polisher_pos_supv_dist',
         'polisher_pattern',
         'polisher_speed',
+        'polisher_dual_hatch',
         'screed_z_offset',
         'vib_screed_speed',
         'screed_angle_offset',
@@ -184,7 +186,7 @@ class ToolpathGenerator:
         py2vacuum_proc = TOOLS['vacuum'].generate_procedure(self.params)
         py2pan_proc = TOOLS['pan'].generate_procedure(self.params)
         py2vib_screed_proc = TOOLS['vib_screed'].generate_procedure(self.params)
-        py2trowel_proc = TOOLS['trowel'].generate_procedure(self.params)
+        # py2trowel_proc = TOOLS['trowel'].generate_procedure(self.params)  # Commented out
         seq_bed_clean_proc = generate_seq_bed_clean(self.params)
         
         # Generate the main Py2 menu procedure
@@ -198,7 +200,7 @@ class ToolpathGenerator:
         TPReadNum iTask,"1:Home,2:Py2_{self.timestamp}";
         TEST iTask
         CASE 1:
-            Home;
+            Home TRUE;
         CASE 2:
             Py2Main;
         DEFAULT:
@@ -234,8 +236,6 @@ class ToolpathGenerator:
 
 {py2vib_screed_proc}
 
-{py2trowel_proc}
-
 {seq_bed_clean_proc}
     
     ! ========== END PY2 GENERATED PROCEDURES ==========
@@ -263,7 +263,7 @@ class ToolpathGenerator:
         TPWrite "=== Py2 Tools ({self.timestamp}) ===";
         TPWrite "Panel X: " \\Num:={self.params['panel_x']};
         TPWrite "Panel Y: " \\Num:={self.params['panel_y']};
-        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:Trowel,7:BedClean";
+        TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
         
         TEST iChoice
         CASE 1:
@@ -277,8 +277,6 @@ class ToolpathGenerator:
         CASE 5:
             Py2VS;
         CASE 6:
-            Py2Trowel;
-        CASE 7:
             SeqBedClean;
         DEFAULT:
             TPWrite "Invalid choice";

@@ -57,6 +57,7 @@ class ToolConfig:
     dropoff_pos: ToolPosition    # Where to drop off
     power_do: Optional[str] = None       # Digital output for power (e.g., "Local_IO_0_DO5")
     error_disconnect: Optional[str] = None  # Error to raise if disconnected
+    param_prefix: str = ""       # DB parameter prefix (e.g., "vacuum" for vacuum_speed)
     min_safe_z: int = 300        # Minimum Z height before movements
     home_pos: str = "pHome"      # Home position name
 
@@ -75,6 +76,8 @@ class Tool(ABC):
     
     def __init__(self, config: ToolConfig):
         self.config = config
+        # Use param_prefix if set, otherwise fall back to name.lower()
+        self._prefix = config.param_prefix or config.name.lower()
     
     @property
     def name(self) -> str:
@@ -287,7 +290,7 @@ class Tool(ABC):
     
     def _get_workzone_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate workzone boundaries. Override for tool-specific offsets."""
-        workzone_type = params.get(f'{self.name.lower()}_workzone', 'panel')
+        workzone_type = params.get(f'{self._prefix}_workzone', 'panel')
         
         if workzone_type == 'panel':
             datum_x = params['panel_datum_x']
@@ -309,9 +312,9 @@ class Tool(ABC):
         effective_width_y = effective_max_y - datum_y
         
         # Get tool-specific offsets
-        z_offset = params.get('z_offset', 0) + params.get(f'{self.name.lower()}_z_offset', 0)
+        z_offset = params.get('z_offset', 0) + params.get(f'{self._prefix}_z_offset', 0)
         tool_width = self._get_tool_width()
-        step_size = params.get(f'{self.name.lower()}_step', 200)
+        step_size = params.get(f'{self._prefix}_step', 200)
         
         return {
             'type': workzone_type,
@@ -348,7 +351,7 @@ class Tool(ABC):
     
     def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
         """Generate VAR declarations."""
-        travel_speed = params.get(f'{self.name.lower()}_speed', 100)
+        travel_speed = params.get(f'{self._prefix}_speed', 100)
         return [
             f"        VAR robtarget pCurrent;",
             f"        VAR jointtarget CurrentJoints;",
@@ -357,7 +360,7 @@ class Tool(ABC):
             f"        VAR num SafeZ:={workzone['safe_z']};",
             f"        VAR num CurrentX:=0;",
             f"        VAR num CurrentY:=0;",
-            f"        VAR speeddata vTravel:=[{travel_speed},15,2000,15];",
+            f"        VAR speeddata vTravel:=[{travel_speed},500,5000,1000];",
             f"        VAR num TrackMin:={track_min};",
             f"        VAR num TrackMax:={track_max};",
             f"        VAR num CalcTrack:=0;",
@@ -379,15 +382,18 @@ class Tool(ABC):
         """Generate tool pickup logic."""
         return [
             f"        ! Get tool if needed",
+            f"        UpdateToolNum;",
             f"        IF ToolNum<>{self.config.tool_num} THEN",
             f"            TPWrite \"Py2{self.config.name}: Getting tool...\";",
-            f"            Home;",
+            f"            Home TRUE;",
             f"            {self.config.name}_Pickup;",
+            f"        ELSE",
+            f"            CurrentJoints:=CJointT();",
+            f"            CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=wobj0);",
+            f"            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN",
+            f"                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,{self.config.tooldata};",
+            f"            ENDIF",
             f"        ENDIF",
-            f"",
-            f"        ! Disable configuration tracking",
-            "        ConfL\\Off;",
-            "        ConfJ\\Off;",
             f"",
         ]
     
@@ -416,11 +422,20 @@ class Tool(ABC):
         # Track current axis 6 position for rotation moves
         current_axis_6 = None
         
+        # Track previous move type for descent insertion
+        prev_move_type = None
+        
         # Get axis_5 tilt angle (for vacuum tool - pipe angle)
         axis_5_angle = params.get('vacuum_axis_5', 0) if self.config.name == 'Vac' else 0
         
         # Generate moves for each point
         for i, point in enumerate(points):
+            # After rapid positioning, descend to work height before first work move
+            if prev_move_type == "rapid" and point.move_type not in ("rapid", "lift"):
+                lines.append(f"        ! Descend to work height")
+                lines.append(f"        pCurrent.trans.z:=WorkZ;")
+                lines.append(f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+                lines.append(f"")
             axis_6_str = f", axis_6={point.axis_6:.0f}" if point.axis_6 is not None else ""
             lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]{axis_6_str}")
             lines.append(f"        CurrentX:={point.x:.0f};")
@@ -434,17 +449,23 @@ class Tool(ABC):
             
             # Use point's axis_5 if specified, otherwise use tool param
             point_axis_5 = point.axis_5 if point.axis_5 is not None else axis_5_angle
-            lines.append(f"        pCurrent.rot:=OrientZYX(0,{point_axis_5},180);")
-            lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
+            # Axis 6 rotation encoded as Z-angle in OrientZYX
+            point_axis_6 = point.axis_6 if point.axis_6 is not None else (current_axis_6 or 0)
+            lines.append(f"        pCurrent.rot:=OrientZYX({point_axis_6},{point_axis_5},180);")
+            # Joint 6 = orient_z - 180, normalized to [-180, 180]. cf6 = floor(joint/90).
+            _joint = point_axis_6 - 180.0
+            while _joint < -180.0: _joint += 360.0
+            while _joint > 180.0: _joint -= 360.0
+            cf6 = int(_joint // 90)
+            lines.append(f"        pCurrent.robconf:=[1,0,{cf6},0];")
             lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
+            lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
             lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
             lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
             lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
             
-            # Handle axis 6 rotation if specified
-            if point.axis_6 is not None and point.axis_6 != current_axis_6:
-                lines.append(f"        ! Rotate axis 6 to {point.axis_6:.0f} degrees")
-                lines.append(f"        MoveAbsJ [[0,0,0,0,0,{point.axis_6:.0f}],pCurrent.extax]\\NoEOffs,v100,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+            # Track axis 6 changes
+            if point.axis_6 is not None:
                 current_axis_6 = point.axis_6
             
             if point.move_type == "rapid":
@@ -452,6 +473,7 @@ class Tool(ABC):
             else:
                 lines.append(f"        {move_cmd}")
             lines.append(f"")
+            prev_move_type = point.move_type
         
         # Add force control end if needed
         if use_fc:
@@ -466,7 +488,7 @@ class Tool(ABC):
     def _get_move_command(self, use_fc: bool, params: Dict) -> str:
         """Get the move command string."""
         if use_fc:
-            force = params.get(f'{self.name.lower()}_force', 100)
+            force = params.get(f'{self._prefix}_force', 100)
             return f"FCPressL pCurrent,vTravel,{force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;"
         return f"MoveL pCurrent,vTravel,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;"
     
@@ -488,14 +510,10 @@ class Tool(ABC):
             f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
             f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
             f"",
-            f"        ! Re-enable configuration tracking",
-            "        ConfL\\On;",
-            "        ConfJ\\On;",
-            f"",
             f"        ! Return tool and go home",
             f"        TPWrite \"Py2{self.config.name}: Dropping off tool...\";",
             f"        {self.config.name}_Dropoff;",
-            f"        Home;",
+            f"        Home FALSE;",
             f"",
             f"        TPWrite \"========================================\";",
             f"        TPWrite \"Py2{self.config.name}: COMPLETE\";",
@@ -548,11 +566,7 @@ class Helicopter(Tool):
         return ["            HeliBladeSpeed 0,\"FWD\";"]
     
     def _post_grip_actions(self) -> List[str]:
-        return [
-            "            IF TestDI(Local_IO_0_DI2)=FALSE OR StepperPos<>0 THEN",
-            "                Heli_Stepper_Home;",
-            "            ENDIF",
-        ]
+        return []
     
     def _pickup_departure_moves(self) -> List[str]:
         return [
@@ -566,7 +580,6 @@ class Helicopter(Tool):
         return [
             "            HeliBladeSpeed 0,\"FWD\";",
             "            HeliBlade_Angle 0;",
-            "            Heli_Stepper_Home;",
         ]
     
     def _get_pattern_points(self, params: Dict[str, Any]) -> List[Point]:
@@ -609,13 +622,22 @@ class Helicopter(Tool):
     def _generate_pickup_section(self) -> List[str]:
         """Add blade setup after pickup."""
         lines = super()._generate_pickup_section()
-        lines.extend([
-            f"        ! Home stepper and set blade angle",
-            f"        TPWrite \"Py2Heli: Homing stepper...\";",
-            f"        Heli_Stepper_Home;",
-            f"        ! Blade angle set via params",
+        return lines
+    
+    def _generate_pattern_execution(self, points: List[Point], params: Dict, workzone: Dict) -> List[str]:
+        """Override to pitch blades and start spinning before pattern (regardless of force control)."""
+        blade_angle = params.get('heli_blade_angle', 0)
+        lines = [
+            f"        ! Set blade pitch angle",
+            f"        HeliBlade_Angle {blade_angle};",
             f"",
-        ])
+            f"        ! Start blade rotation",
+            f"        HeliBladeSpeed {params.get('heli_blade_speed', 70)},\"{params.get('heli_blade_direction', 'FWD')}\";",
+            f"        WaitTime 2;",
+            f"",
+        ]
+        # Call parent implementation for pattern execution
+        lines.extend(super()._generate_pattern_execution(points, params, workzone))
         return lines
     
     def _generate_fc_start(self, params: Dict, workzone: Dict) -> List[str]:
@@ -627,10 +649,6 @@ class Helicopter(Tool):
             f"        TPWrite \"Py2Heli: Calibrating force control...\";",
             f"        FCCalib HeliLoad70rpm;",
             f"        WaitTime 0.5;",
-            f"",
-            f"        ! Start blade rotation",
-            f"        HeliBladeSpeed {params.get('heli_blade_speed', 70)},\"{params.get('heli_blade_direction', 'FWD')}\";",
-            f"        WaitTime 2;",
             f"",
             f"        ! Start force control",
             f"        FCPress1LStart pCurrent,v10,\\Fz:={force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tHeli\\WObj:=Bed1Wyong;",
@@ -674,6 +692,7 @@ class VibratingScreened(Tool):
             tool_num=3,
             name="VS",
             tooldata="tVS",
+            param_prefix="screed",
             pickup_pos=ToolPosition("pVS2", approach_offset=(0, 0, 50)),
             dropoff_pos=ToolPosition("ptVS2", approach_offset=(0, 0, 100), depart_offset=(-300, 0, 700)),
             power_do="Local_IO_0_DO5",
@@ -687,8 +706,15 @@ class VibratingScreened(Tool):
         return params.get('vs_force_monitor', False)  # Default disabled
     
     def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
-        """Add force monitoring variables for VS."""
+        """Add force monitoring variables for VS. Override speed param (vib_screed_speed)."""
+        # Override travel speed - DB uses 'vib_screed_speed' not 'screed_speed'
+        travel_speed = params.get('vib_screed_speed', 100)
         lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
+        # Replace the speed line with the correct value
+        for i, line in enumerate(lines):
+            if 'vTravel' in line:
+                lines[i] = f"        VAR speeddata vTravel:=[{travel_speed},15,2000,15];"
+                break
         
         if self._uses_force_monitoring(params):
             force_limit = params.get('vs_force_limit', 300)
@@ -720,6 +746,11 @@ class VibratingScreened(Tool):
         panel_y_center = (workzone['min_y'] + workzone['max_y']) / 2
         bed_y_center = params.get('bed_datum_y', 0) + params.get('bed_width_y', 3000) / 2
         y_center = max(panel_y_center, bed_y_center)
+        
+        # Apply hard_y_offset limit if set
+        hard_y_offset = params.get('hard_y_offset', 0)
+        if hard_y_offset > 0:
+            y_center = min(y_center, hard_y_offset)
         
         return single_pass(
             start_x=workzone['datum_x'] - edge_offset,
@@ -770,6 +801,7 @@ class VibratingScreened(Tool):
             # Use pVSHome3 robconf [1,0,1,0] to match VS_Pickup end position
             lines.append(f"        pCurrent.robconf:=[1,0,1,0];")
             lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
+            lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
             lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
             lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
             lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
@@ -879,12 +911,22 @@ class Vacuum(Tool):
             tool_num=5,
             name="Vac",
             tooldata="tVac",
+            param_prefix="vacuum",
             pickup_pos=ToolPosition("pVac", approach_offset=(0, 0, -100)),  # RelTool approach
             dropoff_pos=ToolPosition("ptVac", approach_offset=(0, 10, 100), depart_offset=(0, 80, 800)),
             power_do="Local_IO_0_DO16",
             min_safe_z=800,
         )
         super().__init__(config)
+    
+    def _get_workzone_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Vacuum always uses bed Z height (0), even when panel workzone is selected for XY."""
+        workzone = super()._get_workzone_params(params)
+        # Override Z to always be relative to bed surface, not panel height
+        z_offset = params.get('z_offset', 0) + params.get('vacuum_z_offset', 0)
+        workzone['work_z'] = z_offset
+        workzone['safe_z'] = z_offset + 200
+        return workzone
     
     def _get_tool_width(self) -> float:
         return 400  # Vacuum nozzle width
@@ -948,6 +990,7 @@ class Polisher(Tool):
             tool_num=6,
             name="Polish",
             tooldata="tPolish",
+            param_prefix="polisher",
             pickup_pos=ToolPosition("pPolish", approach_offset=(0, 0, -100)),  # RelTool
             dropoff_pos=ToolPosition("ptPolish", approach_offset=(0, 0, 100), depart_offset=(0, 0, 500)),
             power_do="Local_IO_0_DO15",
@@ -955,6 +998,14 @@ class Polisher(Tool):
             min_safe_z=700,
         )
         super().__init__(config)
+    
+    def _get_workzone_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Polisher always uses bed Z height (0), even when panel workzone is selected for XY."""
+        workzone = super()._get_workzone_params(params)
+        z_offset = params.get('z_offset', 0) + params.get('polisher_z_offset', 0)
+        workzone['work_z'] = z_offset
+        workzone['safe_z'] = z_offset + 200
+        return workzone
     
     def _get_tool_width(self) -> float:
         return 200  # Polisher contact width
@@ -972,6 +1023,7 @@ class Polisher(Tool):
         lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
         if self._uses_force_control(params):
             lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
+            lines.insert(-1, f"        VAR fcboxvol fc_supv_box:=[-10000,10000,-10000,10000,-10000,10000];")
         return lines
     
     def _generate_fc_start(self, params: Dict, workzone: Dict) -> List[str]:
@@ -1007,6 +1059,197 @@ class Polisher(Tool):
     
     def _generate_motor_off(self) -> List[str]:
         return [f"        Pol_off;"]
+    
+    def _generate_pattern_execution(self, points: List[Point], params: Dict, workzone: Dict) -> List[str]:
+        """Override: Polisher needs special FC startup sequence.
+        
+        Sequence per the working FCtesting.mod Polish() procedure:
+        1. MoveJ to first point at SafeZ (rapid)
+        2. MoveL down to 250mm above WorkZ
+        3. Motor on (Pol_on)
+        4. MoveL down to 80mm above WorkZ (fine)
+        5. WaitTime inpos
+        6. FCCalib
+        7. FCPress1LStart targeting ~50mm above WorkZ (FC presses down from here)
+        8. FCPressL for remaining work points
+        9. FCPressEnd to retract
+        """
+        use_fc = self._uses_force_control(params)
+        
+        lines = [
+            f"        ! ========================================",
+            f"        ! Polisher Pattern Execution: {len(points)} points",
+            f"        ! Force Control: {'ENABLED' if use_fc else 'DISABLED'}",
+            f"        ! ========================================",
+            f"",
+        ]
+        
+        # Separate first rapid point from work points
+        rapid_points = []
+        work_points = []
+        for point in points:
+            if point.move_type == "rapid" and not work_points:
+                rapid_points.append(point)
+            else:
+                work_points.append(point)
+        
+        # 1. Move to first position at SafeZ
+        for point in rapid_points:
+            lines.append(f"        ! Rapid: ({point.x:.0f}, {point.y:.0f})")
+            lines.append(f"        CurrentX:={point.x:.0f};")
+            lines.append(f"        CurrentY:={point.y:.0f};")
+            lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+            lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
+            lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
+            lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
+            lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
+            lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
+            lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+            lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
+            lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+            lines.append(f"")
+        
+        if use_fc:
+            start_force = params.get('polisher_start_force', 140)
+            force_change = params.get('polisher_force_change', 75)
+            pos_supv_dist = params.get('polisher_pos_supv_dist', 100)
+            approach_speed = params.get('polisher_approach_speed', 20)
+            motion_force = params.get('polisher_motion_force', 130)
+            travel_speed = params.get('polisher_speed', 100)
+            
+            # 2. Lower to 250mm above WorkZ
+            lines.extend([
+                f"        ! Lower to 250mm above work surface",
+                f"        pCurrent.trans.z:=WorkZ+250;",
+                f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"        WaitTime\\inpos,0.1;",
+                f"",
+                f"        ! Force control calibration (must be done with motor OFF)",
+                f"        FCCalib PolishLoad;",
+                f"",
+                f"        ! Turn on polisher motor",
+                f"        Pol_on;",
+                f"",
+                f"        ! Lower to 80mm above work surface",
+                f"        pCurrent.trans.z:=WorkZ+80;",
+                f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"        WaitTime\\inpos,0.1;",
+                f"",
+                f"        ! Start force control - pressing from ~50mm above work surface",
+                f"        pCurrent.trans.z:=WorkZ+50;",
+                f"        FCPress1LStart pCurrent,v{approach_speed},\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"        bFCActive:=TRUE;",
+                f"",
+            ])
+            
+            # 3. Work points using FCPressL
+            for i, point in enumerate(work_points):
+                lines.append(f"        ! Work point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
+                lines.append(f"        CurrentX:={point.x:.0f};")
+                lines.append(f"        CurrentY:={point.y:.0f};")
+                
+                if point.move_type in ("rapid", "lift"):
+                    # End FC, retract, reposition, restart FC
+                    retract_speed = params.get('polisher_retract_speed', 50)
+                    lines.extend([
+                        f"        ! Retract - end force control for reposition",
+                        f"        CurrentJoints:=CJointT();",
+                        f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
+                        f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\DeactOnly,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                        f"        bFCActive:=FALSE;",
+                        f"",
+                        f"        ! Reposition at SafeZ",
+                        f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];",
+                        f"        pCurrent.robconf:=[0,0,0,0];",
+                        f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;",
+                        f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF",
+                        f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF",
+                        f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF",
+                        f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];",
+                        f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                        f"",
+                        f"        ! Calibrate FC (motor must be off)",
+                        f"        Pol_off;",
+                        f"        WaitTime\\inpos,0.1;",
+                        f"        FCCalib PolishLoad;",
+                        f"",
+                        f"        ! Motor on, lower and restart FC",
+                        f"        Pol_on;",
+                        f"        pCurrent.trans.z:=WorkZ+80;",
+                        f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                        f"        WaitTime\\inpos,0.1;",
+                        f"        pCurrent.trans.z:=WorkZ+50;",
+                        f"        FCPress1LStart pCurrent,v{approach_speed},\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                        f"        bFCActive:=TRUE;",
+                        f"",
+                    ])
+                else:
+                    # Work move with FCPressL
+                    lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+                    lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
+                    lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
+                    lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
+                    lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
+                    lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+                    lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
+                    lines.append(f"        FCPressL pCurrent,v{travel_speed},{motion_force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+                    lines.append(f"")
+            
+            # 4. End force control
+            retract_speed = params.get('polisher_retract_speed', 50)
+            lines.extend([
+                f"",
+                f"        ! End force control",
+                f"        CurrentJoints:=CJointT();",
+                f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
+                f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\DeactOnly,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"        bFCActive:=FALSE;",
+                f"",
+            ])
+        else:
+            # No force control - use standard base class approach
+            move_cmd = f"MoveL pCurrent,vTravel,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;"
+            
+            # Lower to 250mm, motor on, lower to work height, then start pattern
+            lines.extend([
+                f"        ! Lower to 250mm above work surface",
+                f"        pCurrent.trans.z:=WorkZ+250;",
+                f"        MoveL pCurrent,v100,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"",
+                f"        ! Turn on polisher motor",
+                f"        Pol_on;",
+                f"",
+                f"        ! Lower to work height at start position",
+                f"        pCurrent.trans.z:=WorkZ;",
+                f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"",
+            ])
+            
+            for i, point in enumerate(work_points):
+                lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
+                lines.append(f"        CurrentX:={point.x:.0f};")
+                lines.append(f"        CurrentY:={point.y:.0f};")
+                
+                if point.move_type in ("rapid", "lift"):
+                    lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+                else:
+                    lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+                
+                lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
+                lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
+                lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
+                lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
+                lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
+                lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+                lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
+                
+                if point.move_type == "rapid":
+                    lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+                else:
+                    lines.append(f"        {move_cmd}")
+                lines.append(f"")
+        
+        return lines
     
     def _generate_error_cleanup(self) -> List[str]:
         return [
@@ -1063,20 +1306,21 @@ class Pan(Tool):
         """Pan uses Heli_Pickup since it attaches to helicopter."""
         return [
             f"        ! Get helicopter tool (Pan attaches to it)",
+            f"        UpdateToolNum;",
             f"        IF ToolNum<>2 THEN",
             f"            TPWrite \"Py2Pan: Getting helicopter...\";",
-            f"            Home;",
+            f"            Home TRUE;",
             f"            Heli_Pickup;",
+            f"        ELSE",
+            f"            CurrentJoints:=CJointT();",
+            f"            CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=wobj0);",
+            f"            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN",
+            f"                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tHeli;",
+            f"            ENDIF",
             f"        ENDIF",
             f"",
-            f"        ! Home stepper (blade angle = 0 for pan)",
-            f"        TPWrite \"Py2Pan: Homing stepper...\";",
-            f"        Heli_Stepper_Home;",
+            f"        ! Set blade angle = 0 for pan",
             f"        HeliBlade_Angle 0;",
-            f"",
-            f"        ! Disable configuration tracking",
-            "        ConfL\\Off;",
-            "        ConfJ\\Off;",
             f"",
         ]
     
@@ -1129,14 +1373,10 @@ class Pan(Tool):
             f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);",
             f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,tHeli\\WObj:=Bed1Wyong;",
             f"",
-            f"        ! Re-enable configuration tracking",
-            "        ConfL\\On;",
-            "        ConfJ\\On;",
-            f"",
             f"        ! Return tool and go home",
             f"        TPWrite \"Py2Pan: Dropping off helicopter...\";",
             f"        Heli_Dropoff;",
-            f"        Home;",
+            f"        Home FALSE;",
             f"",
             f"        TPWrite \"========================================\";",
             f"        TPWrite \"Py2Pan: COMPLETE\";",
@@ -1252,7 +1492,7 @@ TOOLS = {
     'vacuum': Vacuum(),
     'polisher': Polisher(),
     'pan': Pan(),
-    'trowel': Trowel(),
+    # 'trowel': Trowel(),  # Commented out - not in use
 }
 
 # Also index by tool number for backward compatibility

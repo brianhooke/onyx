@@ -199,7 +199,7 @@ MODULE ToolPaths
     VAR num VSAngleOffset:=0;
     VAR num DummyRun:=0;
     VAR num DummyZOffs:=300;
-
+    PERS bool RequestAccessTag:=FALSE;
 
 
     PROC DemoScreen()
@@ -211,7 +211,7 @@ MODULE ToolPaths
             TPReadNum iTaskno,"1Plt,2Scr,3Pol,4Vac,5Hel,6Pan,7Dat,8PH,9PV,10PP,11PN";
             TEST iTaskno
             CASE 1:
-                Home;
+                Home TRUE;
             CASE 2:
                 RobbiePlot;
             CASE 3:
@@ -239,9 +239,9 @@ MODULE ToolPaths
         TPReadNum iTaskno,"1Plt,2Scr,3Pol,4Vac,5Hel,6Pan,7Dat,8PH,9PV,10PP,11PN";
         TEST iTaskno
         CASE 1:
-            Home;
+            Home TRUE;
         CASE 2:
-            Home;
+            Home TRUE;
             MoveJ pHomeLoadout,v500,z50,tTCMaster;
         CASE 3:
             TPErase;
@@ -480,9 +480,9 @@ MODULE ToolPaths
 
         pHeliStart.trans:=[HeliStartX,HeliStartY,(FormHeight+HeliZoffset)];
         pHeliEnd.trans:=[HeliEndX,HeliEndY,(FormHeight+HeliZoffset)];
-
+        UpdateToolNum;
         IF ToolNum<>2 THEN
-            Home;
+            Home TRUE;
             Heli_Pickup;
         ENDIF
 
@@ -626,9 +626,9 @@ MODULE ToolPaths
 
         pHeliStart.trans:=[-1*HeliStartX,HeliStartY,(FormHeight+14+HeliZoffset)];
         pHeliEnd.trans:=[-1*HeliEndX,HeliEndY,(FormHeight+14+HeliZoffset)];
-
+        UpdateToolNum;
         IF ToolNum<>2 THEN
-            Home;
+            Home TRUE;
             Heli_Pickup;
         ELSE
             pTemp:=ptHeli;
@@ -778,9 +778,9 @@ MODULE ToolPaths
 
         pHeliStart.trans:=[-1*HeliStartX,HeliStartY,(FormHeight+30+HeliZoffset)];
         pHeliEnd.trans:=[-1*HeliEndX,HeliEndY,(FormHeight+30+HeliZoffset)];
-
+        UpdateToolNum;
         IF ToolNum<>2 THEN
-            Home;
+            Home TRUE;
             Heli_Pickup;
         ENDIF
 
@@ -924,8 +924,9 @@ MODULE ToolPaths
         VAR num EndOffset;
         CurrentJoints:=CJointT();
         CurrentPos:=CalcRobT(CurrentJoints,tVS\WObj:=Bed1Wyong);
+        UpdateToolNum;
         IF ToolNum<>3 THEN
-            Home;
+            Home TRUE;
             VS_Pickup;
         ELSEIF (CurrentPos.trans.z<800) THEN
             MoveL Offs(CurrentPos,0,0,(800-CurrentPos.trans.z)),v200,z5,tVS\WObj:=Bed1Wyong;
@@ -1008,9 +1009,9 @@ MODULE ToolPaths
 
     PROC PlotRect(num Xcord1,num Ycord1,num Xcord2,num Ycord2,num Xcord3,num Ycord3,num Xcord4,num Ycord4)
 
-
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ELSE
             !Check position and move to safe position if needed
@@ -1020,7 +1021,7 @@ MODULE ToolPaths
             IF (CurrentPos.trans.z<(Bed1Wyong.uframe.trans.z-30)) OR (((CurrentPos.trans.x+CurrentPos.extax.eax_a)>Bed1Wyong.uframe.trans.x) AND CurrentPos.trans.z<300) THEN
                 !Robot in TS
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                ExitCycle;
             ENDIF
         ENDIF
 
@@ -1171,9 +1172,9 @@ MODULE ToolPaths
     ENDPROC
 
     PROC PlotLineNoLift(num Xcord1,num Ycord1,num Xcord2,num Ycord2)
-
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ELSE
 
@@ -1271,8 +1272,9 @@ MODULE ToolPaths
     PROC PlotLineStartLift(num Xcord1,num Ycord1,num Xcord2,num Ycord2)
 
         WaitTime\inpos,0.1;
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ENDIF
 
@@ -1370,8 +1372,9 @@ MODULE ToolPaths
     PROC PlotLine(num Xcord1,num Ycord1,num Xcord2,num Ycord2)
 
         WaitTime\inpos,0.1;
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ELSE
             !Check position and move to safe position if needed
@@ -1381,7 +1384,7 @@ MODULE ToolPaths
             IF (CurrentPos.trans.z<(Bed1Wyong.uframe.trans.z-30)) OR (((CurrentPos.trans.x+CurrentPos.extax.eax_a)>Bed1Wyong.uframe.trans.x) AND CurrentPos.trans.z<300) THEN
                 !Robot in TS
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                ExitCycle;
             ENDIF
         ENDIF
 
@@ -1485,8 +1488,9 @@ MODULE ToolPaths
     PROC PlotLineEndLift(num Xcord1,num Ycord1,num Xcord2,num Ycord2)
 
         WaitTime\inpos,0.1;
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
 
         ENDIF
@@ -1584,8 +1588,9 @@ MODULE ToolPaths
     ENDPROC
 
     PROC PlotArc(num StartXcord,num StartYcord,num MidXcord,num MidYcord,num EndXcord,num EndYcord)
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ELSE
             !Check position and move to safe position if needed
@@ -1596,7 +1601,7 @@ MODULE ToolPaths
             IF (CurrentPos.trans.z<(Bed1Wyong.uframe.trans.z-30)) OR (((CurrentPos.trans.x+CurrentPos.extax.eax_a)>Bed1Wyong.uframe.trans.x) AND CurrentPos.trans.z<300) THEN
                 !Robot in TS
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                ExitCycle;
             ENDIF
         ENDIF
 
@@ -1703,8 +1708,9 @@ MODULE ToolPaths
 
 
     PROC PlotCirc(num Xcord,num Ycord,num Rad)
+        UpdateToolNum;
         IF ToolNum<>4 THEN
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ELSE
             !Check position and move to safe position if needed
@@ -1715,7 +1721,7 @@ MODULE ToolPaths
             IF (CurrentPos.trans.z<(Bed1Wyong.uframe.trans.z-30)) OR (((CurrentPos.trans.x+CurrentPos.extax.eax_a)>Bed1Wyong.uframe.trans.x) AND CurrentPos.trans.z<300) THEN
                 !Robot in TS
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                ExitCycle;
             ENDIF
         ENDIF
 
@@ -1901,7 +1907,7 @@ MODULE ToolPaths
 
     PROC PackAway()
         !VAR jointtarget jtTarget;
-        Home;
+        Home TRUE;
         !jtTarget := [[138.31,-55.47,60.29,-0.02,84.30,-2.02], [9416.99,9E+09,9E+09,9E+09,9E+09,9E+09]];
         !MoveAbsJ jtTarget, v500, fine, tTCMaster;
         MoveJ pHomeLoadout,v500,z50,tTCMaster;
@@ -1910,9 +1916,9 @@ MODULE ToolPaths
     ENDPROC
 
 
-    PROC Home()
+    PROC Home(bool dropoffTool)
         !Move robot to safe position, drop off any tools, close tool boxes
-
+        UpdateToolNum;
         TEST ToolNum
 
         CASE 1:
@@ -1922,10 +1928,16 @@ MODULE ToolPaths
             CurrentJoints:=CJointT();
             CurrentPos:=CalcRobT(CurrentJoints,tTCMaster\WObj:=wobj0);
 
-            IF (CurrentPos.trans.x)>8000 AND (CurrentPos.trans.z<265) THEN
+            IF CurrentPos.trans.x >= pPolish.trans.x-100 AND CurrentPos.trans.x <= pPolish.trans.x+100 AND CurrentPos.trans.z <= pPolish.trans.z+100 THEN
                 TPErase;
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                stop;
+                ExitCycle;
+            ELSEIF (CurrentPos.trans.x)>8000 AND (CurrentPos.trans.z<400) THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v500,z5,tTCMaster;
+            ENDIF
+            IF dropoffTool = FALSE THEN
+                MoveJ pHome,vMax,fine,tTCMaster;
             ENDIF
 
         CASE 2:
@@ -1933,16 +1945,28 @@ MODULE ToolPaths
             CurrentJoints:=CJointT();
             CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=wobj0);
 
-            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<125 THEN
-                TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tHeli;
             ENDIF
 
-            IF CurrentPos.trans.y>(Bed1.uframe.trans.y+3000) THEN
-                MoveL Offs(CurrentPos,0,(3000-CurrentPos.trans.y),50),v10,z5,tHeli\WObj:=wobj0;
-                MoveJ Offs(CurrentPos,0,(3000-CurrentPos.trans.y),300-CurrentPos.trans.z),v100,z5,tHeli\WObj:=wobj0;
+            IF CurrentPos.trans.y>(Bed1.uframe.trans.y+3000) AND (CurrentPos.trans.x)<8000  THEN
+                MoveL Offs(CurrentPos,0,(3000-CurrentPos.trans.y),50),v50,z5,tHeli\WObj:=wobj0;
+                MoveJ Offs(CurrentPos,0,(3000-CurrentPos.trans.y),400-CurrentPos.trans.z),v100,z5,tHeli\WObj:=wobj0;
             ENDIF
+            IF dropoffTool THEN
             Heli_Dropoff;
+            ELSE
+                WaiTtime\inpos,0.05;
+                CurrentJoints:=CJointT();
+                CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=wobj0);
+                IF (CurrentPos.trans.z<400) THEN
+                    MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v500,z5,tHeli;
+                ENDIF
+
+                Heli_Off;
+
+                MoveJ Offs(ptHeli,0,0,700),v500,z5,tHeli;
+            ENDIF
 
         CASE 3:
             !VS
@@ -1950,42 +1974,64 @@ MODULE ToolPaths
             CurrentJoints:=CJointT();
             CurrentPos:=CalcRobT(CurrentJoints,tVS\WObj:=wobj0);
 
-
             IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<265 THEN
-                TPErase;
-                TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
-            ELSEIF CurrentPos.trans.z<200 THEN
-                MoveL Offs(CurrentPos,0,0,(200-CurrentPos.trans.z)),v500,z5,tVS;
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v50,z5,tVS;
+            ELSEIF CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v500,z5,tVS;
 
             ENDIF
-
-
+            IF dropoffTool THEN
             VS_Dropoff;
+            ELSE
+                WaiTtime\inpos,0.05;
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tVS\WObj:=wobj0);
+            IF (CurrentPos.trans.z<400) THEN
+                MoveL Offs(CurrentPos,0,(2625-CurrentPos.trans.y),(400-CurrentPos.trans.z)),v500,z5,tVS;
+            ENDIF
 
+            MoveJ pVSHome3,v800,z5,tVS;
+            pTemp:=pVSHome3;
+            pTemp.trans.x:=pVSHome3.trans.x+1500;
+            pTemp.extax.eax_a:=pVSHome3.extax.eax_a+1000;
+            VS_Off;
+            MoveL Offs(ptVS3,-300,0,700),v800,z5,tVS;
+                
+            ENDIF
 
         CASE 4:
             !Plotter
 
             CurrentJoints:=CJointT();
-            CurrentPos:=CalcRobT(CurrentJoints,tPlotter\WObj:=wobj0);
+            CurrentPos:=CalcRobT(CurrentJoints,tPlotter\WObj:=wobj0); 
 
-            IF CurrentPos.trans.z<270 AND (CurrentPos.trans.x)<8000 THEN
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<265 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v50,z5,tPlotter;
+            ELSEIF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v500,z5,tPlotter;
+            ELSEIF CurrentPos.trans.z<270 AND (CurrentPos.trans.x)<8000 THEN
                 MoveL Offs(CurrentPos,0,0,(270-CurrentPos.trans.z)),v500,z5,tPlotter;
             ENDIF
 
-            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<265 THEN
-                TPErase;
-                TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+            IF CurrentPos.trans.y>(Bed1.uframe.trans.y+3300) and (CurrentPos.trans.x)<Bed1Wyong.uframe.trans.x THEN
+                MoveL Offs(CurrentPos,0,(3300-CurrentPos.trans.y),50),v200,z5,tPlotter\WObj:=wobj0;
+                MoveJ Offs(CurrentPos,0,(3300-CurrentPos.trans.y),1000-CurrentPos.trans.z),v200,z5,tPlotter\WObj:=wobj0;
             ENDIF
-
-            IF CurrentPos.trans.y>(Bed1.uframe.trans.y+3300) THEN
-                MoveL Offs(CurrentPos,0,(3300-CurrentPos.trans.y),50),v10,z5,tPlotter\WObj:=wobj0;
-                MoveJ Offs(CurrentPos,0,(3300-CurrentPos.trans.y),1000-CurrentPos.trans.z),v100,z5,tPlotter\WObj:=wobj0;
-            ENDIF
+            IF dropoffTool THEN
             Plotter_Dropoff;
+            ELSE
+                WaiTtime\inpos,0.05;
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tPlotter\WObj:=wobj0);
+            IF (CurrentPos.trans.z<700) OR (CurrentPos.trans.y<1600) THEN  
+                MoveL Offs(CurrentPos,0,1700-CurrentPos.trans.y,(700-CurrentPos.trans.z)),v500,z5,tPlotter;
+            ENDIF
 
+            MoveL Offs(Reltool(ptPlotter,0,0,0\Rz:=-90),-1500,1600,1000),v500,z5,tPlotter;
+            MoveJ Offs(ptPlotter,0,0,600),v500,z5,tPlotter;
+                
+            ENDIF
+            
         CASE 5:
             CurrentJoints:=CJointT();
             CurrentPos:=CalcRobT(CurrentJoints,tVac\WObj:=wobj0);
@@ -1993,7 +2039,7 @@ MODULE ToolPaths
             IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<265 THEN
                 TPErase;
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                ExitCycle;
             ENDIF
             IF CurrentPos.trans.z<200 AND (CurrentPos.trans.x)<8000 THEN
                 MoveL Offs(CurrentPos,0,0,(200-CurrentPos.trans.z)),v500,fine,tVac;
@@ -2004,8 +2050,19 @@ MODULE ToolPaths
                 MoveL Offs(CurrentPos,0,(3000-CurrentPos.trans.y),50),v200,z5,tVac\WObj:=wobj0;
                 MoveJ Offs(CurrentPos,0,(3000-CurrentPos.trans.y),700-CurrentPos.trans.z),v200,z5,tVac\WObj:=wobj0;
             ENDIF
+            IF dropoffTool THEN
             Vac_Dropoff;
+            ELSE
+                 WaiTtime\inpos,0.05;
+                CurrentJoints:=CJointT();
+                CurrentPos:=CalcRobT(CurrentJoints,tVac\WObj:=Bed1Wyong);
+                IF (CurrentPos.trans.z<800) THEN
+                    MoveL Offs(CurrentPos,0,0,(800-CurrentPos.trans.z)),v500,z5,tVac\WObj:=Bed1Wyong;
+                ENDIF
 
+                MoveJ Offs(ptVac,0,150,800),v500,z5,tVac;
+            ENDIF
+            
         CASE 6:
             CurrentJoints:=CJointT();
             CurrentPos:=CalcRobT(CurrentJoints,tPolish\WObj:=wobj0);
@@ -2014,18 +2071,37 @@ MODULE ToolPaths
             IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<265 THEN
                 TPErase;
                 TPWrite("Jog robot out of tool station AND HOME");
-                Stop;
+                ExitCycle;
 
             ENDIF
+            IF dropoffTool THEN
             Polish_Dropoff;
+            ELSE
+                WaitTime \inpos, 0.05;
+                CurrentJoints:=CJointT();
+                CurrentPos:=CalcRobT(CurrentJoints,tPolish\WObj:=wobj0);
+                IF (CurrentPos.trans.z<700) THEN
+                    MoveL Offs(CurrentPos,0,0,(700-CurrentPos.trans.z)),v500,z5,tPolish;
+                ENDIF
+                pTemp:=ptPolishHome;
+                pTemp.extax.eax_a:=ptPolishHome.extax.eax_a-1700;
+                pTemp.trans.x:=ptPolishHome.trans.x-1700;
+                pTemp.trans.y:=ptPolishHome.trans.y-300;
+                MoveJ pTemp,v500,z5,tPolish;
+                
+                MoveJ ptPolishHome,v500,z5,tPolish;
+
+                MoveJ Offs(ptPolish,0,0,500),v500,z5,tPolish;
+            ENDIF
 
         DEFAULT:
             !Unknown
             RAISE ERR_TC_SELECTION;
 
         ENDTEST
-
-        MoveJ pHome,v500,fine,tTCMaster;
+        IF dropoffTool THEN
+        MoveJ pHome,vMax,fine,tTCMaster;
+        ENDIF
 
     ERROR
         RAISE ;
@@ -2156,8 +2232,9 @@ MODULE ToolPaths
     PROC VacuumBed()
 
         VAR num VacOverlap:=-400;
+        UpdateToolNum;
         IF ToolNum<>5 THEN
-            Home;
+            Home TRUE;
             Vac_Pickup;
         ELSE
             CurrentJoints:=CJointT();
@@ -2282,8 +2359,9 @@ MODULE ToolPaths
     ENDPROC
 
     PROC PolishDemo()
+        UpdateToolNum;
         IF ToolNum<>6 THEN
-            Home;
+            Home TRUE;
             Polish_Pickup;
         ELSE
             CurrentJoints:=CJointT();
@@ -2400,7 +2478,7 @@ MODULE ToolPaths
         Polish_Dropoff;
         TPWrite "Polisher tool dropped off";
         
-        Home;
+        Home TRUE;
         TPWrite "BH Test Task Complete";
         
     ERROR
@@ -2419,11 +2497,12 @@ MODULE ToolPaths
         VAR num SafeZ:=500;
         VAR num i;
         
+        UpdateToolNum;
         TPWrite "Datum: ToolNum=" \Num:=ToolNum;
         IF ToolNum<>4 THEN
             TPWrite "No plotter! Will pickup plotter.";
             Stop;
-            Home;
+            Home TRUE;
             Plotter_Pickup;
         ELSE
             CurrentJoints:=CJointT();
@@ -2474,26 +2553,48 @@ MODULE ToolPaths
         ConfJ\On;
         
         Plotter_Dropoff;
-        Home;
+        Home TRUE;
         
         TPWrite "Datum Complete";
     ERROR
         RAISE;
     ENDPROC
+    
+    PROC RequestAccessCheck()
+            
+        IF TestDI (PN_DI_08) AND (TestDI (PN_DI_09) = FALSE) THEN
+            Home TRUE;
+            SetDO PN_DO_08,1;
+        ENDIF
+            IF TestDI (PN_DI_09)  THEN
+                SetDO PN_DO_10,0;
+                Home FALSE;
+                SetDO PN_DO_09, 1;
+            ENDIF
+            
+
+
+    ENDPROC
+    PROC Automoving()
+
+        MoveJ pVSautoTest4, v500, z10, tTCmaster;
+        MoveJ pVSautoTest3, v500, z10, tTCmaster;
+
+    ENDPROC
 
     
     ! ========== PY2 GENERATED PROCEDURES ==========
-    ! Generated: 27-feb_16:09
+    ! Generated: 10-mar_08:05
     ! Do not edit manually - regenerate via web interface
     
 
     PROC MainMenu()
         VAR num iTask;
         TPErase;
-        TPReadNum iTask,"1:Home,2:Py2_27-feb_16:09";
+        TPReadNum iTask,"1:Home,2:Py2_10-mar_08:05";
         TEST iTask
         CASE 1:
-            Home;
+            Home TRUE;
         CASE 2:
             Py2Main;
         DEFAULT:
@@ -2506,14 +2607,14 @@ MODULE ToolPaths
 
     PROC Py2Main()
         ! Py2Main - Python-generated tools menu
-        ! Generated: 27-feb_16:09
+        ! Generated: 10-mar_08:05
         
         VAR num iChoice;
         
         TPErase;
-        TPWrite "=== Py2 Tools (27-feb_16:09) ===";
-        TPWrite "Panel X: " \Num:=5530;
-        TPWrite "Panel Y: " \Num:=2000;
+        TPWrite "=== Py2 Tools (10-mar_08:05) ===";
+        TPWrite "Panel X: " \Num:=6000;
+        TPWrite "Panel Y: " \Num:=3500;
         TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
         
         TEST iChoice
@@ -2538,18 +2639,18 @@ MODULE ToolPaths
     PROC Py2Heli()
         ! Py2Heli - Generated by Onyx Tool Class
         ! Workzone: panel
-        ! Area: (450,450) to (5380,1700)
-        ! Z = 650mm
+        ! Area: (530,300) to (5930,1550)
+        ! Z = 455mm
         ! Step: 200mm
 
         VAR robtarget pCurrent;
         VAR jointtarget CurrentJoints;
         VAR robtarget CurrentPos;
-        VAR num WorkZ:=650;
-        VAR num SafeZ:=850;
+        VAR num WorkZ:=455;
+        VAR num SafeZ:=655;
         VAR num CurrentX:=0;
         VAR num CurrentY:=0;
-        VAR speeddata vTravel:=[100,15,2000,15];
+        VAR speeddata vTravel:=[100,500,5000,1000];
         VAR num TrackMin:=-300;
         VAR num TrackMax:=10050;
         VAR num CalcTrack:=0;
@@ -2564,56 +2665,146 @@ MODULE ToolPaths
         TPWrite "WorkZ=" \Num:=WorkZ;
 
         ! Get tool if needed
+        UpdateToolNum;
         IF ToolNum<>2 THEN
             TPWrite "Py2Heli: Getting tool...";
-            Home;
+            Home TRUE;
             Heli_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=wobj0);
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tHeli;
+            ENDIF
         ENDIF
 
-        ! Disable configuration tracking
-        ConfL\Off;
-        ConfJ\Off;
+        ! Set blade pitch angle
+        HeliBlade_Angle 7;
 
-        ! Home stepper and set blade angle
-        TPWrite "Py2Heli: Homing stepper...";
-        Heli_Stepper_Home;
-        ! Blade angle set via params
+        ! Start blade rotation
+        HeliBladeSpeed 80,"REV";
+        WaitTime 2;
 
         ! ========================================
-        ! Pattern Execution: 3 points
+        ! Pattern Execution: 9 points
         ! ========================================
 
-        ! Point 1: (1000, 1150) [rapid]
-        CurrentX:=1000;
-        CurrentY:=1150;
+        ! Point 1: (780, 1300) [rapid]
+        CurrentX:=780;
+        CurrentY:=1300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveJ pCurrent,v500,z5,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 2: (4830, 1150) [work]
-        CurrentX:=4830;
-        CurrentY:=1150;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 2: (5680, 1300) [work]
+        CurrentX:=5680;
+        CurrentY:=1300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 3: (4830, 1000) [work]
-        CurrentX:=4830;
-        CurrentY:=1000;
+        ! Point 3: (5680, 550) [work]
+        CurrentX:=5680;
+        CurrentY:=550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 4: (780, 550) [work]
+        CurrentX:=780;
+        CurrentY:=550;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 5: (780, 1100) [work]
+        CurrentX:=780;
+        CurrentY:=1100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 6: (5480, 1100) [work]
+        CurrentX:=5480;
+        CurrentY:=1100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 7: (5480, 750) [work]
+        CurrentX:=5480;
+        CurrentY:=750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 8: (980, 750) [work]
+        CurrentX:=980;
+        CurrentY:=750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 9: (980, 900) [work]
+        CurrentX:=980;
+        CurrentY:=900;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
@@ -2628,14 +2819,10 @@ MODULE ToolPaths
         CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
         MoveL Offs(CurrentPos,0,0,200),v200,z5,tHeli\WObj:=Bed1Wyong;
 
-        ! Re-enable configuration tracking
-        ConfL\On;
-        ConfJ\On;
-
         ! Return tool and go home
         TPWrite "Py2Heli: Dropping off tool...";
         Heli_Dropoff;
-        Home;
+        Home FALSE;
 
         TPWrite "========================================";
         TPWrite "Py2Heli: COMPLETE";
@@ -2651,967 +2838,791 @@ MODULE ToolPaths
 
     PROC Py2Polish()
         ! Py2Polish - Generated by Onyx Tool Class
-        ! Workzone: panel
-        ! Area: (250,250) to (5580,1900)
-        ! Z = 650mm
-        ! Step: 200mm
+        ! Workzone: bed
+        ! Area: (100,100) to (8150,1750)
+        ! Z = 305mm
+        ! Step: 350mm
 
         VAR robtarget pCurrent;
         VAR jointtarget CurrentJoints;
         VAR robtarget CurrentPos;
-        VAR num WorkZ:=650;
-        VAR num SafeZ:=850;
+        VAR num WorkZ:=305;
+        VAR num SafeZ:=505;
         VAR num CurrentX:=0;
         VAR num CurrentY:=0;
-        VAR speeddata vTravel:=[100,15,2000,15];
+        VAR speeddata vTravel:=[500,500,5000,1000];
         VAR num TrackMin:=-300;
         VAR num TrackMax:=10050;
         VAR num CalcTrack:=0;
         VAR bool bFCActive:=FALSE;
+        VAR fcboxvol fc_supv_box:=[-10000,10000,-10000,10000,-10000,10000];
 
         TPWrite "========================================";
         TPWrite "Py2Polish: Starting";
         TPWrite "========================================";
-        TPWrite "Workzone: panel";
+        TPWrite "Workzone: bed";
         TPWrite "WorkZ=" \Num:=WorkZ;
 
         ! Get tool if needed
+        UpdateToolNum;
         IF ToolNum<>6 THEN
             TPWrite "Py2Polish: Getting tool...";
-            Home;
+            Home TRUE;
             Polish_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tPolish\WObj:=wobj0);
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tPolish;
+            ENDIF
         ENDIF
 
-        ! Disable configuration tracking
-        ConfL\Off;
-        ConfJ\Off;
-
         ! ========================================
-        ! Pattern Execution: 76 points
+        ! Polisher Pattern Execution: 60 points
+        ! Force Control: ENABLED
         ! ========================================
 
-        ! Turn on polisher motor
-        Pol_on;
-
-        ! Force control calibration
-        WaitTime\inpos,0.1;
-        FCCalib PolishLoad;
-
-        ! Start force control
-        FCPress1LStart pCurrent,v20,\Fz:=200,15,\ForceChange:=150\PosSupvDist:=50,z5,tPolish\WObj:=Bed1Wyong;
-        bFCActive:=TRUE;
-
-        ! Point 1: (250, 1900) [rapid]
-        CurrentX:=250;
-        CurrentY:=1900;
+        ! Rapid: (100, 1750)
+        CurrentX:=100;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
         pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveJ pCurrent,v500,z5,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 2: (5580, 1900) [work]
-        CurrentX:=5580;
-        CurrentY:=1900;
+        ! Lower to 250mm above work surface
+        pCurrent.trans.z:=WorkZ+250;
+        MoveL pCurrent,v100,fine,tPolish\WObj:=Bed1Wyong;
+        WaitTime\inpos,0.1;
+
+        ! Force control calibration (must be done with motor OFF)
+        FCCalib PolishLoad;
+
+        ! Turn on polisher motor
+        Pol_on;
+
+        ! Lower to 80mm above work surface
+        pCurrent.trans.z:=WorkZ+80;
+        MoveL pCurrent,v100,fine,tPolish\WObj:=Bed1Wyong;
+        WaitTime\inpos,0.1;
+
+        ! Start force control - pressing from ~50mm above work surface
+        pCurrent.trans.z:=WorkZ+50;
+        FCPress1LStart pCurrent,v20,\Fz:=300,15,\ForceChange:=150\PosSupvDist:=100,z5,tPolish\WObj:=Bed1Wyong;
+        bFCActive:=TRUE;
+
+        ! Work point 1: (8150, 1750) [work]
+        CurrentX:=8150;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 3: (5580, 1700) [work]
-        CurrentX:=5580;
-        CurrentY:=1700;
+        ! Work point 2: (8150, 1400) [work]
+        CurrentX:=8150;
+        CurrentY:=1400;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 4: (250, 1700) [work]
-        CurrentX:=250;
-        CurrentY:=1700;
+        ! Work point 3: (100, 1400) [work]
+        CurrentX:=100;
+        CurrentY:=1400;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 5: (250, 1500) [work]
-        CurrentX:=250;
-        CurrentY:=1500;
+        ! Work point 4: (100, 1050) [work]
+        CurrentX:=100;
+        CurrentY:=1050;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 6: (5580, 1500) [work]
-        CurrentX:=5580;
-        CurrentY:=1500;
+        ! Work point 5: (8150, 1050) [work]
+        CurrentX:=8150;
+        CurrentY:=1050;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 7: (5580, 1300) [work]
-        CurrentX:=5580;
-        CurrentY:=1300;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 8: (250, 1300) [work]
-        CurrentX:=250;
-        CurrentY:=1300;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 9: (250, 1100) [work]
-        CurrentX:=250;
-        CurrentY:=1100;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 10: (5580, 1100) [work]
-        CurrentX:=5580;
-        CurrentY:=1100;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 11: (5580, 900) [work]
-        CurrentX:=5580;
-        CurrentY:=900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 12: (250, 900) [work]
-        CurrentX:=250;
-        CurrentY:=900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 13: (250, 700) [work]
-        CurrentX:=250;
+        ! Work point 6: (8150, 700) [work]
+        CurrentX:=8150;
         CurrentY:=700;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 14: (5580, 700) [work]
-        CurrentX:=5580;
+        ! Work point 7: (100, 700) [work]
+        CurrentX:=100;
         CurrentY:=700;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 15: (5580, 500) [work]
-        CurrentX:=5580;
-        CurrentY:=500;
+        ! Work point 8: (100, 350) [work]
+        CurrentX:=100;
+        CurrentY:=350;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 16: (250, 500) [work]
-        CurrentX:=250;
-        CurrentY:=500;
+        ! Work point 9: (8150, 350) [work]
+        CurrentX:=8150;
+        CurrentY:=350;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 17: (250, 300) [work]
-        CurrentX:=250;
-        CurrentY:=300;
+        ! Work point 10: (8150, 100) [work]
+        CurrentX:=8150;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 18: (5580, 300) [work]
-        CurrentX:=5580;
-        CurrentY:=300;
+        ! Work point 11: (100, 100) [work]
+        CurrentX:=100;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 19: (5580, 250) [work]
-        CurrentX:=5580;
-        CurrentY:=250;
+        ! Work point 12: (100, 100) [work]
+        CurrentX:=100;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 20: (250, 250) [work]
-        CurrentX:=250;
-        CurrentY:=250;
+        ! Work point 13: (100, 1750) [work]
+        CurrentX:=100;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 21: (250, 250) [work]
-        CurrentX:=250;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 22: (250, 1900) [work]
-        CurrentX:=250;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 23: (450, 1900) [work]
+        ! Work point 14: (450, 1750) [work]
         CurrentX:=450;
-        CurrentY:=1900;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 24: (450, 250) [work]
+        ! Work point 15: (450, 100) [work]
         CurrentX:=450;
-        CurrentY:=250;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 25: (650, 250) [work]
-        CurrentX:=650;
-        CurrentY:=250;
+        ! Work point 16: (800, 100) [work]
+        CurrentX:=800;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 26: (650, 1900) [work]
-        CurrentX:=650;
-        CurrentY:=1900;
+        ! Work point 17: (800, 1750) [work]
+        CurrentX:=800;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 27: (850, 1900) [work]
-        CurrentX:=850;
-        CurrentY:=1900;
+        ! Work point 18: (1150, 1750) [work]
+        CurrentX:=1150;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 28: (850, 250) [work]
-        CurrentX:=850;
-        CurrentY:=250;
+        ! Work point 19: (1150, 100) [work]
+        CurrentX:=1150;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 29: (1050, 250) [work]
-        CurrentX:=1050;
-        CurrentY:=250;
+        ! Work point 20: (1500, 100) [work]
+        CurrentX:=1500;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 30: (1050, 1900) [work]
-        CurrentX:=1050;
-        CurrentY:=1900;
+        ! Work point 21: (1500, 1750) [work]
+        CurrentX:=1500;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 31: (1250, 1900) [work]
-        CurrentX:=1250;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 32: (1250, 250) [work]
-        CurrentX:=1250;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 33: (1450, 250) [work]
-        CurrentX:=1450;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 34: (1450, 1900) [work]
-        CurrentX:=1450;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 35: (1650, 1900) [work]
-        CurrentX:=1650;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 36: (1650, 250) [work]
-        CurrentX:=1650;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 37: (1850, 250) [work]
+        ! Work point 22: (1850, 1750) [work]
         CurrentX:=1850;
-        CurrentY:=250;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 38: (1850, 1900) [work]
+        ! Work point 23: (1850, 100) [work]
         CurrentX:=1850;
-        CurrentY:=1900;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 39: (2050, 1900) [work]
-        CurrentX:=2050;
-        CurrentY:=1900;
+        ! Work point 24: (2200, 100) [work]
+        CurrentX:=2200;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 40: (2050, 250) [work]
-        CurrentX:=2050;
-        CurrentY:=250;
+        ! Work point 25: (2200, 1750) [work]
+        CurrentX:=2200;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 41: (2250, 250) [work]
-        CurrentX:=2250;
-        CurrentY:=250;
+        ! Work point 26: (2550, 1750) [work]
+        CurrentX:=2550;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 42: (2250, 1900) [work]
-        CurrentX:=2250;
-        CurrentY:=1900;
+        ! Work point 27: (2550, 100) [work]
+        CurrentX:=2550;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 43: (2450, 1900) [work]
-        CurrentX:=2450;
-        CurrentY:=1900;
+        ! Work point 28: (2900, 100) [work]
+        CurrentX:=2900;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 44: (2450, 250) [work]
-        CurrentX:=2450;
-        CurrentY:=250;
+        ! Work point 29: (2900, 1750) [work]
+        CurrentX:=2900;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 45: (2650, 250) [work]
-        CurrentX:=2650;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 46: (2650, 1900) [work]
-        CurrentX:=2650;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 47: (2850, 1900) [work]
-        CurrentX:=2850;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 48: (2850, 250) [work]
-        CurrentX:=2850;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 49: (3050, 250) [work]
-        CurrentX:=3050;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 50: (3050, 1900) [work]
-        CurrentX:=3050;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 51: (3250, 1900) [work]
+        ! Work point 30: (3250, 1750) [work]
         CurrentX:=3250;
-        CurrentY:=1900;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 52: (3250, 250) [work]
+        ! Work point 31: (3250, 100) [work]
         CurrentX:=3250;
-        CurrentY:=250;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 53: (3450, 250) [work]
-        CurrentX:=3450;
-        CurrentY:=250;
+        ! Work point 32: (3600, 100) [work]
+        CurrentX:=3600;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 54: (3450, 1900) [work]
-        CurrentX:=3450;
-        CurrentY:=1900;
+        ! Work point 33: (3600, 1750) [work]
+        CurrentX:=3600;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 55: (3650, 1900) [work]
-        CurrentX:=3650;
-        CurrentY:=1900;
+        ! Work point 34: (3950, 1750) [work]
+        CurrentX:=3950;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 56: (3650, 250) [work]
-        CurrentX:=3650;
-        CurrentY:=250;
+        ! Work point 35: (3950, 100) [work]
+        CurrentX:=3950;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 57: (3850, 250) [work]
-        CurrentX:=3850;
-        CurrentY:=250;
+        ! Work point 36: (4300, 100) [work]
+        CurrentX:=4300;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 58: (3850, 1900) [work]
-        CurrentX:=3850;
-        CurrentY:=1900;
+        ! Work point 37: (4300, 1750) [work]
+        CurrentX:=4300;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 59: (4050, 1900) [work]
-        CurrentX:=4050;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 60: (4050, 250) [work]
-        CurrentX:=4050;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 61: (4250, 250) [work]
-        CurrentX:=4250;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 62: (4250, 1900) [work]
-        CurrentX:=4250;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 63: (4450, 1900) [work]
-        CurrentX:=4450;
-        CurrentY:=1900;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 64: (4450, 250) [work]
-        CurrentX:=4450;
-        CurrentY:=250;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
-
-        ! Point 65: (4650, 250) [work]
+        ! Work point 38: (4650, 1750) [work]
         CurrentX:=4650;
-        CurrentY:=250;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 66: (4650, 1900) [work]
+        ! Work point 39: (4650, 100) [work]
         CurrentX:=4650;
-        CurrentY:=1900;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 67: (4850, 1900) [work]
-        CurrentX:=4850;
-        CurrentY:=1900;
+        ! Work point 40: (5000, 100) [work]
+        CurrentX:=5000;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 68: (4850, 250) [work]
-        CurrentX:=4850;
-        CurrentY:=250;
+        ! Work point 41: (5000, 1750) [work]
+        CurrentX:=5000;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 69: (5050, 250) [work]
-        CurrentX:=5050;
-        CurrentY:=250;
+        ! Work point 42: (5350, 1750) [work]
+        CurrentX:=5350;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 70: (5050, 1900) [work]
-        CurrentX:=5050;
-        CurrentY:=1900;
+        ! Work point 43: (5350, 100) [work]
+        CurrentX:=5350;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 71: (5250, 1900) [work]
-        CurrentX:=5250;
-        CurrentY:=1900;
+        ! Work point 44: (5700, 100) [work]
+        CurrentX:=5700;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 72: (5250, 250) [work]
-        CurrentX:=5250;
-        CurrentY:=250;
+        ! Work point 45: (5700, 1750) [work]
+        CurrentX:=5700;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 73: (5450, 250) [work]
-        CurrentX:=5450;
-        CurrentY:=250;
+        ! Work point 46: (6050, 1750) [work]
+        CurrentX:=6050;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 74: (5450, 1900) [work]
-        CurrentX:=5450;
-        CurrentY:=1900;
+        ! Work point 47: (6050, 100) [work]
+        CurrentX:=6050;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 75: (5580, 1900) [work]
-        CurrentX:=5580;
-        CurrentY:=1900;
+        ! Work point 48: (6400, 100) [work]
+        CurrentX:=6400;
+        CurrentY:=100;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
-        ! Point 76: (5580, 250) [work]
-        CurrentX:=5580;
-        CurrentY:=250;
+        ! Work point 49: (6400, 1750) [work]
+        CurrentX:=6400;
+        CurrentY:=1750;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
         pCurrent.robconf:=[0,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        FCPressL pCurrent,vTravel,100,fine,tPolish\WObj:=Bed1Wyong;
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 50: (6750, 1750) [work]
+        CurrentX:=6750;
+        CurrentY:=1750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 51: (6750, 100) [work]
+        CurrentX:=6750;
+        CurrentY:=100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 52: (7100, 100) [work]
+        CurrentX:=7100;
+        CurrentY:=100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 53: (7100, 1750) [work]
+        CurrentX:=7100;
+        CurrentY:=1750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 54: (7450, 1750) [work]
+        CurrentX:=7450;
+        CurrentY:=1750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 55: (7450, 100) [work]
+        CurrentX:=7450;
+        CurrentY:=100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 56: (7800, 100) [work]
+        CurrentX:=7800;
+        CurrentY:=100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 57: (7800, 1750) [work]
+        CurrentX:=7800;
+        CurrentY:=1750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 58: (8150, 1750) [work]
+        CurrentX:=8150;
+        CurrentY:=1750;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
+
+        ! Work point 59: (8150, 100) [work]
+        CurrentX:=8150;
+        CurrentY:=100;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.robconf:=[0,0,0,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        FCPressL pCurrent,v500,150,fine,tPolish\WObj:=Bed1Wyong;
 
 
         ! End force control
@@ -3627,14 +3638,10 @@ MODULE ToolPaths
         CurrentPos:=CalcRobT(CurrentJoints,tPolish\WObj:=Bed1Wyong);
         MoveL Offs(CurrentPos,0,0,200),v200,z5,tPolish\WObj:=Bed1Wyong;
 
-        ! Re-enable configuration tracking
-        ConfL\On;
-        ConfJ\On;
-
         ! Return tool and go home
         TPWrite "Py2Polish: Dropping off tool...";
         Polish_Dropoff;
-        Home;
+        Home FALSE;
 
         TPWrite "========================================";
         TPWrite "Py2Polish: COMPLETE";
@@ -3648,19 +3655,19 @@ MODULE ToolPaths
 
     PROC Py2Vac()
         ! Py2Vac - Generated by Onyx Tool Class
-        ! Workzone: panel
-        ! Area: (350,350) to (5480,1800)
-        ! Z = 650mm
+        ! Workzone: bed
+        ! Area: (200,200) to (8050,1650)
+        ! Z = 295mm
         ! Step: 200mm
 
         VAR robtarget pCurrent;
         VAR jointtarget CurrentJoints;
         VAR robtarget CurrentPos;
-        VAR num WorkZ:=650;
-        VAR num SafeZ:=850;
+        VAR num WorkZ:=295;
+        VAR num SafeZ:=495;
         VAR num CurrentX:=0;
         VAR num CurrentY:=0;
-        VAR speeddata vTravel:=[100,15,2000,15];
+        VAR speeddata vTravel:=[300,500,5000,1000];
         VAR num TrackMin:=-300;
         VAR num TrackMax:=10050;
         VAR num CalcTrack:=0;
@@ -3668,19 +3675,22 @@ MODULE ToolPaths
         TPWrite "========================================";
         TPWrite "Py2Vac: Starting";
         TPWrite "========================================";
-        TPWrite "Workzone: panel";
+        TPWrite "Workzone: bed";
         TPWrite "WorkZ=" \Num:=WorkZ;
 
         ! Get tool if needed
+        UpdateToolNum;
         IF ToolNum<>5 THEN
             TPWrite "Py2Vac: Getting tool...";
-            Home;
+            Home TRUE;
             Vac_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tVac\WObj:=wobj0);
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tVac;
+            ENDIF
         ENDIF
-
-        ! Disable configuration tracking
-        ConfL\Off;
-        ConfJ\Off;
 
         ! Turn on vacuum
         TPWrite "Py2Vac: Starting vacuum...";
@@ -3688,868 +3698,495 @@ MODULE ToolPaths
         WaitTime 1;
 
         ! ========================================
-        ! Pattern Execution: 72 points
+        ! Pattern Execution: 35 points
         ! ========================================
 
-        ! Point 1: (350, 1800) [rapid]
-        CurrentX:=350;
-        CurrentY:=1800;
+        ! Point 1: (200, 1650) [rapid], axis_6=180
+        CurrentX:=200;
+        CurrentY:=1650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 2: (5480, 1800) [work]
-        CurrentX:=5480;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 3: (5480, 1600) [work]
-        CurrentX:=5480;
-        CurrentY:=1600;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 4: (350, 1600) [work]
-        CurrentX:=350;
-        CurrentY:=1600;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 5: (350, 1400) [work]
-        CurrentX:=350;
-        CurrentY:=1400;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 6: (5480, 1400) [work]
-        CurrentX:=5480;
-        CurrentY:=1400;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 7: (5480, 1200) [work]
-        CurrentX:=5480;
-        CurrentY:=1200;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 8: (350, 1200) [work]
-        CurrentX:=350;
-        CurrentY:=1200;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 9: (350, 1000) [work]
-        CurrentX:=350;
-        CurrentY:=1000;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 10: (5480, 1000) [work]
-        CurrentX:=5480;
-        CurrentY:=1000;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 11: (5480, 800) [work]
-        CurrentX:=5480;
-        CurrentY:=800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 12: (350, 800) [work]
-        CurrentX:=350;
-        CurrentY:=800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 13: (350, 600) [work]
-        CurrentX:=350;
-        CurrentY:=600;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 14: (5480, 600) [work]
-        CurrentX:=5480;
-        CurrentY:=600;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 15: (5480, 400) [work]
-        CurrentX:=5480;
-        CurrentY:=400;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 16: (350, 400) [work]
-        CurrentX:=350;
-        CurrentY:=400;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 17: (350, 350) [work]
-        CurrentX:=350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 18: (5480, 350) [work]
-        CurrentX:=5480;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 19: (350, 350) [work]
-        CurrentX:=350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 20: (350, 1800) [work]
-        CurrentX:=350;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 21: (550, 1800) [work]
-        CurrentX:=550;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 22: (550, 350) [work]
-        CurrentX:=550;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 23: (750, 350) [work]
-        CurrentX:=750;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 24: (750, 1800) [work]
-        CurrentX:=750;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 25: (950, 1800) [work]
-        CurrentX:=950;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 26: (950, 350) [work]
-        CurrentX:=950;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 27: (1150, 350) [work]
-        CurrentX:=1150;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 28: (1150, 1800) [work]
-        CurrentX:=1150;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 29: (1350, 1800) [work]
-        CurrentX:=1350;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
-
-        ! Point 30: (1350, 350) [work]
-        CurrentX:=1350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 31: (1550, 350) [work]
-        CurrentX:=1550;
-        CurrentY:=350;
+        ! Point 2: (200, 1650) [work], axis_6=180
+        CurrentX:=200;
+        CurrentY:=1650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 32: (1550, 1800) [work]
-        CurrentX:=1550;
-        CurrentY:=1800;
+        ! Point 3: (8050, 1650) [work], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=1650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 33: (1750, 1800) [work]
-        CurrentX:=1750;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 4: (8050, 1450) [rapid], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=1450;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 34: (1750, 350) [work]
-        CurrentX:=1750;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 5: (8050, 1450) [rapid], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=1450;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 35: (1950, 350) [work]
-        CurrentX:=1950;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 36: (1950, 1800) [work]
-        CurrentX:=1950;
-        CurrentY:=1800;
+        ! Point 6: (8050, 1450) [work], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=1450;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 37: (2150, 1800) [work]
-        CurrentX:=2150;
-        CurrentY:=1800;
+        ! Point 7: (200, 1450) [work], axis_6=0
+        CurrentX:=200;
+        CurrentY:=1450;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 38: (2150, 350) [work]
-        CurrentX:=2150;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 8: (200, 1250) [rapid], axis_6=0
+        CurrentX:=200;
+        CurrentY:=1250;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 39: (2350, 350) [work]
-        CurrentX:=2350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 9: (200, 1250) [rapid], axis_6=180
+        CurrentX:=200;
+        CurrentY:=1250;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 40: (2350, 1800) [work]
-        CurrentX:=2350;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 41: (2550, 1800) [work]
-        CurrentX:=2550;
-        CurrentY:=1800;
+        ! Point 10: (200, 1250) [work], axis_6=180
+        CurrentX:=200;
+        CurrentY:=1250;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 42: (2550, 350) [work]
-        CurrentX:=2550;
-        CurrentY:=350;
+        ! Point 11: (8050, 1250) [work], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=1250;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 43: (2750, 350) [work]
-        CurrentX:=2750;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 12: (8050, 1050) [rapid], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=1050;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 44: (2750, 1800) [work]
-        CurrentX:=2750;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 13: (8050, 1050) [rapid], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=1050;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 45: (2950, 1800) [work]
-        CurrentX:=2950;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 46: (2950, 350) [work]
-        CurrentX:=2950;
-        CurrentY:=350;
+        ! Point 14: (8050, 1050) [work], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=1050;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 47: (3150, 350) [work]
-        CurrentX:=3150;
-        CurrentY:=350;
+        ! Point 15: (200, 1050) [work], axis_6=0
+        CurrentX:=200;
+        CurrentY:=1050;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 48: (3150, 1800) [work]
-        CurrentX:=3150;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 16: (200, 850) [rapid], axis_6=0
+        CurrentX:=200;
+        CurrentY:=850;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 49: (3350, 1800) [work]
-        CurrentX:=3350;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 17: (200, 850) [rapid], axis_6=180
+        CurrentX:=200;
+        CurrentY:=850;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 50: (3350, 350) [work]
-        CurrentX:=3350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 51: (3550, 350) [work]
-        CurrentX:=3550;
-        CurrentY:=350;
+        ! Point 18: (200, 850) [work], axis_6=180
+        CurrentX:=200;
+        CurrentY:=850;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 52: (3550, 1800) [work]
-        CurrentX:=3550;
-        CurrentY:=1800;
+        ! Point 19: (8050, 850) [work], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=850;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 53: (3750, 1800) [work]
-        CurrentX:=3750;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 20: (8050, 650) [rapid], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=650;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 54: (3750, 350) [work]
-        CurrentX:=3750;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 21: (8050, 650) [rapid], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=650;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 55: (3950, 350) [work]
-        CurrentX:=3950;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 56: (3950, 1800) [work]
-        CurrentX:=3950;
-        CurrentY:=1800;
+        ! Point 22: (8050, 650) [work], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 57: (4150, 1800) [work]
-        CurrentX:=4150;
-        CurrentY:=1800;
+        ! Point 23: (200, 650) [work], axis_6=0
+        CurrentX:=200;
+        CurrentY:=650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 58: (4150, 350) [work]
-        CurrentX:=4150;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 24: (200, 450) [rapid], axis_6=0
+        CurrentX:=200;
+        CurrentY:=450;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 59: (4350, 350) [work]
-        CurrentX:=4350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 25: (200, 450) [rapid], axis_6=180
+        CurrentX:=200;
+        CurrentY:=450;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 60: (4350, 1800) [work]
-        CurrentX:=4350;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 61: (4550, 1800) [work]
-        CurrentX:=4550;
-        CurrentY:=1800;
+        ! Point 26: (200, 450) [work], axis_6=180
+        CurrentX:=200;
+        CurrentY:=450;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 62: (4550, 350) [work]
-        CurrentX:=4550;
-        CurrentY:=350;
+        ! Point 27: (8050, 450) [work], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=450;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 63: (4750, 350) [work]
-        CurrentX:=4750;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 28: (8050, 250) [rapid], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=250;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 64: (4750, 1800) [work]
-        CurrentX:=4750;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 29: (8050, 250) [rapid], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=250;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 65: (4950, 1800) [work]
-        CurrentX:=4950;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 66: (4950, 350) [work]
-        CurrentX:=4950;
-        CurrentY:=350;
+        ! Point 30: (8050, 250) [work], axis_6=0
+        CurrentX:=8050;
+        CurrentY:=250;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 67: (5150, 350) [work]
-        CurrentX:=5150;
-        CurrentY:=350;
+        ! Point 31: (200, 250) [work], axis_6=0
+        CurrentX:=200;
+        CurrentY:=250;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 68: (5150, 1800) [work]
-        CurrentX:=5150;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 32: (200, 200) [rapid], axis_6=0
+        CurrentX:=200;
+        CurrentY:=200;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(0,20,180);
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 69: (5350, 1800) [work]
-        CurrentX:=5350;
-        CurrentY:=1800;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        ! Point 33: (200, 200) [rapid], axis_6=180
+        CurrentX:=200;
+        CurrentY:=200;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        MoveJ pCurrent,v500,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Point 70: (5350, 350) [work]
-        CurrentX:=5350;
-        CurrentY:=350;
-        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
-        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
-        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
-        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
-        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
-        MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 71: (5480, 350) [work]
-        CurrentX:=5480;
-        CurrentY:=350;
+        ! Point 34: (200, 200) [work], axis_6=180
+        CurrentX:=200;
+        CurrentY:=200;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVac\WObj:=Bed1Wyong;
 
-        ! Point 72: (5480, 1800) [work]
-        CurrentX:=5480;
-        CurrentY:=1800;
+        ! Point 35: (8050, 200) [work], axis_6=180
+        CurrentX:=8050;
+        CurrentY:=200;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
-        pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.rot:=OrientZYX(180,20,180);
+        pCurrent.robconf:=[1,0,0,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
@@ -4562,14 +4199,10 @@ MODULE ToolPaths
         CurrentPos:=CalcRobT(CurrentJoints,tVac\WObj:=Bed1Wyong);
         MoveL Offs(CurrentPos,0,0,200),v200,z5,tVac\WObj:=Bed1Wyong;
 
-        ! Re-enable configuration tracking
-        ConfL\On;
-        ConfJ\On;
-
         ! Return tool and go home
         TPWrite "Py2Vac: Dropping off tool...";
         Vac_Dropoff;
-        Home;
+        Home FALSE;
 
         TPWrite "========================================";
         TPWrite "Py2Vac: COMPLETE";
@@ -4584,18 +4217,18 @@ MODULE ToolPaths
     PROC Py2Pan()
         ! Py2Pan - Generated by Onyx Tool Class
         ! Workzone: panel
-        ! Area: (450,450) to (5380,1700)
-        ! Z = 651mm
+        ! Area: (530,300) to (5930,1550)
+        ! Z = 456mm
         ! Step: 300mm
 
         VAR robtarget pCurrent;
         VAR jointtarget CurrentJoints;
         VAR robtarget CurrentPos;
-        VAR num WorkZ:=651;
-        VAR num SafeZ:=851;
+        VAR num WorkZ:=456;
+        VAR num SafeZ:=656;
         VAR num CurrentX:=0;
         VAR num CurrentY:=0;
-        VAR speeddata vTravel:=[100,15,2000,15];
+        VAR speeddata vTravel:=[100,500,5000,1000];
         VAR num TrackMin:=-300;
         VAR num TrackMax:=10050;
         VAR num CalcTrack:=0;
@@ -4609,596 +4242,675 @@ MODULE ToolPaths
         TPWrite "WorkZ=" \Num:=WorkZ;
 
         ! Get helicopter tool (Pan attaches to it)
+        UpdateToolNum;
         IF ToolNum<>2 THEN
             TPWrite "Py2Pan: Getting helicopter...";
-            Home;
+            Home TRUE;
             Heli_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=wobj0);
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tHeli;
+            ENDIF
         ENDIF
 
-        ! Home stepper (blade angle = 0 for pan)
-        TPWrite "Py2Pan: Homing stepper...";
-        Heli_Stepper_Home;
+        ! Set blade angle = 0 for pan
         HeliBlade_Angle 0;
 
-        ! Disable configuration tracking
-        ConfL\Off;
-        ConfJ\Off;
-
         ! ========================================
-        ! Pattern Execution: 48 points
+        ! Pattern Execution: 50 points
         ! ========================================
 
-        ! Point 1: (450, 1700) [rapid]
-        CurrentX:=450;
-        CurrentY:=1700;
+        ! Point 1: (530, 1550) [rapid]
+        CurrentX:=530;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveJ pCurrent,v500,z5,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 2: (5380, 1700) [work]
-        CurrentX:=5380;
-        CurrentY:=1700;
+        ! Descend to work height
+        pCurrent.trans.z:=WorkZ;
+        MoveL pCurrent,v100,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 2: (5930, 1550) [work]
+        CurrentX:=5930;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 3: (5380, 1400) [work]
-        CurrentX:=5380;
-        CurrentY:=1400;
+        ! Point 3: (5930, 1250) [work]
+        CurrentX:=5930;
+        CurrentY:=1250;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 4: (450, 1400) [work]
-        CurrentX:=450;
-        CurrentY:=1400;
+        ! Point 4: (530, 1250) [work]
+        CurrentX:=530;
+        CurrentY:=1250;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 5: (450, 1100) [work]
-        CurrentX:=450;
-        CurrentY:=1100;
+        ! Point 5: (530, 950) [work]
+        CurrentX:=530;
+        CurrentY:=950;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 6: (5380, 1100) [work]
-        CurrentX:=5380;
-        CurrentY:=1100;
+        ! Point 6: (5930, 950) [work]
+        CurrentX:=5930;
+        CurrentY:=950;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 7: (5380, 800) [work]
-        CurrentX:=5380;
-        CurrentY:=800;
+        ! Point 7: (5930, 650) [work]
+        CurrentX:=5930;
+        CurrentY:=650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 8: (450, 800) [work]
-        CurrentX:=450;
-        CurrentY:=800;
+        ! Point 8: (530, 650) [work]
+        CurrentX:=530;
+        CurrentY:=650;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 9: (450, 500) [work]
-        CurrentX:=450;
-        CurrentY:=500;
+        ! Point 9: (530, 350) [work]
+        CurrentX:=530;
+        CurrentY:=350;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 10: (5380, 500) [work]
-        CurrentX:=5380;
-        CurrentY:=500;
+        ! Point 10: (5930, 350) [work]
+        CurrentX:=5930;
+        CurrentY:=350;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 11: (5380, 450) [work]
-        CurrentX:=5380;
-        CurrentY:=450;
+        ! Point 11: (5930, 300) [work]
+        CurrentX:=5930;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 12: (450, 450) [work]
-        CurrentX:=450;
-        CurrentY:=450;
+        ! Point 12: (530, 300) [work]
+        CurrentX:=530;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 13: (450, 450) [work]
-        CurrentX:=450;
-        CurrentY:=450;
+        ! Point 13: (530, 300) [work]
+        CurrentX:=530;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 14: (450, 1700) [work]
-        CurrentX:=450;
-        CurrentY:=1700;
+        ! Point 14: (530, 1550) [work]
+        CurrentX:=530;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 15: (750, 1700) [work]
-        CurrentX:=750;
-        CurrentY:=1700;
+        ! Point 15: (830, 1550) [work]
+        CurrentX:=830;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 16: (750, 450) [work]
-        CurrentX:=750;
-        CurrentY:=450;
+        ! Point 16: (830, 300) [work]
+        CurrentX:=830;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 17: (1050, 450) [work]
-        CurrentX:=1050;
-        CurrentY:=450;
+        ! Point 17: (1130, 300) [work]
+        CurrentX:=1130;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 18: (1050, 1700) [work]
-        CurrentX:=1050;
-        CurrentY:=1700;
+        ! Point 18: (1130, 1550) [work]
+        CurrentX:=1130;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 19: (1350, 1700) [work]
-        CurrentX:=1350;
-        CurrentY:=1700;
+        ! Point 19: (1430, 1550) [work]
+        CurrentX:=1430;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 20: (1350, 450) [work]
-        CurrentX:=1350;
-        CurrentY:=450;
+        ! Point 20: (1430, 300) [work]
+        CurrentX:=1430;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 21: (1650, 450) [work]
-        CurrentX:=1650;
-        CurrentY:=450;
+        ! Point 21: (1730, 300) [work]
+        CurrentX:=1730;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 22: (1650, 1700) [work]
-        CurrentX:=1650;
-        CurrentY:=1700;
+        ! Point 22: (1730, 1550) [work]
+        CurrentX:=1730;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 23: (1950, 1700) [work]
-        CurrentX:=1950;
-        CurrentY:=1700;
+        ! Point 23: (2030, 1550) [work]
+        CurrentX:=2030;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 24: (1950, 450) [work]
-        CurrentX:=1950;
-        CurrentY:=450;
+        ! Point 24: (2030, 300) [work]
+        CurrentX:=2030;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 25: (2250, 450) [work]
-        CurrentX:=2250;
-        CurrentY:=450;
+        ! Point 25: (2330, 300) [work]
+        CurrentX:=2330;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 26: (2250, 1700) [work]
-        CurrentX:=2250;
-        CurrentY:=1700;
+        ! Point 26: (2330, 1550) [work]
+        CurrentX:=2330;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 27: (2550, 1700) [work]
-        CurrentX:=2550;
-        CurrentY:=1700;
+        ! Point 27: (2630, 1550) [work]
+        CurrentX:=2630;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 28: (2550, 450) [work]
-        CurrentX:=2550;
-        CurrentY:=450;
+        ! Point 28: (2630, 300) [work]
+        CurrentX:=2630;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 29: (2850, 450) [work]
-        CurrentX:=2850;
-        CurrentY:=450;
+        ! Point 29: (2930, 300) [work]
+        CurrentX:=2930;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 30: (2850, 1700) [work]
-        CurrentX:=2850;
-        CurrentY:=1700;
+        ! Point 30: (2930, 1550) [work]
+        CurrentX:=2930;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 31: (3150, 1700) [work]
-        CurrentX:=3150;
-        CurrentY:=1700;
+        ! Point 31: (3230, 1550) [work]
+        CurrentX:=3230;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 32: (3150, 450) [work]
-        CurrentX:=3150;
-        CurrentY:=450;
+        ! Point 32: (3230, 300) [work]
+        CurrentX:=3230;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 33: (3450, 450) [work]
-        CurrentX:=3450;
-        CurrentY:=450;
+        ! Point 33: (3530, 300) [work]
+        CurrentX:=3530;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 34: (3450, 1700) [work]
-        CurrentX:=3450;
-        CurrentY:=1700;
+        ! Point 34: (3530, 1550) [work]
+        CurrentX:=3530;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 35: (3750, 1700) [work]
-        CurrentX:=3750;
-        CurrentY:=1700;
+        ! Point 35: (3830, 1550) [work]
+        CurrentX:=3830;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 36: (3750, 450) [work]
-        CurrentX:=3750;
-        CurrentY:=450;
+        ! Point 36: (3830, 300) [work]
+        CurrentX:=3830;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 37: (4050, 450) [work]
-        CurrentX:=4050;
-        CurrentY:=450;
+        ! Point 37: (4130, 300) [work]
+        CurrentX:=4130;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 38: (4050, 1700) [work]
-        CurrentX:=4050;
-        CurrentY:=1700;
+        ! Point 38: (4130, 1550) [work]
+        CurrentX:=4130;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 39: (4350, 1700) [work]
-        CurrentX:=4350;
-        CurrentY:=1700;
+        ! Point 39: (4430, 1550) [work]
+        CurrentX:=4430;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 40: (4350, 450) [work]
-        CurrentX:=4350;
-        CurrentY:=450;
+        ! Point 40: (4430, 300) [work]
+        CurrentX:=4430;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 41: (4650, 450) [work]
-        CurrentX:=4650;
-        CurrentY:=450;
+        ! Point 41: (4730, 300) [work]
+        CurrentX:=4730;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 42: (4650, 1700) [work]
-        CurrentX:=4650;
-        CurrentY:=1700;
+        ! Point 42: (4730, 1550) [work]
+        CurrentX:=4730;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 43: (4950, 1700) [work]
-        CurrentX:=4950;
-        CurrentY:=1700;
+        ! Point 43: (5030, 1550) [work]
+        CurrentX:=5030;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 44: (4950, 450) [work]
-        CurrentX:=4950;
-        CurrentY:=450;
+        ! Point 44: (5030, 300) [work]
+        CurrentX:=5030;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 45: (5250, 450) [work]
-        CurrentX:=5250;
-        CurrentY:=450;
+        ! Point 45: (5330, 300) [work]
+        CurrentX:=5330;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 46: (5250, 1700) [work]
-        CurrentX:=5250;
-        CurrentY:=1700;
+        ! Point 46: (5330, 1550) [work]
+        CurrentX:=5330;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 47: (5380, 1700) [work]
-        CurrentX:=5380;
-        CurrentY:=1700;
+        ! Point 47: (5630, 1550) [work]
+        CurrentX:=5630;
+        CurrentY:=1550;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
 
-        ! Point 48: (5380, 450) [work]
-        CurrentX:=5380;
-        CurrentY:=450;
+        ! Point 48: (5630, 300) [work]
+        CurrentX:=5630;
+        CurrentY:=300;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.rot:=OrientZYX(0,0,180);
-        pCurrent.robconf:=[0,0,0,0];
+        pCurrent.robconf:=[1,0,-2,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 49: (5930, 300) [work]
+        CurrentX:=5930;
+        CurrentY:=300;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+        MoveL pCurrent,vTravel,fine,tHeli\WObj:=Bed1Wyong;
+
+        ! Point 50: (5930, 1550) [work]
+        CurrentX:=5930;
+        CurrentY:=1550;
+        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+        pCurrent.rot:=OrientZYX(0,0,180);
+        pCurrent.robconf:=[1,0,-2,0];
+        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
@@ -5213,14 +4925,10 @@ MODULE ToolPaths
         CurrentPos:=CalcRobT(CurrentJoints,tHeli\WObj:=Bed1Wyong);
         MoveL Offs(CurrentPos,0,0,200),v200,z5,tHeli\WObj:=Bed1Wyong;
 
-        ! Re-enable configuration tracking
-        ConfL\On;
-        ConfJ\On;
-
         ! Return tool and go home
         TPWrite "Py2Pan: Dropping off helicopter...";
         Heli_Dropoff;
-        Home;
+        Home FALSE;
 
         TPWrite "========================================";
         TPWrite "Py2Pan: COMPLETE";
@@ -5237,18 +4945,18 @@ MODULE ToolPaths
     PROC Py2VS()
         ! Py2VS - Generated by Onyx Tool Class
         ! Workzone: panel
-        ! Area: (500,500) to (5330,1650)
-        ! Z = 650mm
+        ! Area: (580,350) to (5880,1500)
+        ! Z = 455mm
         ! Step: 200mm
 
         VAR robtarget pCurrent;
         VAR jointtarget CurrentJoints;
         VAR robtarget CurrentPos;
-        VAR num WorkZ:=650;
-        VAR num SafeZ:=850;
+        VAR num WorkZ:=455;
+        VAR num SafeZ:=655;
         VAR num CurrentX:=0;
         VAR num CurrentY:=0;
-        VAR speeddata vTravel:=[100,15,2000,15];
+        VAR speeddata vTravel:=[75,15,2000,15];
         VAR num TrackMin:=-300;
         VAR num TrackMax:=10050;
         VAR num CalcTrack:=0;
@@ -5260,15 +4968,18 @@ MODULE ToolPaths
         TPWrite "WorkZ=" \Num:=WorkZ;
 
         ! Get tool if needed
+        UpdateToolNum;
         IF ToolNum<>3 THEN
             TPWrite "Py2VS: Getting tool...";
-            Home;
+            Home TRUE;
             VS_Pickup;
+        ELSE
+            CurrentJoints:=CJointT();
+            CurrentPos:=CalcRobT(CurrentJoints,tVS\WObj:=wobj0);
+            IF (CurrentPos.trans.x)>8000 AND CurrentPos.trans.z<400 THEN
+                MoveL Offs(CurrentPos,0,0,(400-CurrentPos.trans.z)),v100,z5,tVS;
+            ENDIF
         ENDIF
-
-        ! Disable configuration tracking
-        ConfL\Off;
-        ConfJ\Off;
 
         ! ========================================
         ! Pattern Execution: 4 points
@@ -5279,12 +4990,13 @@ MODULE ToolPaths
         ! This prevents 180 degree rotation when moving to work surface
         pCurrent.rot:=pVSHome3.rot;
 
-        ! Point 1: (-100, 1900) [rapid]
-        CurrentX:=-100;
-        CurrentY:=1900;
+        ! Point 1: (173, 1850) [rapid]
+        CurrentX:=173;
+        CurrentY:=1850;
         pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
         pCurrent.robconf:=[1,0,1,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
@@ -5294,34 +5006,37 @@ MODULE ToolPaths
         TPWrite "Py2VS: Starting screed...";
         VS_on;
 
-        ! Point 2: (-50, 1900) [work]
-        CurrentX:=-50;
-        CurrentY:=1900;
+        ! Point 2: (223, 1850) [work]
+        CurrentX:=223;
+        CurrentY:=1850;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.robconf:=[1,0,1,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVS\WObj:=Bed1Wyong;
 
-        ! Point 3: (5880, 1900) [work]
-        CurrentX:=5880;
-        CurrentY:=1900;
+        ! Point 3: (6237, 1850) [work]
+        CurrentX:=6237;
+        CurrentY:=1850;
         pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
         pCurrent.robconf:=[1,0,1,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
         MoveL pCurrent,vTravel,fine,tVS\WObj:=Bed1Wyong;
 
-        ! Point 4: (5930, 1900) [rapid]
-        CurrentX:=5930;
-        CurrentY:=1900;
+        ! Point 4: (6287, 1850) [rapid]
+        CurrentX:=6287;
+        CurrentY:=1850;
         pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];
         pCurrent.robconf:=[1,0,1,0];
         CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
         IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
         IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
         pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
@@ -5334,14 +5049,10 @@ MODULE ToolPaths
         CurrentPos:=CalcRobT(CurrentJoints,tVS\WObj:=Bed1Wyong);
         MoveL Offs(CurrentPos,0,0,200),v200,z5,tVS\WObj:=Bed1Wyong;
 
-        ! Re-enable configuration tracking
-        ConfL\On;
-        ConfJ\On;
-
         ! Return tool and go home
         TPWrite "Py2VS: Dropping off tool...";
         VS_Dropoff;
-        Home;
+        Home FALSE;
 
         TPWrite "========================================";
         TPWrite "Py2VS: COMPLETE";

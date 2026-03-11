@@ -18,11 +18,11 @@ from dataclasses import dataclass
 from typing import List, Literal, Optional
 
 
-# Vacuum rotation constraints (axis 6 mechanical limits)
-# Rotation is cumulative - we track total rotation from initial position (0°)
-# Positive rotation = clockwise (CW), Negative = anticlockwise (ACW)
-MAX_CW_ROTATION = 270.0   # Maximum clockwise rotation (positive degrees)
-MAX_ACW_ROTATION = -270.0  # Maximum anticlockwise rotation (negative degrees)
+# Vacuum rotation constraint: max allowed rotation delta between consecutive moves.
+# Joint 6 safety limits are ±185° on the controller. OrientZYX angle maps to
+# joint_6 = orient_z - 180°, so we keep orient_z in [0°, 360°] to stay within
+# joint limits of [-180°, 180°]. Unwind neutral = orient 180° = joint 0°.
+MAX_ROTATION_DELTA = 180.0  # Max degrees of rotation allowed in a single move
 
 
 @dataclass
@@ -71,27 +71,30 @@ def check_and_unwind(points: List[Point], current_axis_6: float, new_axis_6: flo
     
     The unwind routine:
     1. Lift at current position
-    2. Rotate back to 0° (neutral position)
-    3. Rotate to new target angle from 0°
+    2. Rotate to neutral (orient 180° = joint 0°)
+    3. Rotate to normalized target angle
     4. Place back down
     
     Returns the new_axis_6 value (which may be normalized if we unwound).
     """
-    # Check if new rotation would exceed limits
-    if new_axis_6 > MAX_CW_ROTATION or new_axis_6 < MAX_ACW_ROTATION:
-        # Need to unwind - lift, rotate to 0, then to new angle (normalized)
+    # Convert orient angles to joint space (joint = orient - 180, normalized to [-180, 180])
+    # then check if the JOINT delta exceeds the safe rotation limit.
+    # e.g. orient 0° → joint -180°, orient -90° → joint 90°: joint delta = 270° → unwind!
+    def orient_to_joint(orient):
+        j = orient - 180.0
+        while j < -180.0: j += 360.0
+        while j > 180.0: j -= 360.0
+        return j
+    
+    current_joint = orient_to_joint(current_axis_6)
+    new_joint = orient_to_joint(new_axis_6)
+    joint_delta = abs(new_joint - current_joint)
+    
+    if joint_delta > MAX_ROTATION_DELTA:
+        # Unwind: lift, rotate to neutral (orient 180° = joint 0°), then place at target
         points.append(Point(current_x, current_y, "lift", axis_6=current_axis_6))
-        points.append(Point(current_x, current_y, "rapid", axis_6=0.0))  # Unwind to neutral
-        
-        # Normalize new_axis_6 to be within limits (closest equivalent angle)
-        normalized = new_axis_6 % 360
-        if normalized > 180:
-            normalized -= 360
-        elif normalized < -180:
-            normalized += 360
-        
-        points.append(Point(current_x, current_y, "place", axis_6=normalized))
-        return normalized
+        points.append(Point(current_x, current_y, "rapid", axis_6=180.0))  # Joint neutral
+        points.append(Point(current_x, current_y, "place", axis_6=new_axis_6))
     
     return new_axis_6
 
@@ -136,11 +139,12 @@ def cross_hatch(
     points: List[Point] = []
     is_vacuum = tool == "vacuum"
     
-    # Vacuum axis_6 angles (handle points OPPOSITE to travel direction)
-    # Moving right (+X): handle faces left = 180°
-    # Moving left (-X): handle faces right = 0°
-    # Moving up (+Y): handle faces down = -90° (or 270°)
-    # Moving down (-Y): handle faces up = 90°
+    # Vacuum axis_6 angles (OrientZYX Z-angle, handle points OPPOSITE to travel)
+    # Joint 6 = (orient_z - 180) normalized to [-180, 180]
+    # Moving right (+X): orient 180° → joint 0°,    cf6=0,  robconf [1,0,0,0]
+    # Moving left  (-X): orient 0°   → joint -180°,  cf6=-2, robconf [1,0,-2,0]
+    # Moving down  (-Y): orient 90°  → joint -90°,   cf6=-1, robconf [1,0,-1,0]
+    # Moving up    (+Y): orient -90° → joint 90°,    cf6=1,  robconf [1,0,1,0]
     AXIS6_MOVE_RIGHT = 180.0
     AXIS6_MOVE_LEFT = 0.0
     AXIS6_MOVE_UP = -90.0
@@ -672,18 +676,18 @@ def sweep_lift(
     by offsetting the start position after each rotation.
     
     Pattern (bidirectional with axis 6 rotation):
-    1. Start at max_x, min_y (axis_6 = 0, facing left)
-    2. Sweep to min_x (work move)
-    3. Lift tool, step in Y direction
+    1. Start at min_x, max_y (axis_6 = 180, facing right)
+    2. Sweep to max_x (work move)
+    3. Lift tool, step down in Y direction (toward min_y)
     4. Rotate axis 6 by 180 degrees (contact point shifts by tool_offset)
-    5. Sweep to max_x (work move)
-    6. Lift, step Y, rotate back, repeat alternating
+    5. Sweep to min_x (work move)
+    6. Lift, step Y down, rotate back, repeat alternating
     
     Args:
         min_x: Left edge of workspace
         max_x: Right edge of workspace
-        min_y: Bottom edge of workspace (starting Y)
-        max_y: Top edge of workspace (ending Y)
+        min_y: Bottom edge of workspace (ending Y)
+        max_y: Top edge of workspace (starting Y)
         step_size: Distance to step in Y between passes
         lift_height: Height to lift during repositioning (for reference only)
         tool_offset: Contact point shift when rotating 180° (default 500mm)
@@ -697,36 +701,42 @@ def sweep_lift(
     """
     points: List[Point] = []
     
-    # Axis 6 positions
-    axis_facing_left = axis_6_initial        # 0 degrees - tool facing left (negative X direction)
-    axis_facing_right = axis_6_initial + 180 # 180 degrees - tool facing right (positive X direction)
+    # Axis 6 positions - tool pulls (not pushes) in direction of travel
+    # Sweeping right (+X): axis 6 = 180° to pull
+    # Sweeping left (-X): axis 6 = 0° to pull
+    axis_facing_right = axis_6_initial + 180  # 180 degrees - pulling when sweeping right
+    axis_facing_left = axis_6_initial         # 0 degrees - pulling when sweeping left
     
-    # Generate Y positions for each pass
-    y_values = _generate_steps(min_y, max_y, step_size)
+    # Generate Y positions for each pass (from max_y down to min_y)
+    y_values = _generate_steps(max_y, min_y, -step_size)
     
     for i, y in enumerate(y_values):
-        sweeping_left = (i % 2 == 0)  # Alternate: even passes go left, odd passes go right
+        sweeping_right = (i % 2 == 0)  # Alternate: even passes go right, odd passes go left
         
         if i == 0:
-            # First pass: rapid to start position (max_x), facing left
-            points.append(Point(max_x, y, "rapid", axis_6=axis_facing_left))
-            # Sweep left (on surface) to min_x
-            points.append(Point(min_x, y, "work", axis_6=axis_facing_left))
+            # First pass: rapid to start position (min_x, max_y), facing right
+            points.append(Point(min_x, y, "rapid", axis_6=axis_facing_right))
+            # Lower to work height at start position
+            points.append(Point(min_x, y, "work", axis_6=axis_facing_right))
+            # Sweep right (on surface) to max_x
+            points.append(Point(max_x, y, "work", axis_6=axis_facing_right))
         else:
-            if sweeping_left:
-                # We just finished sweeping right, ended at max_x
-                # Step Y (lifted), then rotate to face left, then sweep
-                points.append(Point(max_x, y, "rapid", axis_6=axis_facing_right))  # Step Y (still facing right)
-                points.append(Point(max_x, y, "rapid", axis_6=axis_facing_left))   # Rotate to face left
-                # Sweep left (on surface) to min_x
-                points.append(Point(min_x, y, "work", axis_6=axis_facing_left))
-            else:
+            if sweeping_right:
                 # We just finished sweeping left, ended at min_x
-                # Step Y (lifted), then rotate to face right, then sweep
+                # Step Y down (lifted), then rotate to face right, then lower, then sweep
                 points.append(Point(min_x, y, "rapid", axis_6=axis_facing_left))   # Step Y (still facing left)
                 points.append(Point(min_x, y, "rapid", axis_6=axis_facing_right))  # Rotate to face right
+                points.append(Point(min_x, y, "work", axis_6=axis_facing_right))   # Lower to work height
                 # Sweep right (on surface) to max_x
                 points.append(Point(max_x, y, "work", axis_6=axis_facing_right))
+            else:
+                # We just finished sweeping right, ended at max_x
+                # Step Y down (lifted), then rotate to face left, then lower, then sweep
+                points.append(Point(max_x, y, "rapid", axis_6=axis_facing_right))  # Step Y (still facing right)
+                points.append(Point(max_x, y, "rapid", axis_6=axis_facing_left))   # Rotate to face left
+                points.append(Point(max_x, y, "work", axis_6=axis_facing_left))    # Lower to work height
+                # Sweep left (on surface) to min_x
+                points.append(Point(min_x, y, "work", axis_6=axis_facing_left))
     
     return points
 

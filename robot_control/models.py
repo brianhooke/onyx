@@ -72,6 +72,7 @@ class ToolPathParameters(models.Model):
     polisher_speed = models.IntegerField(default=100, help_text="Polisher travel speed (mm/s)")
     polisher_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Polisher spiral direction: clockwise or anticlockwise")
     polisher_formwork_offset = models.IntegerField(default=100, help_text="Polisher spiral formwork offset from edges (mm)")
+    polisher_dual_hatch = models.BooleanField(default=False, help_text="Run a second offset cross-hatch pass between the first")
     # Vib Screed parameters
     screed_z_offset = models.IntegerField(default=0, help_text="Screed Z offset (mm)")
     vib_screed_speed = models.IntegerField(default=100, help_text="Vibrating screed speed (mm/s)")
@@ -222,6 +223,7 @@ class ToolPathParameters(models.Model):
             'vacuum_axis_5': self.vacuum_axis_5,
             'polisher_spiral_direction': self.polisher_spiral_direction,
             'polisher_formwork_offset': self.polisher_formwork_offset,
+            'polisher_dual_hatch': self.polisher_dual_hatch,
             'pan_spiral_direction': self.pan_spiral_direction,
             'pan_formwork_offset': self.pan_formwork_offset,
             # Trowel parameters

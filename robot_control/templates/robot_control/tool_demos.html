@@ -734,6 +734,10 @@ function setupBedVisualization() {
         if (window._lastTrowelArgs && demoState && demoState.active && demoState.tool === 'trowel') {
             updateTrowel3D(...window._lastTrowelArgs);
         }
+        // Re-project the screed tool directly using saved args
+        if (window._lastScreedArgs && demoState && demoState.active && demoState.tool === 'screed') {
+            updateScreed3D(...window._lastScreedArgs);
+        }
     }
     
     svg.addEventListener('mousedown', (e) => {
@@ -895,7 +899,7 @@ async function startDemo(tool) {
         heli_pattern: getSelect('heli_pattern', 'cross-hatch'),
         heli_formwork_offset: getVal('heli_formwork_offset', 50),
         heli_spiral_direction: getSelect('heli_spiral_direction', 'anticlockwise'),
-        heli_blade_speed: parseInt(getSelect('heli_blade_speed', '70')),
+        heli_blade_speed: getVal('heli_blade_speed', 70),
         heli_blade_direction: getSelect('heli_blade_direction', 'FWD'),
         pan_step: getVal('pan_step', 200),
         pan_travel_speed: parseInt(getSelect('pan_travel_speed', '100')),
@@ -903,11 +907,13 @@ async function startDemo(tool) {
         vacuum_step: getVal('vacuum_step', 400),
         vacuum_pattern: getSelect('vacuum_pattern', 'cross-hatch'),
         vacuum_speed: getVal('vacuum_speed', 100),
+        vacuum_axis_5: getVal('vacuum_axis_5', 0),
         polisher_speed: getVal('polisher_speed', 100),
-        heli_travel_speed: parseInt(getSelect('heli_travel_speed', '40')),
+        heli_travel_speed: getVal('heli_travel_speed', 40),
         vib_screed_speed: getVal('vib_screed_speed', 100),
         hard_y_offset: getVal('hard_y_offset', 0),
         screed_edge_offset: getVal('screed_edge_offset', 200),
+        screed_angle_offset: getVal('screed_angle_offset', 0),
         trowel_speed: getVal('trowel_speed', 100),
         trowel_step: getVal('trowel_step', 300),
         trowel_pass_1_angle: getVal('trowel_pass_1_angle', 0),
@@ -1035,6 +1041,7 @@ async function startDemo(tool) {
             bladeDirection: params.heli_blade_direction || 'FWD',  // For helicopter blade rotation
             bladeRPM: params.heli_blade_speed || HELI_BLADE_RPM,
             bladeAngle: 0,  // Current blade rotation angle
+            params,  // Store all params for tool-specific use (e.g., screed_angle_offset)
         };
         
         // Initialize coverage grid
@@ -1133,19 +1140,10 @@ function createToolCircle(tool) {
     const color = TOOL_COLORS[tool] || '#fff';
     
     if (tool === 'screed') {
-        // Screed is a rectangle: 3800mm (Y) x 120mm (X)
-        const width = SCREED_WIDTH_X * scale;
-        const height = SCREED_LENGTH_Y * scale;
-        
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('id', 'demo-tool');
-        rect.setAttribute('width', width);
-        rect.setAttribute('height', height);
-        rect.setAttribute('fill', color);
-        rect.setAttribute('fill-opacity', '0.6');
-        rect.setAttribute('stroke', color);
-        rect.setAttribute('stroke-width', '2');
-        circleGroup.appendChild(rect);
+        // 3D Screed: empty group — faces are dynamically created by updateScreed3D
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('id', 'demo-tool');
+        circleGroup.appendChild(g);
     } else if (tool === 'vacuum') {
         // Vacuum is a rectangle with handle - create a group
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1499,6 +1497,114 @@ function updateCoverageToTime(targetTime) {
     renderCoverage();
 }
 
+function updateScreed3D(wx, wy, wz, angle) {
+    // Save args so onViewChange can re-render the tool at the same position
+    window._lastScreedArgs = [wx, wy, wz, angle];
+    
+    if (!window.bedVisualization) return;
+    const { worldToSvg3D } = window.bedVisualization;
+    const group = document.getElementById('demo-tool');
+    if (!group) return;
+    
+    // Screed dimensions: 3800mm (Y) x 120mm (X) x 20mm (Z height)
+    const halfL = SCREED_LENGTH_Y / 2;  // 1900mm along Y
+    const halfW = SCREED_WIDTH_X / 2;   // 60mm along X
+    const height = 20;                   // 20mm tall
+    const lipHeight = 100;               // L-lip extends 100mm up
+    const lipThick = 20;                 // L-lip is 20mm thick
+    
+    // Rotation around Y-axis (pivot at +X edge, i.e., the L corner)
+    // Match RAPID RelTool \Ry convention: positive angle tilts leading edge (-X) down
+    // Negate angle to match RAPID right-hand rule around Y
+    const a = -(angle || 0) * Math.PI / 180;
+    const cosA = Math.cos(a), sinA = Math.sin(a);
+    
+    // Transform: rotate around Y-axis at pivot point (+X edge), then translate
+    // Pivot is at x = halfW (the +X edge where the lip is)
+    function L2W(lx, ly, lz) {
+        // Shift so pivot is at origin
+        const px = lx - halfW;
+        const pz = lz;
+        // Rotate around Y-axis
+        const rx = px * cosA + pz * sinA;
+        const rz = -px * sinA + pz * cosA;
+        // Shift back and translate to world position
+        return [rx + halfW + wx, ly + wy, rz + wz];
+    }
+    
+    // --- Define all 3D faces ---
+    const faces = [];
+    
+    // === Main blade (3800 x 120 x 20) ===
+    // Top face (+Z) - green screed color
+    faces.push({ v: [[-halfW,-halfL,height],[-halfW,halfL,height],[halfW,halfL,height],[halfW,-halfL,height]], fill:'#22c55e', stroke:'#16a34a' });
+    // Bottom face (-Z)
+    faces.push({ v: [[-halfW,halfL,0],[-halfW,-halfL,0],[halfW,-halfL,0],[halfW,halfL,0]], fill:'#14532d', stroke:'#14532d' });
+    // Front face (-Y)
+    faces.push({ v: [[-halfW,-halfL,0],[halfW,-halfL,0],[halfW,-halfL,height],[-halfW,-halfL,height]], fill:'#16a34a', stroke:'#15803d' });
+    // Back face (+Y)
+    faces.push({ v: [[halfW,halfL,0],[-halfW,halfL,0],[-halfW,halfL,height],[halfW,halfL,height]], fill:'#16a34a', stroke:'#15803d' });
+    // Left edge (-X) - leading edge orange
+    faces.push({ v: [[-halfW,halfL,0],[-halfW,-halfL,0],[-halfW,-halfL,height],[-halfW,halfL,height]], fill:'#f97316', stroke:'#ea580c' });
+    // Right edge (+X) - partial, below lip
+    faces.push({ v: [[halfW,-halfL,0],[halfW,halfL,0],[halfW,halfL,height],[halfW,-halfL,height]], fill:'#22c55e', stroke:'#16a34a' });
+    
+    // === L-lip (on +X side, goes up from top of blade) ===
+    const lipX0 = halfW - lipThick;  // Inner edge of lip
+    const lipX1 = halfW;              // Outer edge of lip (same as blade edge)
+    const lipZ0 = height;             // Bottom of lip (top of blade)
+    const lipZ1 = height + lipHeight; // Top of lip
+    
+    // Lip front face (-Y)
+    faces.push({ v: [[lipX0,-halfL,lipZ0],[lipX1,-halfL,lipZ0],[lipX1,-halfL,lipZ1],[lipX0,-halfL,lipZ1]], fill:'#16a34a', stroke:'#15803d' });
+    // Lip back face (+Y)
+    faces.push({ v: [[lipX1,halfL,lipZ0],[lipX0,halfL,lipZ0],[lipX0,halfL,lipZ1],[lipX1,halfL,lipZ1]], fill:'#16a34a', stroke:'#15803d' });
+    // Lip outer face (+X)
+    faces.push({ v: [[lipX1,-halfL,lipZ0],[lipX1,halfL,lipZ0],[lipX1,halfL,lipZ1],[lipX1,-halfL,lipZ1]], fill:'#22c55e', stroke:'#16a34a' });
+    // Lip inner face (-X)
+    faces.push({ v: [[lipX0,halfL,lipZ0],[lipX0,-halfL,lipZ0],[lipX0,-halfL,lipZ1],[lipX0,halfL,lipZ1]], fill:'#15803d', stroke:'#14532d' });
+    // Lip top face (+Z)
+    faces.push({ v: [[lipX0,-halfL,lipZ1],[lipX0,halfL,lipZ1],[lipX1,halfL,lipZ1],[lipX1,-halfL,lipZ1]], fill:'#22c55e', stroke:'#16a34a' });
+    
+    // --- Transform, project, cull, sort ---
+    const visible = [];
+    for (const face of faces) {
+        const pts = face.v.map(v => {
+            const w = L2W(v[0], v[1], v[2]);
+            return worldToSvg3D(w[0], w[1], w[2]);
+        });
+        
+        // Back-face culling: signed area < 0 = front-facing in SVG (Y-down)
+        let area = 0;
+        for (let i = 0; i < pts.length; i++) {
+            const j = (i + 1) % pts.length;
+            area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+        }
+        if (area >= 0) continue; // back-facing, skip
+        
+        // Depth: average SVG Y (lower = farther from viewer)
+        const avgY = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        visible.push({ pts, avgY, fill: face.fill, stroke: face.stroke });
+    }
+    
+    // Painter's algorithm: sort ascending by avgY (farthest first)
+    visible.sort((a, b) => a.avgY - b.avgY);
+    
+    // --- Render: clear old faces, create new in sorted order ---
+    const old = group.querySelectorAll('.screed-face');
+    for (let i = old.length - 1; i >= 0; i--) old[i].remove();
+    
+    for (const f of visible) {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.classList.add('screed-face');
+        poly.setAttribute('points', f.pts.map(p => `${p.x},${p.y}`).join(' '));
+        poly.setAttribute('fill', f.fill);
+        poly.setAttribute('stroke', f.stroke);
+        poly.setAttribute('stroke-width', '0.5');
+        group.appendChild(poly);
+    }
+}
+
 function updateTrowel3D(wx, wy, axis6, wz, axis4) {
     // Save args so onViewChange can re-render the tool at the same position
     window._lastTrowelArgs = [wx, wy, axis6, wz, axis4];
@@ -1667,12 +1773,12 @@ function updateToolPosition(time) {
     const toolEl = document.getElementById('demo-tool');
     if (toolEl) {
         if (demoState.tool === 'screed') {
-            // Rectangle: position by top-left corner, centered on tool position
-            const { scale } = window.bedVisualization;
-            const width = SCREED_WIDTH_X * scale;
-            const height = SCREED_LENGTH_Y * scale;
-            toolEl.setAttribute('x', svgPos.x - width / 2);
-            toolEl.setAttribute('y', svgPos.y - height / 2);
+            // 3D Screed: calculate Z from panel_z + global_z_offset
+            const { panelZ } = window.bedVisualization;
+            const globalZOffset = demoState.params?.global_z_offset || 0;
+            const screedZ = panelZ + globalZOffset;
+            const screedAngle = demoState.params?.screed_angle_offset || 0;
+            updateScreed3D(pos.x, pos.y, screedZ, screedAngle);
         } else if (demoState.tool === 'vacuum') {
             // Vacuum group: use transform to position and rotate based on axis_6
             // Rotation is animated during rotation segments

@@ -1,16 +1,13 @@
 MODULE MainModule
     PROC main()
-        Heli_Off;
-        Pol_off;
-        !Vac_off;
-        VS_off;
-        !Turn off Helicopter
+        AllOutputOff;
         InitialiseERRORs;
         !Turn on custom errors
         Interrupts;
         !Turn on any interrupts
-
+        
         WHILE TRUE DO
+            !RequestAccessCheck;
             MainMenu;
         ENDWHILE
  
@@ -20,14 +17,7 @@ MODULE MainModule
 
         CASE ERR_WAIT_MAXTIME:
             ErrWrite "ERR_WAIT_MAXTIME","Robot has not received signal, check air compressor pressure.";
-            SetDO Local_IO_0_DO9,0;
-            SetDO Local_IO_0_DO10,0;
-            SetDO Local_IO_0_DO11,0;
-            SetDO Local_IO_0_DO12,0;
-            IF ToolNum=1 THEN
-                SETDO Local_IO_0_DO13,0;
-                SETDO Local_IO_0_DO14,0;
-            ENDIF
+            SetDO PN_DO_15,0;
             EXIT;
 
         CASE ERR_HELI_DISCONNECT:
@@ -69,7 +59,12 @@ MODULE MainModule
         CASE ERR_POLISH_DISCONNECT:
             ErrWrite "ERR_POLISH_DISCONNECT","Polish Tool is not coupled but power is trying to be supplied.";
             EXIT;
-
+        CASE ERR_AIR_PRESSURE:
+            ErrWrite "ERR_AIR_PRESSURE","Check air pressure on the regulator.";
+            EXIT;
+        CASE ERR_TC_SLAVE_PROX:
+            ErrWrite "ERR_TC_SLAVE_PROX","Check mounting and power of inductive sensor.";
+            EXIT;
         DEFAULT:
             ErrWrite "UNKNOWN_ERROR","An unhandled error has occurred.";
             EXIT;

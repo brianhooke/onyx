@@ -19,8 +19,16 @@ MODULE ErrorHandling
     !Incorrect input into Flex Pendant
     VAR errnum ERR_POLISH_DISCONNECT:=-1;
     !Polish tool not connected
+    VAR errnum ERR_AIR_PRESSURE:=-1;
+    !Less than 5 bar of pressure from regulator
+    VAR errnum ERR_TC_SLAVE_PROX:=-1;
+    !Toolchanger slave proximity reading incorrect to expected value
+    
+
 
     VAR intnum STPAlarm;
+    VAR intnum toolnumUpdate;
+    VAR intnum RequestAccess;
 
     PROC InitialiseERRORs()
 
@@ -34,16 +42,37 @@ MODULE ErrorHandling
         BookErrNo ERR_PLOT_POS;
         BookErrNo ERR_INVALID_INPUT;
         BookErrNo ERR_POLISH_DISCONNECT;
+        BookErrNo ERR_AIR_PRESSURE;
+        BookErrNo ERR_TC_SLAVE_PROX;
 
     ENDPROC
 
 
     PROC Interrupts()
+        UpdateToolNum; !Set toolnum on startup
+        SetDO PN_DO_10,0;
+        SetDO PN_DO_14, 0;
+        SetDO PN_DO_15,0;
+        SetDO PN_DO_17,0;
+        SetDO PN_DO_18,0;
+        SetDO PN_DO_19,0;
+        SetDO PN_DO_23,0;
+        WaitTime \inpos, 0.2;
+        StartMove;
         IF STPAlarm=0 THEN
             CONNECT STPAlarm WITH iSTPAlarm;
             ISignalDI Local_IO_0_DI1,1,STPAlarm;
         ENDIF
-
+        IF toolnumUpdate=0 THEN
+            CONNECT toolnumUpdate WITH itoolnumUpdate;
+            ISignalDI PN_dI_24,1,toolnumUpdate;
+        ENDIF
+        IF RequestAccess=0 THEN
+            CONNECT RequestAccess WITH iRequestAccess;
+            ISignalDI PN_DI_09,1,RequestAccess;
+        ENDIF
+        
+        IEnable;
     ENDPROC
 
     TRAP iSTPAlarm
@@ -52,5 +81,20 @@ MODULE ErrorHandling
         WaitTime(StepPulseLength*2);
     ENDTRAP
 
-
+    TRAP itoolnumUpdate  !Updates toolnum based on PLC change
+        Toolnum:=dnumtonum (GInputDnum (PN_GI_Toolnum));
+        SetDO PN_DO_24,1;
+        WaitDI PN_DI_24,0;
+        SetDO PN_DO_24,0;
+        RETURN;
+    ENDTRAP    
+    
+    TRAP iRequestAccess
+        StopMove;
+        ClearPath;
+        AllOutputOff;
+        SetDO PN_DO_10,1;
+        RETURN;
+    ENDTRAP
+    
 ENDMODULE
