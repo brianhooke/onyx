@@ -1,0 +1,129 @@
+14 March 2025 — RAPID Code Generation Refactoring
+===================================================
+
+Summary: Reduced generated ToolPaths.mod per-point RAPID code from ~11 lines
+to ~3 lines by extracting a reusable FUNC and eliminating redundant variables.
+Total generated output reduced from ~5843 to ~4823 lines (~17% smaller).
+
+Files Changed:
+  - robot_control/generator/generator.py
+  - robot_control/generator/tool_class.py
+
+--- CHANGE 1: New Py2CalcTrack RAPID FUNC (generator.py) ---
+Added _generate_calc_track_func() method that produces a reusable RAPID FUNC
+injected into ToolPaths.mod before the Py2 procedures:
+
+    FUNC num Py2CalcTrack(num tcpX, num curY, num yOff, num trkMin, num trkMax, num minSep)
+        VAR num worldX;
+        VAR num ct;
+        worldX:=Bed1Wyong.uframe.trans.x+tcpX;
+        ct:=worldX;
+        IF curY<1000 THEN ct:=ct+yOff; ENDIF
+        IF minSep>0 AND curY<=1500 THEN
+            IF (ct-worldX)<minSep THEN ct:=worldX+minSep; ENDIF
+        ENDIF
+        IF ct<trkMin THEN ct:=trkMin; ENDIF
+        IF ct>trkMax THEN ct:=trkMax; ENDIF
+        RETURN ct;
+    ENDFUNC
+
+Parameters:
+  tcpX    = pCurrent.trans.x (already negated)
+  curY    = pCurrent.trans.y
+  yOff    = Track Y offset (tool-specific, e.g. 1200 for heli)
+  trkMin  = TrackMin limit
+  trkMax  = TrackMax limit
+  minSep  = Minimum track-to-TCP X separation (0 = disabled, 1000 for polisher)
+
+Replaces the 4-8 line inline track calculation that was repeated per point.
+
+
+--- CHANGE 2: Pre-negate X coordinates (tool_class.py) ---
+Before:
+    CurrentX:=5550;
+    CurrentY:=2200;
+    pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+
+After:
+    pCurrent.trans:=[-5550,2200,WorkZ];
+
+X is negated in Python at generation time. Eliminates CurrentX and CurrentY
+variables entirely — Py2CalcTrack reads pCurrent.trans.y instead of CurrentY.
+
+
+--- CHANGE 3: Inline CalcTrack into extax (tool_class.py) ---
+Before:
+    CalcTrack:=Py2CalcTrack(pCurrent.trans.x,CurrentY,1200,TrackMin,TrackMax,0);
+    pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+
+After:
+    pCurrent.extax:=[Py2CalcTrack(pCurrent.trans.x,pCurrent.trans.y,1200,TrackMin,TrackMax,0),9E+09,9E+09,9E+09,9E+09,9E+09];
+
+Eliminates the CalcTrack intermediate variable.
+
+
+--- CHANGE 4: Only emit rot/robconf when changed (tool_class.py) ---
+pCurrent.rot and pCurrent.robconf are now only emitted when their values
+differ from the previous point. For cross-hatch patterns where rot/robconf
+stay constant, this saves 2 lines per point after the first.
+
+
+--- CHANGE 5: Removed unused VAR declarations (tool_class.py) ---
+Removed from all generated procedures:
+  - VAR num CurrentX
+  - VAR num CurrentY
+  - VAR num CalcTrack
+Removed from Helicopter (Py2Heli):
+  - VAR num HeliForce  (force value was hardcoded directly in FCPressL/FCPress1LStart)
+  - VAR fcforcevector myForceVector  (never referenced)
+Removed from Pan (Py2Pan):
+  - VAR num PanForce  (same reason as HeliForce)
+  - VAR fcforcevector myForceVector  (never referenced)
+
+
+--- CHANGE 6: VS pattern uses shared helper (tool_class.py) ---
+VibratingScreened._generate_pattern_execution() now uses:
+  - _generate_track_calc_lines() shared helper (was inline 4-line calc)
+  - pCurrent.robconf set once before loop (was per-point)
+  - Same pre-negated X and inlined extax as other tools
+
+
+--- NET RESULT: Per work-point RAPID code ---
+
+BEFORE (original, 11 lines):
+    CurrentX:=5550;
+    CurrentY:=2200;
+    pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];
+    pCurrent.rot:=OrientZYX(0,0,180);
+    pCurrent.robconf:=[1,0,-2,0];
+    CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;
+    IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF
+    IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF
+    IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF
+    pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];
+    FCPressL pCurrent,vTravel,400,fine,tHeli\WObj:=Bed1Wyong;
+
+AFTER (3 lines, rot/robconf omitted when unchanged):
+    pCurrent.trans:=[-5550,2200,WorkZ];
+    pCurrent.extax:=[Py2CalcTrack(pCurrent.trans.x,pCurrent.trans.y,1200,TrackMin,TrackMax,0),9E+09,9E+09,9E+09,9E+09,9E+09];
+    FCPressL pCurrent,vTravel,400,fine,tHeli\WObj:=Bed1Wyong;
+
+
+--- DEBUGGING NOTES ---
+If the IRC5 controller rejects the code:
+  1. Check that RAPID supports function calls inside array literals (the
+     inlined Py2CalcTrack in extax). If not, revert to CalcTrack intermediate
+     variable by restoring _generate_track_calc_lines() to 2-line version.
+  2. Py2CalcTrack FUNC is injected before all PROCs. If RAPID requires FUNCs
+     in a specific location, move it within the MODULE.
+  3. The minSep parameter (6th arg) is 0 for most tools, 1000 for polisher
+     (enforce_min_track_sep=True). If SafeMove trips, check this value.
+  4. Pre-negated X: verify that e.g. pCurrent.trans:=[-450,2200,SafeZ] behaves
+     identically to pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ] with
+     CurrentX:=450. It should — both produce trans.x = -450.
+
+--- DB MIGRATIONS (this Mac) ---
+Applied 3 pending migrations:
+  - robot_control.0033_toolpathparameters_polisher_dual_hatch
+  - robot_control.0034_toolpathparameters_blend_radius
+  - robot_control.0035_add_desc_asc_blend

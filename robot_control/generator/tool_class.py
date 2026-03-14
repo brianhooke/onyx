@@ -360,12 +360,9 @@ class Tool(ABC):
             f"        VAR robtarget CurrentPos;",
             f"        VAR num WorkZ:={workzone['work_z']};",
             f"        VAR num SafeZ:={workzone['safe_z']};",
-            f"        VAR num CurrentX:=0;",
-            f"        VAR num CurrentY:=0;",
             f"        VAR speeddata vTravel:=[{travel_speed},500,5000,1000];",
             f"        VAR num TrackMin:={track_min};",
             f"        VAR num TrackMax:={track_max};",
-            f"        VAR num CalcTrack:=0;",
         ]
         da_blend = int(params.get('desc_asc_blend', 0))
         if da_blend > 200:
@@ -450,16 +447,15 @@ class Tool(ABC):
                 lines.append(f"        pCurrent.trans.z:=WorkZ;")
                 lines.append(f"        MoveL pCurrent,v100,{da_zone},{self.config.tooldata}\\WObj:=Bed1Wyong;")
                 lines.append(f"")
+            neg_x = -point.x
             axis_6_str = f", axis_6={point.axis_6:.0f}" if point.axis_6 is not None else ""
             lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]{axis_6_str}")
-            lines.append(f"        CurrentX:={point.x:.0f};")
-            lines.append(f"        CurrentY:={point.y:.0f};")
             
             # Handle Z based on move type (lifted for rapid/lift, work height for work/place)
             if point.move_type in ("rapid", "lift"):
-                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+                lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
             else:
-                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+                lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
             
             # Use point's axis_5 if specified, otherwise use tool param
             point_axis_5 = point.axis_5 if point.axis_5 is not None else axis_5_angle
@@ -498,16 +494,15 @@ class Tool(ABC):
         return lines
     
     def _generate_track_calc_lines(self) -> List[str]:
-        """Generate RAPID lines for track position calculation using Py2CalcTrack FUNC.
+        """Generate RAPID line for track position calculation + extax assignment.
         
-        Replaces the repeated inline track calculation with a single FUNC call.
-        Includes the extax assignment so callers don't need to append it separately.
+        Uses Py2CalcTrack FUNC inlined into extax assignment.
+        Reads Y from pCurrent.trans.y (no separate CurrentY variable needed).
         """
         offset = self.config.track_y_offset
         min_sep = 1000 if self.config.enforce_min_track_sep else 0
         return [
-            f"        CalcTrack:=Py2CalcTrack(pCurrent.trans.x,CurrentY,{offset},TrackMin,TrackMax,{min_sep});",
-            f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];",
+            f"        pCurrent.extax:=[Py2CalcTrack(pCurrent.trans.x,pCurrent.trans.y,{offset},TrackMin,TrackMax,{min_sep}),9E+09,9E+09,9E+09,9E+09,9E+09];",
         ]
     
     def _uses_force_control(self, params: Dict) -> bool:
@@ -652,10 +647,7 @@ class Helicopter(Tool):
     def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
         """Add helicopter-specific variables."""
         lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
-        heli_force = params.get('heli_force', 0)
-        lines.insert(-1, f"        VAR num HeliForce:={heli_force};")
         lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
-        lines.insert(-1, f"        VAR fcforcevector myForceVector;")
         return lines
     
     def _generate_pickup_section(self) -> List[str]:
@@ -833,15 +825,14 @@ class VibratingScreened(Tool):
         
         # Generate moves for each point
         for i, point in enumerate(points):
+            neg_x = -point.x
             lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
-            lines.append(f"        CurrentX:={point.x:.0f};")
-            lines.append(f"        CurrentY:={point.y:.0f};")
             
             # Handle Z based on move type
             if point.move_type in ("rapid", "lift"):
-                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+                lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
             else:
-                lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+                lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
             
             lines.extend(self._generate_track_calc_lines())
             
@@ -1137,10 +1128,9 @@ class Polisher(Tool):
         
         # 1. Move to first position at SafeZ
         for point in rapid_points:
+            neg_x = -point.x
             lines.append(f"        ! Rapid: ({point.x:.0f}, {point.y:.0f})")
-            lines.append(f"        CurrentX:={point.x:.0f};")
-            lines.append(f"        CurrentY:={point.y:.0f};")
-            lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+            lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
             lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
             lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
             lines.extend(self._generate_track_calc_lines())
@@ -1182,9 +1172,8 @@ class Polisher(Tool):
             
             # 3. Work points using FCPressL
             for i, point in enumerate(work_points):
+                neg_x = -point.x
                 lines.append(f"        ! Work point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
-                lines.append(f"        CurrentX:={point.x:.0f};")
-                lines.append(f"        CurrentY:={point.y:.0f};")
                 
                 if point.move_type in ("rapid", "lift"):
                     # End FC, retract, reposition, restart FC
@@ -1197,7 +1186,7 @@ class Polisher(Tool):
                         f"        bFCActive:=FALSE;",
                         f"",
                         f"        ! Reposition at SafeZ",
-                        f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];",
+                        f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];",
                         f"        pCurrent.robconf:=[0,0,0,0];",
                     ])
                     lines.extend(self._generate_track_calc_lines())
@@ -1221,7 +1210,7 @@ class Polisher(Tool):
                     ])
                 else:
                     # Work move with FCPressL
-                    lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+                    lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
                     lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
                     lines.extend(self._generate_track_calc_lines())
                     lines.append(f"        FCPressL pCurrent,v{travel_speed},{motion_force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
@@ -1258,14 +1247,13 @@ class Polisher(Tool):
             ])
             
             for i, point in enumerate(work_points):
+                neg_x = -point.x
                 lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]")
-                lines.append(f"        CurrentX:={point.x:.0f};")
-                lines.append(f"        CurrentY:={point.y:.0f};")
                 
                 if point.move_type in ("rapid", "lift"):
-                    lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
+                    lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
                 else:
-                    lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
+                    lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
                 
                 lines.extend(self._generate_track_calc_lines())
                 
@@ -1321,11 +1309,7 @@ class Pan(Tool):
     
     def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
         lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
-        pan_force = params.get('pan_force', 0)
-        lines.insert(-1, f"        VAR num PanForce:={pan_force};")
         lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
-        if self._uses_force_control(params):
-            lines.insert(-1, f"        VAR fcforcevector myForceVector;")
         return lines
     
     def _generate_pickup_section(self) -> List[str]:
