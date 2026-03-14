@@ -49,7 +49,7 @@ def api_toolpath_save_params(request):
             'polisher_z_offset', 'polisher_workzone', 'polisher_start_force', 'polisher_motion_force', 'polisher_force_change',
             'polisher_approach_speed', 'polisher_retract_speed', 'polisher_pos_supv_dist',
             'screed_z_offset', 'vib_screed_speed', 'screed_angle_offset', 'screed_edge_offset',
-            'z_offset', 'hard_y_offset',
+            'z_offset', 'hard_y_offset', 'blend_radius', 'desc_asc_blend',
             'serpentine_offset_x', 'serpentine_offset_y', 'serpentine_direction', 'serpentine_start_bottom',
             'trowel_z_offset', 'trowel_speed', 'trowel_force',
             'trowel_pass_1_angle', 'trowel_pass_1_rotation', 'trowel_pass_2_angle', 'trowel_pass_2_rotation',

@@ -94,7 +94,7 @@ def api_position(request):
 
 @require_http_methods(["GET"])
 def api_live_log(request):
-    """Get a lightweight live snapshot for the Toolpath Generator live log panel."""
+    """Get pendant-style event log (TPWrite messages, warnings, errors)."""
     client = IRC5Client()
 
     # Fast-fail if not connected (avoid multiple 10s timeouts)
@@ -103,8 +103,6 @@ def api_live_log(request):
         return JsonResponse({'lines': [], 'current_tool': 'disconnected'})
 
     try:
-        contains = request.GET.get('contains', 'LIVE:')
-
         # Current tool
         tool_num = client.get_rapid_variable('Tools', 'ToolNum')
         tool_names = {
@@ -117,54 +115,30 @@ def api_live_log(request):
         }
         tool_name = tool_names.get(str(tool_num), f'Unknown ({tool_num})')
 
-        # TCP snapshot (world)
-        tcp = client.get_robot_position() or {}
-        x = tcp.get('x')
-        y = tcp.get('y')
-
-        # Helicopter blade pitch (degrees) derived from stepper position
-        stepper_pos = client.get_rapid_variable('Tools', 'StepperPos')
-        steps_per_rev = client.get_rapid_variable('Tools', 'StepsPerRevolution')
-        revs_to_angle = client.get_rapid_variable('Tools', 'RevstoAngle')
-
-        pitch_deg = None
-        try:
-            if stepper_pos is not None and steps_per_rev is not None and revs_to_angle is not None:
-                denom = float(steps_per_rev) * float(revs_to_angle)
-                if denom != 0:
-                    pitch_deg = float(stepper_pos) / denom
-        except (TypeError, ValueError):
-            pitch_deg = None
-
         ts = datetime.now().strftime("%H:%M:%S")
         lines = []
 
-        # Filtered recent event log lines (e.g. TPWrite output)
+        # All recent event log entries (same as pendant display)
+        count = int(request.GET.get('count', 50))
         try:
-            events = client.get_event_log_detailed(30)
+            events = client.get_event_log_detailed(count)
             for e in events:
                 title = e.get('title')
                 if not title:
                     continue
-                if contains and contains not in title:
-                    continue
-                # Prefer controller timestamp if present; otherwise fall back to local time
                 evt_ts = e.get('timestamp') or ts
-                lines.append(f"{evt_ts} {title}")
+                msg_type = e.get('type', 'info')
+                lines.append({
+                    'ts': evt_ts,
+                    'text': title,
+                    'type': msg_type,
+                })
         except Exception:
             pass
-
-        if x is not None and y is not None:
-            lines.append(f"{ts} Heli XY: x={x}, y={y}")
-        if pitch_deg is not None:
-            lines.append(f"{ts} Heli Pitch: {pitch_deg:.2f}°")
 
         return JsonResponse({
             'current_tool': tool_name,
             'tool_num': tool_num,
-            'x': x,
-            'y': y,
-            'blade_pitch_deg': pitch_deg,
             'lines': lines,
         })
     except Exception as e:
@@ -389,41 +363,39 @@ def api_generate_toolpath(request):
         # Load all parameters from DB first (single source of truth)
         db_params = ToolPathParameters.get_instance().to_dict()
         
-        # Overlay with any values from POST data
+        # Overlay with any values from POST data (check all db params, not just REQUIRED)
         params = dict(db_params)
-        for key in ToolpathGenerator.REQUIRED_PARAMS:
+        for key in list(db_params.keys()) + list(ToolpathGenerator.REQUIRED_PARAMS):
             if key in data and data[key] is not None:
-                if key in ('vacuum_pattern', 'vacuum_workzone', 'polisher_workzone', 'polisher_pattern', 'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'pan_pattern'):
-                    params[key] = str(data[key])
-                elif key in ('serpentine_start_bottom', 'polisher_dual_hatch'):
+                if key in ('serpentine_start_bottom', 'polisher_dual_hatch'):
                     params[key] = bool(int(data[key])) if data[key] != '' else False
                 else:
-                    params[key] = int(data[key])
+                    try:
+                        params[key] = int(data[key])
+                    except (ValueError, TypeError):
+                        params[key] = str(data[key])
         
         upload_to_irc5 = data.get('upload_to_irc5', True)
-        use_temp_templates = data.get('use_temp_templates', False)  # Legacy mode
-        use_irc5_templates = data.get('use_irc5_templates', True)  # New workflow: use pulled IRC5 files
         
         # Step 1: Pull latest files from IRC5 before generating
         pull_result = None
-        if use_irc5_templates:
-            client = IRC5Client()
-            conn_test = client.test_connection()
-            if conn_test['connected']:
-                pull_result = client.download_all_modules(str(IRC5_PULL_DIR))
-                if not pull_result['success']:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f"Failed to pull IRC5 files: {pull_result.get('failed', [])}"
-                    })
-            else:
+        client = IRC5Client()
+        conn_test = client.test_connection()
+        if conn_test['connected']:
+            pull_result = client.download_all_modules(str(IRC5_PULL_DIR))
+            if not pull_result['success']:
                 return JsonResponse({
                     'success': False,
-                    'error': 'IRC5 not connected - cannot pull latest files'
+                    'error': f"Failed to pull IRC5 files: {pull_result.get('failed', [])}"
                 })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'IRC5 not connected - cannot pull latest files'
+            })
         
-        # Step 2: Generate modules (IRC5 templates mode = only generate ToolPaths.mod)
-        generator = ToolpathGenerator(params, use_temp_templates=use_temp_templates, use_irc5_templates=use_irc5_templates)
+        # Step 2: Generate ToolPaths.mod (reads from templates_from_irc5, writes to irc5_upload)
+        generator = ToolpathGenerator(params)
         result = generator.generate()
         
         response_data = {
@@ -520,79 +492,6 @@ def api_generate_toolpath(request):
         
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_upload_original_progmod(request):
-    """
-    Upload the original RAPID modules from RAPID/RAPID/TASK1/PROGMOD to IRC5.
-    These are Andrew's original program files.
-    """
-    try:
-        client = IRC5Client()
-        
-        # Check connection first
-        conn_test = client.test_connection()
-        if not conn_test['connected']:
-            return JsonResponse({
-                'success': False,
-                'error': 'IRC5 not connected'
-            })
-        
-        # Get loaded program name
-        program_name = client.get_loaded_program_name()
-        if not program_name:
-            return JsonResponse({
-                'success': False,
-                'error': 'Could not detect loaded program name on IRC5'
-            })
-        
-        # Original PROGMOD directory
-        original_progmod = Path(__file__).parent / 'generator' / 'templates_original'
-        
-        if not original_progmod.exists():
-            return JsonResponse({
-                'success': False,
-                'error': f'Original PROGMOD directory not found: {original_progmod}'
-            })
-        
-        # Get all .mod files
-        mod_files = list(original_progmod.glob('*.mod'))
-        if not mod_files:
-            return JsonResponse({
-                'success': False,
-                'error': 'No .mod files found in original PROGMOD directory'
-            })
-        
-        # Create backup of existing files before upload
-        backup_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_subdir = BACKUP_DIR / f"{program_name}_original_{backup_timestamp}"
-        backup_subdir.mkdir(parents=True, exist_ok=True)
-        
-        backed_up = []
-        for mod_file in mod_files:
-            backup_result = client.backup_rapid_module(mod_file.name, str(backup_subdir), program_name=program_name)
-            if backup_result['success']:
-                backed_up.append(mod_file.name)
-        
-        # Upload all .mod files
-        module_paths = [(str(f), f.name) for f in mod_files]
-        upload_result = client.upload_rapid_modules(module_paths)
-        
-        return JsonResponse({
-            'success': upload_result['success'],
-            'program_name': program_name,
-            'uploaded_files': upload_result['uploaded'],
-            'failed_files': upload_result.get('failed', []),
-            'backed_up_files': backed_up,
-            'backup_dir': str(backup_subdir),
-            'source_dir': str(original_progmod),
-            'upload_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
-        
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 

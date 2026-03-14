@@ -7,7 +7,7 @@ MODULE MainModule
         !Turn on any interrupts
         
         WHILE TRUE DO
-            !RequestAccessCheck;
+            RequestAccessCheck;
             MainMenu;
         ENDWHILE
  

@@ -80,6 +80,8 @@ class ToolPathParameters(models.Model):
     screed_edge_offset = models.IntegerField(default=200, help_text="Screed edge offset (mm) - positive extends beyond panel edges")
     z_offset = models.IntegerField(default=0, help_text="Z offset (mm) - applies to all workzones")
     hard_y_offset = models.IntegerField(default=0, help_text="Hard Y offset (mm) - absolute minimum Y bound for all tools")
+    blend_radius = models.IntegerField(default=0, help_text="Corner blend radius (mm) - 0=fine/off, or ABB zone value (z1,z5,...,z200)")
+    desc_asc_blend = models.IntegerField(default=0, help_text="Descent/ascent blend radius (mm) - 0=fine/off, or ABB zone value (z1,z5,...,z200)")
     
     # Cross-hatch pattern parameters (legacy/global - deprecated, use per-tool params below)
     serpentine_offset_x = models.IntegerField(default=100, help_text="Serpentine X offset from edges (mm)")
@@ -163,6 +165,7 @@ class ToolPathParameters(models.Model):
             'vacuum_step': self.vacuum_step,
             'pan_step': self.pan_step,
             'helicopter_step': self.helicopter_step,
+            'heli_step': self.helicopter_step,
             'pan_travel_speed': self.pan_travel_speed,
             'pan_blade_speed': self.pan_blade_speed,
             'pan_z_offset': self.pan_z_offset,
@@ -196,6 +199,8 @@ class ToolPathParameters(models.Model):
             'screed_edge_offset': self.screed_edge_offset,
             'z_offset': self.z_offset,
             'hard_y_offset': self.hard_y_offset,
+            'blend_radius': self.blend_radius,
+            'desc_asc_blend': self.desc_asc_blend,
             'serpentine_offset_x': self.serpentine_offset_x,
             'serpentine_offset_y': self.serpentine_offset_y,
             'serpentine_direction': self.serpentine_direction,

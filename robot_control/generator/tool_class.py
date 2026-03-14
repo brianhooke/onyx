@@ -60,6 +60,8 @@ class ToolConfig:
     param_prefix: str = ""       # DB parameter prefix (e.g., "vacuum" for vacuum_speed)
     min_safe_z: int = 300        # Minimum Z height before movements
     home_pos: str = "pHome"      # Home position name
+    enforce_min_track_sep: bool = False  # Enforce minimum track-to-TCP X separation
+    track_y_offset: int = 1200   # Track offset added when Y < 1000mm
 
 
 class Tool(ABC):
@@ -270,7 +272,7 @@ class Tool(ABC):
         lines.extend(self._generate_init_section(params, workzone))
         lines.extend(self._generate_pickup_section())
         lines.extend(self._generate_pattern_execution(points, params, workzone))
-        lines.extend(self._generate_finish_section())
+        lines.extend(self._generate_finish_section(params))
         lines.extend(self._generate_error_handler())
         
         return "\n".join(lines)
@@ -351,8 +353,8 @@ class Tool(ABC):
     
     def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
         """Generate VAR declarations."""
-        travel_speed = params.get(f'{self._prefix}_speed', 100)
-        return [
+        travel_speed = params.get(f'{self._prefix}_travel_speed', params.get(f'{self._prefix}_speed', 100))
+        lines = [
             f"        VAR robtarget pCurrent;",
             f"        VAR jointtarget CurrentJoints;",
             f"        VAR robtarget CurrentPos;",
@@ -364,8 +366,17 @@ class Tool(ABC):
             f"        VAR num TrackMin:={track_min};",
             f"        VAR num TrackMax:={track_max};",
             f"        VAR num CalcTrack:=0;",
-            f"",
         ]
+        da_blend = int(params.get('desc_asc_blend', 0))
+        if da_blend > 200:
+            lines.append(f"        VAR zonedata z{da_blend}:=[FALSE,{da_blend},{int(da_blend*1.5)},{int(da_blend*1.5)},{int(da_blend*0.15)},{int(da_blend*1.5)},{int(da_blend*0.15)}];")
+        if self.config.enforce_min_track_sep:
+            lines.extend([
+                f"        VAR num TcpWorldX:=0;",
+                f"        VAR num MinTrackSep:=1000;",
+            ])
+        lines.append(f"")
+        return lines
     
     def _generate_init_section(self, params: Dict, workzone: Dict) -> List[str]:
         """Generate initialization and TPWrite statements."""
@@ -415,6 +426,10 @@ class Tool(ABC):
         use_fc = self._uses_force_control(params)
         move_cmd = self._get_move_command(use_fc, params)
         
+        # Descent/ascent zone data
+        da_blend = int(params.get('desc_asc_blend', 0))
+        da_zone = f"z{da_blend}" if da_blend > 0 else "fine"
+        
         # Add force control start if needed
         if use_fc:
             lines.extend(self._generate_fc_start(params, workzone))
@@ -434,7 +449,7 @@ class Tool(ABC):
             if prev_move_type == "rapid" and point.move_type not in ("rapid", "lift"):
                 lines.append(f"        ! Descend to work height")
                 lines.append(f"        pCurrent.trans.z:=WorkZ;")
-                lines.append(f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+                lines.append(f"        MoveL pCurrent,v100,{da_zone},{self.config.tooldata}\\WObj:=Bed1Wyong;")
                 lines.append(f"")
             axis_6_str = f", axis_6={point.axis_6:.0f}" if point.axis_6 is not None else ""
             lines.append(f"        ! Point {i+1}: ({point.x:.0f}, {point.y:.0f}) [{point.move_type}]{axis_6_str}")
@@ -458,10 +473,7 @@ class Tool(ABC):
             while _joint > 180.0: _joint -= 360.0
             cf6 = int(_joint // 90)
             lines.append(f"        pCurrent.robconf:=[1,0,{cf6},0];")
-            lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
-            lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
-            lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
-            lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+            lines.extend(self._generate_track_calc_lines())
             lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
             
             # Track axis 6 changes
@@ -481,16 +493,48 @@ class Tool(ABC):
         
         return lines
     
+    def _generate_track_calc_lines(self) -> List[str]:
+        """Generate RAPID lines for track position calculation.
+        
+        When enforce_min_track_sep is enabled, enforces minimum track-to-TCP X
+        separation to prevent SafeMove violations when the arm folds compactly.
+        """
+        offset = self.config.track_y_offset
+        if self.config.enforce_min_track_sep:
+            return [
+                f"        TcpWorldX:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;",
+                f"        CalcTrack:=TcpWorldX;",
+                f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+{offset}; ENDIF",
+                f"        IF CurrentY<=1500 THEN",
+                f"            IF (CalcTrack-TcpWorldX)<MinTrackSep THEN CalcTrack:=TcpWorldX+MinTrackSep; ENDIF",
+                f"        ENDIF",
+                f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF",
+                f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF",
+            ]
+        return [
+            f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;",
+            f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+{offset}; ENDIF",
+            f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF",
+            f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF",
+        ]
+    
     def _uses_force_control(self, params: Dict) -> bool:
         """Check if this tool uses force control. Override in subclasses."""
         return False
     
     def _get_move_command(self, use_fc: bool, params: Dict) -> str:
-        """Get the move command string."""
+        """Get the move command string.
+        
+        Uses blend_radius param to set zone data:
+          0 = fine (stop at each point, current default)
+          >0 = z{N} (blend through corners for smoother motion)
+        """
+        blend = int(params.get('blend_radius', 0))
+        zone = f"z{blend}" if blend > 0 else "fine"
         if use_fc:
             force = params.get(f'{self._prefix}_force', 100)
-            return f"FCPressL pCurrent,vTravel,{force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;"
-        return f"MoveL pCurrent,vTravel,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;"
+            return f"FCPressL pCurrent,vTravel,{force},{zone},{self.config.tooldata}\\WObj:=Bed1Wyong;"
+        return f"MoveL pCurrent,vTravel,{zone},{self.config.tooldata}\\WObj:=Bed1Wyong;"
     
     def _generate_fc_start(self, params: Dict, workzone: Dict) -> List[str]:
         """Generate force control start sequence. Override in FC-capable tools."""
@@ -500,15 +544,18 @@ class Tool(ABC):
         """Generate force control end sequence. Override in FC-capable tools."""
         return []
     
-    def _generate_finish_section(self) -> List[str]:
+    def _generate_finish_section(self, params: Dict) -> List[str]:
         """Generate finish/cleanup section."""
-        lines = self._generate_motor_off()
-        lines.extend([
+        da_blend = int(params.get('desc_asc_blend', 0))
+        da_zone = f"z{da_blend}" if da_blend > 0 else "fine"
+        lines = [
             f"",
-            f"        ! Lift to safe height",
-            f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
-            f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+            f"        ! Lift to safe height (before motor off for smooth blend)",
+            f"        pCurrent.trans.z:=WorkZ+500;",
+            f"        MoveL pCurrent,v200,{da_zone},{self.config.tooldata}\\WObj:=Bed1Wyong;",
+        ]
+        lines.extend(self._generate_motor_off())
+        lines.extend([
             f"",
             f"        ! Return tool and go home",
             f"        TPWrite \"Py2{self.config.name}: Dropping off tool...\";",
@@ -627,13 +674,17 @@ class Helicopter(Tool):
     def _generate_pattern_execution(self, points: List[Point], params: Dict, workzone: Dict) -> List[str]:
         """Override to pitch blades and start spinning before pattern (regardless of force control)."""
         blade_angle = params.get('heli_blade_angle', 0)
+        blade_speed = params.get('heli_blade_speed', 70)
+        blade_dir = params.get('heli_blade_direction', 'FWD')
         lines = [
             f"        ! Set blade pitch angle",
             f"        HeliBlade_Angle {blade_angle};",
             f"",
             f"        ! Start blade rotation",
-            f"        HeliBladeSpeed {params.get('heli_blade_speed', 70)},\"{params.get('heli_blade_direction', 'FWD')}\";",
-            f"        WaitTime 2;",
+            f"        TPWrite \"Py2Heli: Starting blades at \" \\Num:={blade_speed};",
+            f"        HeliBladeSpeed {blade_speed},\"{blade_dir}\";",
+            f"        TPWrite \"Py2Heli: Blades motor on\";",
+            f"        WaitTime 5;",
             f"",
         ]
         # Call parent implementation for pattern execution
@@ -916,6 +967,8 @@ class Vacuum(Tool):
             dropoff_pos=ToolPosition("ptVac", approach_offset=(0, 10, 100), depart_offset=(0, 80, 800)),
             power_do="Local_IO_0_DO16",
             min_safe_z=800,
+            enforce_min_track_sep=True,
+            track_y_offset=1500,
         )
         super().__init__(config)
     
@@ -996,6 +1049,7 @@ class Polisher(Tool):
             power_do="Local_IO_0_DO15",
             error_disconnect="ERR_POLISH_DISCONNECT",
             min_safe_z=700,
+            enforce_min_track_sep=True,
         )
         super().__init__(config)
     
@@ -1101,10 +1155,7 @@ class Polisher(Tool):
             lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];")
             lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
             lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
-            lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
-            lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
-            lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
-            lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+            lines.extend(self._generate_track_calc_lines())
             lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
             lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
             lines.append(f"")
@@ -1161,10 +1212,9 @@ class Polisher(Tool):
                         f"        ! Reposition at SafeZ",
                         f"        pCurrent.trans:=[-1*CurrentX,CurrentY,SafeZ];",
                         f"        pCurrent.robconf:=[0,0,0,0];",
-                        f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;",
-                        f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF",
-                        f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF",
-                        f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF",
+                    ])
+                    lines.extend(self._generate_track_calc_lines())
+                    lines.extend([
                         f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];",
                         f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                         f"",
@@ -1187,10 +1237,7 @@ class Polisher(Tool):
                     # Work move with FCPressL
                     lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
                     lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
-                    lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
-                    lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
-                    lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
-                    lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+                    lines.extend(self._generate_track_calc_lines())
                     lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
                     lines.append(f"        FCPressL pCurrent,v{travel_speed},{motion_force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
                     lines.append(f"")
@@ -1237,10 +1284,7 @@ class Polisher(Tool):
                 
                 lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
                 lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
-                lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
-                lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
-                lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
-                lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
+                lines.extend(self._generate_track_calc_lines())
                 lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
                 
                 if point.move_type == "rapid":
@@ -1324,20 +1368,30 @@ class Pan(Tool):
             f"",
         ]
     
+    def _generate_pattern_execution(self, points: List[Point], params: Dict, workzone: Dict) -> List[str]:
+        """Override to start blade rotation before pattern (regardless of force control)."""
+        blade_speed = params.get('pan_blade_speed', 70)
+        lines = [
+            f"        ! Start blade rotation",
+            f"        TPWrite \"Py2Pan: Starting blades at \" \\Num:={blade_speed};",
+            f"        HeliBladeSpeed {blade_speed},\"REV\";",
+            f"        TPWrite \"Py2Pan: Blades motor on\";",
+            f"        WaitTime 5;",
+            f"",
+        ]
+        # Call parent implementation for pattern execution
+        lines.extend(super()._generate_pattern_execution(points, params, workzone))
+        return lines
+    
     def _generate_fc_start(self, params: Dict, workzone: Dict) -> List[str]:
         force = params.get('pan_force', 100)
         force_change = params.get('pan_force_change', 100)
         pos_supv_dist = params.get('pan_pos_supv_dist', 125)
-        blade_speed = params.get('pan_blade_speed', 70)
         return [
             f"        ! Force control calibration",
             f"        TPWrite \"Py2Pan: Calibrating force control...\";",
             f"        FCCalib HeliLoad70rpm;",
             f"        WaitTime 0.5;",
-            f"",
-            f"        ! Start blade rotation",
-            f"        HeliBladeSpeed {blade_speed},\"FWD\";",
-            f"        WaitTime 2;",
             f"",
             f"        ! Start force control",
             f"        FCPress1LStart pCurrent,v10,\\Fz:={force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tHeli\\WObj:=Bed1Wyong;",
@@ -1359,19 +1413,22 @@ class Pan(Tool):
     def _generate_motor_off(self) -> List[str]:
         return [
             f"        ! Stop blade rotation",
-            f"        HeliBladeSpeed 0,\"FWD\";",
+            f"        HeliBladeSpeed 0,\"REV\";",
             f"        WaitTime 1;",
         ]
     
-    def _generate_finish_section(self) -> List[str]:
+    def _generate_finish_section(self, params: Dict) -> List[str]:
         """Pan uses Heli_Dropoff."""
-        lines = self._generate_motor_off()
-        lines.extend([
+        da_blend = int(params.get('desc_asc_blend', 0))
+        da_zone = f"z{da_blend}" if da_blend > 0 else "fine"
+        lines = [
             f"",
-            f"        ! Lift to safe height",
-            f"        CurrentJoints:=CJointT();",
-            f"        CurrentPos:=CalcRobT(CurrentJoints,tHeli\\WObj:=Bed1Wyong);",
-            f"        MoveL Offs(CurrentPos,0,0,200),v200,z5,tHeli\\WObj:=Bed1Wyong;",
+            f"        ! Lift to safe height (before motor off for smooth blend)",
+            f"        pCurrent.trans.z:=WorkZ+500;",
+            f"        MoveL pCurrent,v200,{da_zone},tHeli\\WObj:=Bed1Wyong;",
+        ]
+        lines.extend(self._generate_motor_off())
+        lines.extend([
             f"",
             f"        ! Return tool and go home",
             f"        TPWrite \"Py2Pan: Dropping off helicopter...\";",
@@ -1388,7 +1445,7 @@ class Pan(Tool):
     def _generate_error_cleanup(self) -> List[str]:
         return [
             f"    ERROR",
-            f"        HeliBladeSpeed 0,\"FWD\";",
+            f"        HeliBladeSpeed 0,\"REV\";",
             f"        IF bFCActive THEN",
             f"            FCPressEnd Offs(CurrentPos,0,0,100),v50,\\DeactOnly,tHeli\\WObj:=Bed1Wyong;",
             f"        ENDIF",

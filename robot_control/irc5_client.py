@@ -14,20 +14,23 @@ import threading
 
 # Global singleton session to reuse connections
 _session = None
+_session_credentials = None
 _session_lock = threading.Lock()
 
 
 def get_shared_session(host, username, password):
     """Get or create a shared session for IRC5 communication."""
-    global _session
+    global _session, _session_credentials
+    creds = (host, username, password)
     with _session_lock:
-        if _session is None:
+        if _session is None or _session_credentials != creds:
             _session = requests.Session()
             _session.auth = HTTPDigestAuth(username, password)
             _session.headers.update({
                 'Accept': 'application/xhtml+xml;v=2.0',
                 'Content-Type': 'application/x-www-form-urlencoded'
             })
+            _session_credentials = creds
         return _session
 
 
@@ -655,9 +658,26 @@ class IRC5Client:
     # =========================================================================
     
     def get_file_list(self, path='$HOME'):
-        """Get list of files in a directory on the controller."""
+        """Get list of files in a directory on the controller.
+        
+        Returns list of file dicts, or list with single error dict if access fails.
+        """
         try:
-            response = self._get(f"/fileservice/{path}")
+            url = f"{self.base_url}/fileservice/{path}"
+            response = self.session.get(url, timeout=10)
+            
+            # Check for permission/auth errors explicitly
+            if response.status_code in [401, 403]:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"IRC5 fileservice access denied (HTTP {response.status_code}) for {path}. "
+                    f"Check UAS permissions for RWS user."
+                )
+                return [{'_error': f'Access denied (HTTP {response.status_code}) - check UAS permissions for RWS user'}]
+            
+            if response.status_code != 200:
+                return [{'_error': f'HTTP {response.status_code} from fileservice'}]
+            
             files = []
             root = ET.fromstring(response.text)
             for elem in root.iter():
@@ -674,7 +694,9 @@ class IRC5Client:
                         files.append(file_info)
             return files
         except Exception as e:
-            return []
+            import logging
+            logging.getLogger(__name__).warning(f"IRC5 get_file_list failed for {path}: {e}")
+            return [{'_error': str(e)}]
     
     def upload_file(self, local_path, remote_path):
         """
@@ -903,6 +925,21 @@ class IRC5Client:
             'program_name': program_name
         }
     
+    def _get_module_names_from_rapid(self, task='T_ROB1'):
+        """Discover module names via RAPID API (fallback when fileservice is blocked).
+        
+        Returns list of module name strings, or empty list on failure.
+        """
+        try:
+            modules = self.get_modules(task)
+            # Filter out system modules (typically uppercase like 'BASE', 'USER')
+            # Keep all for now - the caller filters by .mod extension anyway
+            return modules if modules else []
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"RAPID API module discovery failed: {e}")
+            return []
+    
     def download_all_modules(self, local_dir, task='T_ROB1'):
         """
         Download all RAPID modules from the LOADED program (RAM) to a local directory.
@@ -945,12 +982,37 @@ class IRC5Client:
         remote_path = f'$HOME/{program_name}'
         files = self.get_file_list(remote_path)
         
+        # Check if get_file_list returned an error (e.g. permission denied)
+        file_list_error = None
+        if files and isinstance(files[0], dict) and '_error' in files[0]:
+            file_list_error = files[0]['_error']
+            files = []
+        
         # Filter to just .mod files
         mod_files = []
         for f in files:
             name = f.get('name', '') if isinstance(f, dict) else str(f)
             if name.lower().endswith('.mod'):
                 mod_files.append(name)
+        
+        # If fileservice failed (e.g. UAS permissions), try discovering modules via RAPID API
+        if not mod_files and file_list_error:
+            import logging
+            logging.getLogger(__name__).info(
+                f"Fileservice listing failed ({file_list_error}), trying RAPID API for module names..."
+            )
+            rapid_modules = self._get_module_names_from_rapid(task)
+            if rapid_modules:
+                mod_files = [f"{name}.mod" for name in rapid_modules]
+                source = 'ram'  # Will download from RAM since fileservice is blocked
+            else:
+                return {
+                    'success': False,
+                    'downloaded': [],
+                    'failed': [{'name': 'all', 'error': f'Fileservice: {file_list_error}. RAPID API module discovery also failed. Check UAS permissions for the RWS user on the IRC5.'}],
+                    'program_name': program_name,
+                    'source': None
+                }
         
         if not mod_files:
             return {

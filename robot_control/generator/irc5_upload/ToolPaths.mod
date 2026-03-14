@@ -2583,14 +2583,14 @@ MODULE ToolPaths
 
     
     ! ========== PY2 GENERATED PROCEDURES ==========
-    ! Generated: 14-mar_16:28
+    ! Generated: 14-mar_16:56
     ! Do not edit manually - regenerate via web interface
     
 
     PROC MainMenu()
         VAR num iTask;
         TPErase;
-        TPReadNum iTask,"1:Home,2:Py2_14-mar_16:28";
+        TPReadNum iTask,"1:Home,2:Py2_14-mar_16:56";
         TEST iTask
         CASE 1:
             Home TRUE;
@@ -2606,12 +2606,12 @@ MODULE ToolPaths
 
     PROC Py2Main()
         ! Py2Main - Python-generated tools menu
-        ! Generated: 14-mar_16:28
+        ! Generated: 14-mar_16:56
         
         VAR num iChoice;
         
         TPErase;
-        TPWrite "=== Py2 Tools (14-mar_16:28) ===";
+        TPWrite "=== Py2 Tools (14-mar_16:56) ===";
         TPWrite "Panel X: " \Num:=2000;
         TPWrite "Panel Y: " \Num:=3500;
         TPReadNum iChoice,"1:Heli,2:Polish,3:Vac,4:Pan,5:Screed,6:BedClean";
@@ -2685,7 +2685,7 @@ MODULE ToolPaths
         TPWrite "Py2Heli: Starting blades at " \Num:=100;
         HeliBladeSpeed 100,"REV";
         TPWrite "Py2Heli: Blades motor on";
-        WaitTime 2;
+        WaitTime 5;
 
         ! ========================================
         ! Pattern Execution: 20 points
@@ -4791,7 +4791,7 @@ MODULE ToolPaths
         TPWrite "Py2Pan: Starting blades at " \Num:=80;
         HeliBladeSpeed 80,"REV";
         TPWrite "Py2Pan: Blades motor on";
-        WaitTime 2;
+        WaitTime 5;
 
         ! ========================================
         ! Pattern Execution: 24 points

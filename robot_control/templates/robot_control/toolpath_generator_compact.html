@@ -85,6 +85,42 @@
                         <input type="number" name="panel_z" value="150" readonly class="compact-input w-16 bg-gray-100 text-gray-400 cursor-not-allowed">
                         <span class="text-gray-500 text-xs">Hard Y Offset:</span>
                         <input type="number" name="hard_y_offset" value="{{ defaults.hard_y_offset }}" class="compact-input w-16" title="Absolute minimum Y bound for all tools (mm)">
+                        <span class="text-gray-500 text-xs">Blend:</span>
+                        <select name="blend_radius" class="compact-select w-20" title="Corner blend radius (0=fine/stop at each point)">
+                            <option value="0" {% if defaults.blend_radius == 0 %}selected{% endif %}>Off</option>
+                            <option value="1" {% if defaults.blend_radius == 1 %}selected{% endif %}>z1</option>
+                            <option value="5" {% if defaults.blend_radius == 5 %}selected{% endif %}>z5</option>
+                            <option value="10" {% if defaults.blend_radius == 10 %}selected{% endif %}>z10</option>
+                            <option value="15" {% if defaults.blend_radius == 15 %}selected{% endif %}>z15</option>
+                            <option value="20" {% if defaults.blend_radius == 20 %}selected{% endif %}>z20</option>
+                            <option value="30" {% if defaults.blend_radius == 30 %}selected{% endif %}>z30</option>
+                            <option value="40" {% if defaults.blend_radius == 40 %}selected{% endif %}>z40</option>
+                            <option value="50" {% if defaults.blend_radius == 50 %}selected{% endif %}>z50</option>
+                            <option value="60" {% if defaults.blend_radius == 60 %}selected{% endif %}>z60</option>
+                            <option value="80" {% if defaults.blend_radius == 80 %}selected{% endif %}>z80</option>
+                            <option value="100" {% if defaults.blend_radius == 100 %}selected{% endif %}>z100</option>
+                            <option value="150" {% if defaults.blend_radius == 150 %}selected{% endif %}>z150</option>
+                            <option value="200" {% if defaults.blend_radius == 200 %}selected{% endif %}>z200</option>
+                        </select>
+                        <span class="text-gray-500 text-xs">Desc/Asc:</span>
+                        <select name="desc_asc_blend" class="compact-select w-20" title="Descent/ascent blend radius (0=fine/stop)">
+                            <option value="0" {% if defaults.desc_asc_blend == 0 %}selected{% endif %}>Off</option>
+                            <option value="1" {% if defaults.desc_asc_blend == 1 %}selected{% endif %}>z1</option>
+                            <option value="5" {% if defaults.desc_asc_blend == 5 %}selected{% endif %}>z5</option>
+                            <option value="10" {% if defaults.desc_asc_blend == 10 %}selected{% endif %}>z10</option>
+                            <option value="15" {% if defaults.desc_asc_blend == 15 %}selected{% endif %}>z15</option>
+                            <option value="20" {% if defaults.desc_asc_blend == 20 %}selected{% endif %}>z20</option>
+                            <option value="30" {% if defaults.desc_asc_blend == 30 %}selected{% endif %}>z30</option>
+                            <option value="40" {% if defaults.desc_asc_blend == 40 %}selected{% endif %}>z40</option>
+                            <option value="50" {% if defaults.desc_asc_blend == 50 %}selected{% endif %}>z50</option>
+                            <option value="60" {% if defaults.desc_asc_blend == 60 %}selected{% endif %}>z60</option>
+                            <option value="80" {% if defaults.desc_asc_blend == 80 %}selected{% endif %}>z80</option>
+                            <option value="100" {% if defaults.desc_asc_blend == 100 %}selected{% endif %}>z100</option>
+                            <option value="150" {% if defaults.desc_asc_blend == 150 %}selected{% endif %}>z150</option>
+                            <option value="200" {% if defaults.desc_asc_blend == 200 %}selected{% endif %}>z200</option>
+                            <option value="500" {% if defaults.desc_asc_blend == 500 %}selected{% endif %}>z500</option>
+                            <option value="1000" {% if defaults.desc_asc_blend == 1000 %}selected{% endif %}>z1000</option>
+                        </select>
                     </div>
                 </details>
                 
@@ -373,25 +409,21 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                         Generate & Push
                     </button>
-                    <button type="button" id="upload-original-btn" class="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium">Original</button>
                 </div>
             </div>
 
             {% include "robot_control/tool_demos.html" %}
 
-            <!-- Live Log (compact) -->
+            <!-- Pendant Log -->
             <div class="card p-3">
                 <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-xs font-medium text-gray-400">Live Log</h3>
-                    <span id="live-log-status" class="text-[10px] text-gray-500">Idle</span>
-                </div>
-                <div class="bg-gray-100 rounded h-32 overflow-hidden border border-gray-200">
-                    <div class="px-2 py-1 border-b border-gray-200 flex items-center justify-between text-[10px] bg-gray-50">
-                        <span class="text-gray-500">Tool:</span>
-                        <span id="live-current-tool" class="text-gray-900 font-mono">none</span>
+                    <h3 class="text-xs font-medium text-gray-400">Pendant Log</h3>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] text-gray-500">Tool: <span id="live-current-tool" class="font-mono text-gray-900">none</span></span>
+                        <span id="live-log-status" class="text-[10px] text-gray-500">Idle</span>
                     </div>
-                    <div id="live-log-lines" class="h-24 px-2 py-1 overflow-y-auto text-[10px] font-mono text-gray-700 space-y-0.5"></div>
                 </div>
+                <div id="live-log-lines" class="bg-gray-900 rounded h-48 px-3 py-2 overflow-y-auto text-[11px] font-mono leading-relaxed border border-gray-700"></div>
             </div>
 
             <!-- Result Panel -->
@@ -456,22 +488,31 @@
             const toolEl = document.getElementById('live-current-tool');
             const linesEl = document.getElementById('live-log-lines');
             let seen = new Set();
+            const typeColors = { info: '#4ade80', warning: '#fbbf24', error: '#f87171' };
 
             async function poll() {
                 try {
-                    const r = await fetch('/api/live-log/?contains=LIVE:');
+                    const r = await fetch('/api/live-log/');
                     const data = await r.json();
                     if (data.current_tool) toolEl.textContent = data.current_tool;
                     if (Array.isArray(data.lines)) {
-                        data.lines.slice().reverse().forEach(line => {
-                            if (line && !seen.has(line)) {
-                                seen.add(line);
+                        data.lines.slice().reverse().forEach(entry => {
+                            const key = entry.ts + ' ' + entry.text;
+                            if (!seen.has(key)) {
+                                seen.add(key);
                                 const div = document.createElement('div');
-                                div.textContent = line;
+                                const ts = document.createElement('span');
+                                ts.style.color = '#6b7280';
+                                ts.textContent = entry.ts + ' ';
+                                const msg = document.createElement('span');
+                                msg.style.color = typeColors[entry.type] || '#d1d5db';
+                                msg.textContent = entry.text;
+                                div.appendChild(ts);
+                                div.appendChild(msg);
                                 linesEl.appendChild(div);
                             }
                         });
-                        while (linesEl.childNodes.length > 100) {
+                        while (linesEl.childNodes.length > 200) {
                             const first = linesEl.firstChild;
                             if (first) { seen.delete(first.textContent); linesEl.removeChild(first); }
                         }
@@ -480,7 +521,8 @@
                         }
                     }
                     statusEl.textContent = 'Live';
-                } catch { statusEl.textContent = 'Error'; }
+                    statusEl.style.color = '#4ade80';
+                } catch { statusEl.textContent = 'Error'; statusEl.style.color = '#f87171'; }
             }
             poll();
             setInterval(poll, 1000);
@@ -576,32 +618,6 @@
             btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Pull IRC5';
         });
 
-        document.getElementById('upload-original-btn').addEventListener('click', async () => {
-            if (!confirm("Upload original programs to IRC5?")) return;
-            const btn = document.getElementById('upload-original-btn');
-            btn.disabled = true;
-            btn.textContent = 'Uploading...';
-            try {
-                const r = await fetch('/api/toolpath/upload-original/', { method: 'POST' });
-                const data = await r.json();
-                const panel = document.getElementById('result-panel');
-                const title = document.getElementById('result-title');
-                const content = document.getElementById('result-content');
-                panel.classList.remove('hidden');
-                if (data.success) {
-                    title.textContent = '✓ Original Uploaded';
-                    title.className = 'text-sm font-semibold mb-2 text-amber-400';
-                    content.innerHTML = `<p>Uploaded ${data.uploaded_files?.length} files</p>`;
-                } else {
-                    title.textContent = '✗ Failed';
-                    content.innerHTML = `<p>${data.error}</p>`;
-                }
-            } catch (err) {
-                alert(err.message);
-            }
-            btn.disabled = false;
-            btn.textContent = 'Original';
-        });
     </script>
 </body>
 </html>

@@ -43,8 +43,8 @@ INSTALLED_APPS = [
 
 # IRC5 Controller Settings
 IRC5_HOST = '192.168.125.1'
-IRC5_USERNAME = 'Default User'
-IRC5_PASSWORD = 'robotics'
+IRC5_USERNAME = 'MasonBuild'
+IRC5_PASSWORD = 'Mason100'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

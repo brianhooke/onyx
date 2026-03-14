@@ -13,7 +13,7 @@ MODULE Tools
     PERS tooldata tPolish:=[TRUE,[[-73.9437,0.320318,577.592],[1,0,0,0]],[98.6,[46.8,-4.7,321.4],[1,0,0,0],8.622,12.165,6.339]];
     !tool 6
 
-    PERS num ToolNum:=3;
+    PERS num ToolNum:=2;
     CONST num StepsPerRevolution:=200;
     PERS num StepperPos:=0;
     CONST num RevstoAngle:=0.81;
@@ -82,7 +82,7 @@ MODULE Tools
         HeliBladeSpeed 0,"FWD";
         SetDO PN_DO_08,0;
         SetDO PN_DO_09,0;
-        SetDO PN_DO_23,1;
+        SetDO PN_DO_23,0;
         SetDO PN_DO_14,0;
         SetDO PN_DO_15,0;
     ENDPROC
@@ -357,7 +357,7 @@ MODULE Tools
                 MoveL Offs(CurrentPos,0,(2600-CurrentPos.trans.y),(400-CurrentPos.trans.z)),v500,z5,tVS;
             ENDIF
 
-            MoveJ pVSHome3,v800,z5,tVS;
+            MoveL pVSHome3,v800,z5,tVS;
             pTemp:=pVSHome3;
             pTemp.trans.x:=pVSHome3.trans.x+1500;
             pTemp.extax.eax_a:=pVSHome3.extax.eax_a+1000;
