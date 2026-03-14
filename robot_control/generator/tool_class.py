@@ -370,11 +370,6 @@ class Tool(ABC):
         da_blend = int(params.get('desc_asc_blend', 0))
         if da_blend > 200:
             lines.append(f"        VAR zonedata z{da_blend}:=[FALSE,{da_blend},{int(da_blend*1.5)},{int(da_blend*1.5)},{int(da_blend*0.15)},{int(da_blend*1.5)},{int(da_blend*0.15)}];")
-        if self.config.enforce_min_track_sep:
-            lines.extend([
-                f"        VAR num TcpWorldX:=0;",
-                f"        VAR num MinTrackSep:=1000;",
-            ])
         lines.append(f"")
         return lines
     
@@ -440,6 +435,10 @@ class Tool(ABC):
         # Track previous move type for descent insertion
         prev_move_type = None
         
+        # Track previous rot/robconf to only emit when changed
+        prev_rot_str = None
+        prev_robconf_str = None
+        
         # Get axis_5 tilt angle (for vacuum tool - pipe angle)
         axis_5_angle = params.get('vacuum_axis_5', 0) if self.config.name == 'Vac' else 0
         
@@ -466,15 +465,20 @@ class Tool(ABC):
             point_axis_5 = point.axis_5 if point.axis_5 is not None else axis_5_angle
             # Axis 6 rotation encoded as Z-angle in OrientZYX
             point_axis_6 = point.axis_6 if point.axis_6 is not None else (current_axis_6 or 0)
-            lines.append(f"        pCurrent.rot:=OrientZYX({point_axis_6},{point_axis_5},180);")
+            rot_str = f"OrientZYX({point_axis_6},{point_axis_5},180)"
+            if rot_str != prev_rot_str:
+                lines.append(f"        pCurrent.rot:={rot_str};")
+                prev_rot_str = rot_str
             # Joint 6 = orient_z - 180, normalized to [-180, 180]. cf6 = floor(joint/90).
             _joint = point_axis_6 - 180.0
             while _joint < -180.0: _joint += 360.0
             while _joint > 180.0: _joint -= 360.0
             cf6 = int(_joint // 90)
-            lines.append(f"        pCurrent.robconf:=[1,0,{cf6},0];")
+            robconf_str = f"[1,0,{cf6},0]"
+            if robconf_str != prev_robconf_str:
+                lines.append(f"        pCurrent.robconf:={robconf_str};")
+                prev_robconf_str = robconf_str
             lines.extend(self._generate_track_calc_lines())
-            lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
             
             # Track axis 6 changes
             if point.axis_6 is not None:
@@ -494,28 +498,16 @@ class Tool(ABC):
         return lines
     
     def _generate_track_calc_lines(self) -> List[str]:
-        """Generate RAPID lines for track position calculation.
+        """Generate RAPID lines for track position calculation using Py2CalcTrack FUNC.
         
-        When enforce_min_track_sep is enabled, enforces minimum track-to-TCP X
-        separation to prevent SafeMove violations when the arm folds compactly.
+        Replaces the repeated inline track calculation with a single FUNC call.
+        Includes the extax assignment so callers don't need to append it separately.
         """
         offset = self.config.track_y_offset
-        if self.config.enforce_min_track_sep:
-            return [
-                f"        TcpWorldX:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;",
-                f"        CalcTrack:=TcpWorldX;",
-                f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+{offset}; ENDIF",
-                f"        IF CurrentY<=1500 THEN",
-                f"            IF (CalcTrack-TcpWorldX)<MinTrackSep THEN CalcTrack:=TcpWorldX+MinTrackSep; ENDIF",
-                f"        ENDIF",
-                f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF",
-                f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF",
-            ]
+        min_sep = 1000 if self.config.enforce_min_track_sep else 0
         return [
-            f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;",
-            f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+{offset}; ENDIF",
-            f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF",
-            f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF",
+            f"        CalcTrack:=Py2CalcTrack(pCurrent.trans.x,CurrentY,{offset},TrackMin,TrackMax,{min_sep});",
+            f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];",
         ]
     
     def _uses_force_control(self, params: Dict) -> bool:
@@ -832,6 +824,8 @@ class VibratingScreened(Tool):
             f"        ! Use VS tool's orientation from pickup end position (pVSHome3)",
             f"        ! This prevents 180 degree rotation when moving to work surface",
             f"        pCurrent.rot:=pVSHome3.rot;",
+            f"        ! Use pVSHome3 robconf [1,0,1,0] to match VS_Pickup end position",
+            f"        pCurrent.robconf:=[1,0,1,0];",
             f"",
         ]
         
@@ -849,13 +843,7 @@ class VibratingScreened(Tool):
             else:
                 lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
             
-            # Use pVSHome3 robconf [1,0,1,0] to match VS_Pickup end position
-            lines.append(f"        pCurrent.robconf:=[1,0,1,0];")
-            lines.append(f"        CalcTrack:=Bed1Wyong.uframe.trans.x+pCurrent.trans.x;")
-            lines.append(f"        IF CurrentY<1000 THEN CalcTrack:=CalcTrack+1200; ENDIF")
-            lines.append(f"        IF CalcTrack<TrackMin THEN CalcTrack:=TrackMin; ENDIF")
-            lines.append(f"        IF CalcTrack>TrackMax THEN CalcTrack:=TrackMax; ENDIF")
-            lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
+            lines.extend(self._generate_track_calc_lines())
             
             if point.move_type == "rapid":
                 lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
@@ -1156,7 +1144,6 @@ class Polisher(Tool):
             lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
             lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
             lines.extend(self._generate_track_calc_lines())
-            lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
             lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")
             lines.append(f"")
         
@@ -1215,7 +1202,6 @@ class Polisher(Tool):
                     ])
                     lines.extend(self._generate_track_calc_lines())
                     lines.extend([
-                        f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];",
                         f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                         f"",
                         f"        ! Calibrate FC (motor must be off)",
@@ -1238,7 +1224,6 @@ class Polisher(Tool):
                     lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
                     lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
                     lines.extend(self._generate_track_calc_lines())
-                    lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
                     lines.append(f"        FCPressL pCurrent,v{travel_speed},{motion_force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
                     lines.append(f"")
             
@@ -1282,10 +1267,7 @@ class Polisher(Tool):
                 else:
                     lines.append(f"        pCurrent.trans:=[-1*CurrentX,CurrentY,WorkZ];")
                 
-                lines.append(f"        pCurrent.rot:=OrientZYX(0,0,180);")
-                lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
                 lines.extend(self._generate_track_calc_lines())
-                lines.append(f"        pCurrent.extax:=[CalcTrack,9E+09,9E+09,9E+09,9E+09,9E+09];")
                 
                 if point.move_type == "rapid":
                     lines.append(f"        MoveJ pCurrent,v500,z5,{self.config.tooldata}\\WObj:=Bed1Wyong;")

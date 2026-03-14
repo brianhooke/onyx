@@ -181,12 +181,15 @@ class ToolpathGenerator:
             content = self._remove_existing_py2_procs(content)
             
             # Insert new procedures (including MainMenu)
+            py2_calc_track_func = self._generate_calc_track_func()
             insert_block = f"""
     
     ! ========== PY2 GENERATED PROCEDURES ==========
     ! Generated: {self.timestamp}
     ! Do not edit manually - regenerate via web interface
     
+{py2_calc_track_func}
+
 {new_mainmenu}
 
 {py2main_proc}
@@ -250,6 +253,36 @@ class ToolpathGenerator:
 '''
         return proc
     
+    def _generate_calc_track_func(self) -> str:
+        """Generate Py2CalcTrack RAPID FUNC for track position calculation.
+        
+        Consolidates the repeated per-point track calculation into a single
+        reusable function. Handles Y-offset compensation and optional minimum
+        track-to-TCP separation enforcement.
+        
+        Args (RAPID):
+            tcpX: pCurrent.trans.x (already negated)
+            curY: CurrentY value
+            yOff: Track Y offset (added when curY < 1000)
+            trkMin: TrackMin limit
+            trkMax: TrackMax limit
+            minSep: Minimum track-to-TCP X separation (0 = disabled)
+        """
+        return '''
+    FUNC num Py2CalcTrack(num tcpX, num curY, num yOff, num trkMin, num trkMax, num minSep)
+        VAR num worldX;
+        VAR num ct;
+        worldX:=Bed1Wyong.uframe.trans.x+tcpX;
+        ct:=worldX;
+        IF curY<1000 THEN ct:=ct+yOff; ENDIF
+        IF minSep>0 AND curY<=1500 THEN
+            IF (ct-worldX)<minSep THEN ct:=worldX+minSep; ENDIF
+        ENDIF
+        IF ct<trkMin THEN ct:=trkMin; ENDIF
+        IF ct>trkMax THEN ct:=trkMax; ENDIF
+        RETURN ct;
+    ENDFUNC'''
+
     def _remove_existing_py2_procs(self, content: str) -> str:
         """Remove any existing Py2 generated block."""
         import re
