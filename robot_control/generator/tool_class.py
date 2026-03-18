@@ -281,13 +281,14 @@ class Tool(ABC):
         """Get pattern points for this tool. Override in subclasses."""
         # Default: cross-hatch pattern
         workzone = self._get_workzone_params(params)
+        switch = params.get(f'{self._prefix}_switch_hatch', False)
         return cross_hatch(
             min_x=workzone['min_x'],
             max_x=workzone['max_x'],
             min_y=workzone['min_y'],
             max_y=workzone['max_y'],
             step_size=workzone['step_size'],
-            first_direction='x',
+            first_direction='y' if switch else 'x',
         )
     
     def _get_workzone_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -454,6 +455,8 @@ class Tool(ABC):
             # Handle Z based on move type (lifted for rapid/lift, work height for work/place)
             if point.move_type in ("rapid", "lift"):
                 lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
+            elif point.z_offset:
+                lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ+{point.z_offset:.0f}];")
             else:
                 lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
             
@@ -632,13 +635,14 @@ class Helicopter(Tool):
                 direction=params.get('heli_spiral_direction', 'anticlockwise'),
             )
         else:
+            switch = params.get('heli_switch_hatch', False)
             return cross_hatch(
                 min_x=workzone['min_x'],
                 max_x=workzone['max_x'],
                 min_y=workzone['min_y'],
                 max_y=workzone['max_y'],
                 step_size=workzone['step_size'],
-                first_direction='x',
+                first_direction='y' if switch else 'x',
             )
     
     def _uses_force_control(self, params: Dict) -> bool:
@@ -831,6 +835,8 @@ class VibratingScreened(Tool):
             # Handle Z based on move type
             if point.move_type in ("rapid", "lift"):
                 lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
+            elif point.z_offset:
+                lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ+{point.z_offset:.0f}];")
             else:
                 lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
             
@@ -982,13 +988,14 @@ class Vacuum(Tool):
                 axis_6_initial=axis_6_initial,
             )
         else:
+            switch = params.get('vacuum_switch_hatch', False)
             return cross_hatch(
                 min_x=workzone['min_x'],
                 max_x=workzone['max_x'],
                 min_y=workzone['min_y'],
                 max_y=workzone['max_y'],
                 step_size=workzone['step_size'],
-                first_direction='x',
+                first_direction='y' if switch else 'x',
             )
     
     def _generate_pickup_section(self) -> List[str]:
@@ -1055,6 +1062,10 @@ class Polisher(Tool):
     def _generate_var_declarations(self, params: Dict, workzone: Dict, track_min: float, track_max: float) -> List[str]:
         lines = super()._generate_var_declarations(params, workzone, track_min, track_max)
         if self._uses_force_control(params):
+            approach_speed = params.get('polisher_approach_speed', 20)
+            retract_speed = params.get('polisher_retract_speed', 50)
+            lines.insert(-1, f"        VAR speeddata vApproach:=[{approach_speed},500,5000,1000];")
+            lines.insert(-1, f"        VAR speeddata vRetract:=[{retract_speed},500,5000,1000];")
             lines.insert(-1, f"        VAR bool bFCActive:=FALSE;")
             lines.insert(-1, f"        VAR fcboxvol fc_supv_box:=[-10000,10000,-10000,10000,-10000,10000];")
         return lines
@@ -1063,7 +1074,6 @@ class Polisher(Tool):
         start_force = params.get('polisher_start_force', 100)
         force_change = params.get('polisher_force_change', 100)
         pos_supv_dist = params.get('polisher_pos_supv_dist', 125)
-        approach_speed = params.get('polisher_approach_speed', 50)
         return [
             f"        ! Turn on polisher motor",
             f"        Pol_on;",
@@ -1073,19 +1083,18 @@ class Polisher(Tool):
             f"        FCCalib PolishLoad;",
             f"",
             f"        ! Start force control",
-            f"        FCPress1LStart pCurrent,v{approach_speed},\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tPolish\\WObj:=Bed1Wyong;",
+            f"        FCPress1LStart pCurrent,vApproach,\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,tPolish\\WObj:=Bed1Wyong;",
             f"        bFCActive:=TRUE;",
             f"",
         ]
     
     def _generate_fc_end(self, params: Dict) -> List[str]:
-        retract_speed = params.get('polisher_retract_speed', 100)
         return [
             f"",
             f"        ! End force control",
             f"        CurrentJoints:=CJointT();",
             f"        CurrentPos:=CalcRobT(CurrentJoints,tPolish\\WObj:=Bed1Wyong);",
-            f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\DeactOnly,tPolish\\WObj:=Bed1Wyong;",
+            f"        FCPressEnd Offs(CurrentPos,0,0,75),vRetract,\\DeactOnly,tPolish\\WObj:=Bed1Wyong;",
             f"        bFCActive:=FALSE;",
             f"",
         ]
@@ -1141,9 +1150,7 @@ class Polisher(Tool):
             start_force = params.get('polisher_start_force', 140)
             force_change = params.get('polisher_force_change', 75)
             pos_supv_dist = params.get('polisher_pos_supv_dist', 100)
-            approach_speed = params.get('polisher_approach_speed', 20)
             motion_force = params.get('polisher_motion_force', 130)
-            travel_speed = params.get('polisher_speed', 100)
             
             # 2. Lower to 250mm above WorkZ
             lines.extend([
@@ -1153,10 +1160,13 @@ class Polisher(Tool):
                 f"        WaitTime\\inpos,0.1;",
                 f"",
                 f"        ! Force control calibration (must be done with motor OFF)",
+                f"        TPWrite \"Py2Polish: FC calibrating (motor OFF)...\";",
                 f"        FCCalib PolishLoad;",
+                f"        TPWrite \"Py2Polish: FC calibrated\";",
                 f"",
                 f"        ! Turn on polisher motor",
                 f"        Pol_on;",
+                f"        TPWrite \"Py2Polish: Motor ON\";",
                 f"",
                 f"        ! Lower to 80mm above work surface",
                 f"        pCurrent.trans.z:=WorkZ+80;",
@@ -1164,9 +1174,13 @@ class Polisher(Tool):
                 f"        WaitTime\\inpos,0.1;",
                 f"",
                 f"        ! Start force control - pressing from ~50mm above work surface",
+                f"        TPWrite \"Py2Polish: FC start - target Fz=\" \\Num:={start_force};",
+                f"        TPWrite \"Py2Polish: ForceChange=\" \\Num:={force_change};",
+                f"        TPWrite \"Py2Polish: MotionForce=\" \\Num:={motion_force};",
                 f"        pCurrent.trans.z:=WorkZ+50;",
-                f"        FCPress1LStart pCurrent,v{approach_speed},\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"        FCPress1LStart pCurrent,vApproach,\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                 f"        bFCActive:=TRUE;",
+                f"        TPWrite \"Py2Polish: FC active - force achieved\";",
                 f"",
             ])
             
@@ -1177,12 +1191,12 @@ class Polisher(Tool):
                 
                 if point.move_type in ("rapid", "lift"):
                     # End FC, retract, reposition, restart FC
-                    retract_speed = params.get('polisher_retract_speed', 50)
                     lines.extend([
                         f"        ! Retract - end force control for reposition",
+                        f"        TPWrite \"Py2Polish: FC retract for reposition\";",
                         f"        CurrentJoints:=CJointT();",
                         f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
-                        f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\DeactOnly,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                        f"        FCPressEnd Offs(CurrentPos,0,0,75),vRetract,\\DeactOnly,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                         f"        bFCActive:=FALSE;",
                         f"",
                         f"        ! Reposition at SafeZ",
@@ -1195,6 +1209,7 @@ class Polisher(Tool):
                         f"",
                         f"        ! Calibrate FC (motor must be off)",
                         f"        Pol_off;",
+                        f"        TPWrite \"Py2Polish: FC recalibrating...\";",
                         f"        WaitTime\\inpos,0.1;",
                         f"        FCCalib PolishLoad;",
                         f"",
@@ -1203,28 +1218,34 @@ class Polisher(Tool):
                         f"        pCurrent.trans.z:=WorkZ+80;",
                         f"        MoveL pCurrent,v100,fine,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                         f"        WaitTime\\inpos,0.1;",
+                        f"        TPWrite \"Py2Polish: FC restart - target Fz=\" \\Num:={start_force};",
                         f"        pCurrent.trans.z:=WorkZ+50;",
-                        f"        FCPress1LStart pCurrent,v{approach_speed},\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                        f"        FCPress1LStart pCurrent,vApproach,\\Fz:={start_force},15,\\ForceChange:={force_change}\\PosSupvDist:={pos_supv_dist},z5,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                         f"        bFCActive:=TRUE;",
+                        f"        TPWrite \"Py2Polish: FC active - force achieved\";",
                         f"",
                     ])
                 else:
                     # Work move with FCPressL
-                    lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
+                    if point.z_offset:
+                        lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ+{point.z_offset:.0f}];")
+                    else:
+                        lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
                     lines.append(f"        pCurrent.robconf:=[0,0,0,0];")
                     lines.extend(self._generate_track_calc_lines())
-                    lines.append(f"        FCPressL pCurrent,v{travel_speed},{motion_force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
+                    lines.append(f"        FCPressL pCurrent,vTravel,{motion_force},fine,{self.config.tooldata}\\WObj:=Bed1Wyong;")
                     lines.append(f"")
             
             # 4. End force control
-            retract_speed = params.get('polisher_retract_speed', 50)
             lines.extend([
                 f"",
                 f"        ! End force control",
+                f"        TPWrite \"Py2Polish: FC ending - retracting...\";",
                 f"        CurrentJoints:=CJointT();",
                 f"        CurrentPos:=CalcRobT(CurrentJoints,{self.config.tooldata}\\WObj:=Bed1Wyong);",
-                f"        FCPressEnd Offs(CurrentPos,0,0,75),v{retract_speed},\\DeactOnly,{self.config.tooldata}\\WObj:=Bed1Wyong;",
+                f"        FCPressEnd Offs(CurrentPos,0,0,75),vRetract,\\DeactOnly,{self.config.tooldata}\\WObj:=Bed1Wyong;",
                 f"        bFCActive:=FALSE;",
+                f"        TPWrite \"Py2Polish: FC complete\";",
                 f"",
             ])
         else:
@@ -1252,6 +1273,8 @@ class Polisher(Tool):
                 
                 if point.move_type in ("rapid", "lift"):
                     lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},SafeZ];")
+                elif point.z_offset:
+                    lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ+{point.z_offset:.0f}];")
                 else:
                     lines.append(f"        pCurrent.trans:=[{neg_x:.0f},{point.y:.0f},WorkZ];")
                 
@@ -1295,13 +1318,14 @@ class Pan(Tool):
     def _get_pattern_points(self, params: Dict[str, Any]) -> List[Point]:
         """Pan uses cross-hatch pattern only (no spiral)."""
         workzone = self._get_workzone_params(params)
+        switch = params.get('pan_switch_hatch', False)
         return cross_hatch(
             min_x=workzone['min_x'],
             max_x=workzone['max_x'],
             min_y=workzone['min_y'],
             max_y=workzone['max_y'],
             step_size=workzone['step_size'],
-            first_direction='x',
+            first_direction='y' if switch else 'x',
         )
     
     def _uses_force_control(self, params: Dict) -> bool:

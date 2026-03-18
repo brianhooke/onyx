@@ -29,6 +29,7 @@ class ToolPathParameters(models.Model):
     vacuum_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Vacuum spiral direction: clockwise or anticlockwise")
     vacuum_formwork_offset = models.IntegerField(default=100, help_text="Vacuum spiral formwork offset from edges (mm)")
     vacuum_axis_5 = models.IntegerField(default=0, help_text="Vacuum axis 5 tilt angle (degrees)")
+    vacuum_switch_hatch = models.BooleanField(default=False, help_text="Switch cross-hatch order: Y passes first, then X")
     
     # Cross-hatch pattern steps (per tool)
     polisher_step = models.IntegerField(default=450, help_text="Polisher step (mm)")
@@ -46,6 +47,7 @@ class ToolPathParameters(models.Model):
     pan_force = models.IntegerField(default=0, help_text="Pan force (N, 0=off, 100-500)")
     pan_force_change = models.IntegerField(default=100, help_text="Pan force change rate (N)")
     pan_pos_supv_dist = models.IntegerField(default=125, help_text="Pan position supervision distance (mm)")
+    pan_switch_hatch = models.BooleanField(default=False, help_text="Switch cross-hatch order: Y passes first, then X")
     
     # Helicopter parameters
     heli_travel_speed = models.IntegerField(default=40, help_text="Helicopter travel speed (mm/s)")
@@ -58,6 +60,7 @@ class ToolPathParameters(models.Model):
     heli_pattern = models.CharField(default='cross-hatch', max_length=50, help_text="Helicopter pattern")
     heli_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Rectangular spiral direction: clockwise or anticlockwise")
     heli_formwork_offset = models.IntegerField(default=100, help_text="Rectangular spiral formwork offset from edges (mm)")
+    heli_switch_hatch = models.BooleanField(default=False, help_text="Switch cross-hatch order: Y passes first, then X")
     
     # Polisher force/speed parameters
     polisher_z_offset = models.IntegerField(default=0, help_text="Polisher Z offset (mm)")
@@ -73,6 +76,7 @@ class ToolPathParameters(models.Model):
     polisher_spiral_direction = models.CharField(default='anticlockwise', max_length=20, help_text="Polisher spiral direction: clockwise or anticlockwise")
     polisher_formwork_offset = models.IntegerField(default=100, help_text="Polisher spiral formwork offset from edges (mm)")
     polisher_dual_hatch = models.BooleanField(default=False, help_text="Run a second offset cross-hatch pass between the first")
+    polisher_switch_hatch = models.BooleanField(default=False, help_text="Switch cross-hatch order: Y passes first, then X")
     # Vib Screed parameters
     screed_z_offset = models.IntegerField(default=0, help_text="Screed Z offset (mm)")
     vib_screed_speed = models.IntegerField(default=100, help_text="Vibrating screed speed (mm/s)")
@@ -231,6 +235,11 @@ class ToolPathParameters(models.Model):
             'polisher_dual_hatch': self.polisher_dual_hatch,
             'pan_spiral_direction': self.pan_spiral_direction,
             'pan_formwork_offset': self.pan_formwork_offset,
+            # Per-tool switch hatch
+            'vacuum_switch_hatch': self.vacuum_switch_hatch,
+            'polisher_switch_hatch': self.polisher_switch_hatch,
+            'heli_switch_hatch': self.heli_switch_hatch,
+            'pan_switch_hatch': self.pan_switch_hatch,
             # Trowel parameters
             'trowel_z_offset': self.trowel_z_offset,
             'trowel_speed': self.trowel_speed,

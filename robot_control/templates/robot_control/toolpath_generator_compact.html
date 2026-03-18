@@ -221,6 +221,7 @@
                             <th class="text-left py-1.5 px-1 font-semibold w-20">Tool</th>
                             <th class="text-left py-1.5 px-1 font-semibold">Zone</th>
                             <th class="text-left py-1.5 px-1 font-semibold">Pattern</th>
+                            <th class="text-center py-1.5 px-1 font-semibold" title="Switch cross-hatch: Y passes first, then X">Sw</th>
                             <th class="text-left py-1.5 px-1 font-semibold">Z Off</th>
                             <th class="text-left py-1.5 px-1 font-semibold">Speed</th>
                             <th class="text-left py-1.5 px-1 font-semibold">Force<div class="text-[9px] text-red-500 font-normal">0 = Force Off</div></th>
@@ -244,6 +245,7 @@
                                     <option value="sweep-lift" {% if defaults.vacuum_pattern == 'sweep-lift' %}selected{% endif %}>Sweep</option>
                                 </select>
                             </td>
+                            <td class="py-1 px-1 text-center"><input type="checkbox" name="vacuum_switch_hatch" value="1" {% if defaults.vacuum_switch_hatch %}checked{% endif %} class="w-3 h-3" title="Switch X-hatch order"></td>
                             <td class="py-1 px-1"><input type="number" name="vacuum_z_offset" value="{{ defaults.vacuum_z_offset }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="vacuum_speed" value="{{ defaults.vacuum_speed }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="vacuum_force" value="{{ defaults.vacuum_force }}" class="compact-input"></td>
@@ -269,6 +271,7 @@
                                     <option value="rectangular_spiral" {% if defaults.polisher_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
                                 </select>
                             </td>
+                            <td class="py-1 px-1 text-center"><input type="checkbox" name="polisher_switch_hatch" value="1" {% if defaults.polisher_switch_hatch %}checked{% endif %} class="w-3 h-3" title="Switch X-hatch order"></td>
                             <td class="py-1 px-1"><input type="number" name="polisher_z_offset" value="{{ defaults.polisher_z_offset }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="polisher_speed" value="{{ defaults.polisher_speed }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="polisher_start_force" value="{{ defaults.polisher_start_force }}" class="compact-input" title="Start force"></td>
@@ -285,6 +288,7 @@
                             <td class="py-1 px-1 text-amber-600 font-bold">Vib Screed</td>
                             <td class="py-1 px-1 text-gray-500">Panel</td>
                             <td class="py-1 px-1 text-gray-400">—</td>
+                            <td class="py-1 px-1 text-gray-400 text-center">—</td>
                             <td class="py-1 px-1"><input type="number" name="screed_z_offset" value="{{ defaults.screed_z_offset }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="vib_screed_speed" value="{{ defaults.vib_screed_speed }}" class="compact-input"></td>
                             <td class="py-1 px-1 text-gray-400">—</td>
@@ -310,16 +314,9 @@
                                     <option value="rectangular_spiral" {% if defaults.pan_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
                                 </select>
                             </td>
+                            <td class="py-1 px-1 text-center"><input type="checkbox" name="pan_switch_hatch" value="1" {% if defaults.pan_switch_hatch %}checked{% endif %} class="w-3 h-3" title="Switch X-hatch order"></td>
                             <td class="py-1 px-1"><input type="number" name="pan_z_offset" value="{{ defaults.pan_z_offset }}" class="compact-input"></td>
-                            <td class="py-1 px-1">
-                                <select name="pan_travel_speed" class="compact-select">
-                                    <option value="20">20</option>
-                                    <option value="40">40</option>
-                                    <option value="60">60</option>
-                                    <option value="100" selected>100</option>
-                                    <option value="150">150</option>
-                                </select>
-                            </td>
+                            <td class="py-1 px-1"><input type="number" name="pan_travel_speed" value="{{ defaults.pan_travel_speed }}" class="compact-input"></td>
                             <td class="py-1 px-1"><input type="number" name="pan_force" value="{{ defaults.pan_force }}" class="compact-input"></td>
                             <td class="py-1 px-1 border-l border-gray-100 pl-3">
                                 <div class="flex items-center gap-2">
@@ -339,6 +336,7 @@
                                     <option value="rectangular_spiral" {% if defaults.heli_pattern == 'rectangular_spiral' %}selected{% endif %}>Spiral</option>
                                 </select>
                             </td>
+                            <td class="py-1 px-1 text-center"><input type="checkbox" name="heli_switch_hatch" value="1" {% if defaults.heli_switch_hatch %}checked{% endif %} class="w-3 h-3" title="Switch X-hatch order"></td>
                             <td class="py-1 px-1"><input type="number" name="heli_z_offset" value="{{ defaults.heli_z_offset }}" class="compact-input"></td>
                             <td class="py-1 px-1">
                                 <input type="number" name="heli_travel_speed" value="{{ defaults.heli_travel_speed }}" class="compact-input" min="1" max="500" title="Travel speed mm/s">
@@ -547,6 +545,8 @@
                 params[k] = k === 'upload_to_irc5' ? true : stringFields.includes(k) ? v : parseInt(v);
             }
             if (!formData.has('upload_to_irc5')) params.upload_to_irc5 = false;
+            const boolCheckboxes = ['vacuum_switch_hatch', 'polisher_switch_hatch', 'heli_switch_hatch', 'pan_switch_hatch'];
+            boolCheckboxes.forEach(f => { if (!formData.has(f)) params[f] = 0; });
 
             try {
                 const r = await fetch('/api/toolpath/generate/', {

@@ -55,6 +55,7 @@ def api_toolpath_save_params(request):
             'trowel_pass_1_angle', 'trowel_pass_1_rotation', 'trowel_pass_2_angle', 'trowel_pass_2_rotation',
             'trowel_step', 'trowel_diameter', 'trowel_overhang', 'trowel_spiral_direction', 'trowel_formwork_offset',
             'trowel_direction', 'trowel_start_bottom',
+            'vacuum_switch_hatch', 'polisher_switch_hatch', 'heli_switch_hatch', 'pan_switch_hatch',
         ]
         
         string_fields = [
@@ -64,7 +65,8 @@ def api_toolpath_save_params(request):
             'heli_workzone', 'heli_pattern', 'heli_spiral_direction', 'heli_blade_direction',
             'trowel_spiral_direction',
         ]
-        bool_fields = ['serpentine_start_bottom', 'vacuum_force_enabled', 'vacuum_start_bottom', 'polisher_start_bottom', 'pan_start_bottom', 'heli_start_bottom', 'trowel_start_bottom']
+        bool_fields = ['serpentine_start_bottom', 'vacuum_force_enabled', 'vacuum_start_bottom', 'polisher_start_bottom', 'pan_start_bottom', 'heli_start_bottom', 'trowel_start_bottom',
+                       'vacuum_switch_hatch', 'polisher_switch_hatch', 'heli_switch_hatch', 'pan_switch_hatch']
         
         for field in field_names:
             if field in data:

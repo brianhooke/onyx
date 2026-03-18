@@ -205,12 +205,32 @@ def api_events_latest(request):
 
 @require_http_methods(["GET"])
 def api_force_torque(request):
-    """Get force/torque sensor values (requires ForceMonitor.mod on controller)."""
+    """Get force/torque sensor values from AO signals."""
     client = IRC5Client()
     
     try:
-        data = client.get_force_torque()
-        return JsonResponse(data)
+        conn_test = client.test_connection()
+        if not conn_test['connected']:
+            return JsonResponse({'status': 'error', 'error': 'IRC5 not connected'})
+        
+        signal_map = {
+            'fx': 'AO_Force_X',
+            'fy': 'AO_Force_Y',
+            'fz': 'AO_Force_Z',
+            'tx': 'AO_Force_TX',
+            'ty': 'AO_Force_TY',
+            'tz': 'AO_Force_TZ',
+        }
+        
+        result = {'status': 'ok'}
+        for key, signal_name in signal_map.items():
+            try:
+                value = client.get_signal(signal_name)
+                result[key] = float(value) if value is not None else 0.0
+            except Exception:
+                result[key] = 0.0
+        
+        return JsonResponse(result)
     except Exception as e:
         return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
 
@@ -367,7 +387,8 @@ def api_generate_toolpath(request):
         params = dict(db_params)
         for key in list(db_params.keys()) + list(ToolpathGenerator.REQUIRED_PARAMS):
             if key in data and data[key] is not None:
-                if key in ('serpentine_start_bottom', 'polisher_dual_hatch'):
+                if key in ('serpentine_start_bottom', 'polisher_dual_hatch',
+                          'vacuum_switch_hatch', 'polisher_switch_hatch', 'heli_switch_hatch', 'pan_switch_hatch'):
                     params[key] = bool(int(data[key])) if data[key] != '' else False
                 else:
                     try:
@@ -688,9 +709,11 @@ def api_pattern_points(request):
                 start_x=min_x - edge_offset, end_x=max_x + edge_offset, y_position=y_center,
             )
         else:  # cross-hatch
+            switch_key = f'{tool}_switch_hatch' if tool != 'helicopter' else 'heli_switch_hatch'
+            switch = bool(data.get(switch_key, False))
             points = cross_hatch(
                 min_x=xhatch_min_x, max_x=xhatch_max_x, min_y=xhatch_min_y, max_y=xhatch_max_y,
-                step_size=step, first_direction='x',
+                step_size=step, first_direction='y' if switch else 'x',
                 tool=tool,
                 handle_length=250 if tool == 'vacuum' else 0,
             )
@@ -786,7 +809,7 @@ def api_force_data(request):
         if not conn_test['connected']:
             return JsonResponse({'success': False, 'error': 'IRC5 not connected'})
         
-        # Read force values from analog outputs
+        # Read force values directly from AO signals
         force_signals = {
             'x': 'AO_Force_X',
             'y': 'AO_Force_Y',
@@ -796,24 +819,6 @@ def api_force_data(request):
             'tz': 'AO_Force_TZ',
         }
         
-        # Try reading PERS variables first (requires force_monitor() running)
-        ft_data = client.get_force_torque()
-        if ft_data and ft_data.get('status') == 'ok':
-            return JsonResponse({
-                'success': True,
-                'forces': {
-                    'x': ft_data['fx'],
-                    'y': ft_data['fy'],
-                    'z': ft_data['fz'],
-                    'tx': ft_data['tx'],
-                    'ty': ft_data['ty'],
-                    'tz': ft_data['tz'],
-                },
-                'source': 'rapid_pers',
-                'timestamp': datetime.now().isoformat(),
-            })
-        
-        # Fallback to AO signals
         forces = {}
         errors = []
         for key, signal_name in force_signals.items():
@@ -834,7 +839,6 @@ def api_force_data(request):
             'source': 'ao_signals',
             'timestamp': datetime.now().isoformat(),
             'errors': errors if errors else None,
-            'note': 'Run force_monitor() on IRC5 for live feed'
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

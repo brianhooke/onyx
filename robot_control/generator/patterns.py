@@ -34,6 +34,7 @@ class Point:
     axis_4: Optional[float] = None  # Axis 4 plough angle in degrees (trowel tilt for ploughing, None = unchanged)
     axis_5: Optional[float] = None  # Axis 5 tilt angle in degrees (vacuum pipe tilts towards max_x/far end of bed, None = unchanged)
     axis_6: Optional[float] = None  # Axis 6 rotation in degrees (None = unchanged)
+    z_offset: float = 0  # Z offset above WorkZ in mm (e.g. 25 for gentle lift-off during runoff)
     
     def __repr__(self) -> str:
         extras = []
@@ -43,6 +44,8 @@ class Point:
             extras.append(f"axis_5={self.axis_5:.0f}")
         if self.axis_6 is not None:
             extras.append(f"axis_6={self.axis_6:.0f}")
+        if self.z_offset:
+            extras.append(f"z_offset={self.z_offset:.0f}")
         if extras:
             return f"Point({self.x:.0f}, {self.y:.0f}, '{self.move_type}', {', '.join(extras)})"
         return f"Point({self.x:.0f}, {self.y:.0f}, '{self.move_type}')"
@@ -253,7 +256,11 @@ def cross_hatch(
                 points.append(Point(current_x, y, "work"))
         
         # PHASE 2: Y passes (sweep Y, step in X) - cover full width
-        x_positions = _generate_steps(min_x, max_x, step_size)
+        # Start from where Phase 1 ended to avoid unnecessary repositioning
+        if current_x >= (min_x + max_x) / 2:
+            x_positions = _generate_steps(max_x, min_x, -step_size)
+        else:
+            x_positions = _generate_steps(min_x, max_x, step_size)
         
         if current_y <= (min_y + max_y) / 2:
             y_sweep_start = min_y
@@ -287,6 +294,10 @@ def cross_hatch(
             else:
                 points.append(Point(current_x, y_target, "work"))
             current_y = y_target
+        
+        # Phantom step off worksurface in the Phase 2 stepping direction
+        phase2_x_sign = -1 if x_positions[0] > x_positions[-1] else 1
+        add_runoff_step(points, "x", phase2_x_sign)
     
     else:  # first_direction == "y"
         # PHASE 1: Y passes (sweep Y, step in X)
@@ -324,7 +335,11 @@ def cross_hatch(
                 points.append(Point(x, current_y, "work"))
         
         # PHASE 2: X passes (sweep X, step in Y) - cover full height
-        y_positions = _generate_steps(min_y, max_y, step_size)
+        # Start from where Phase 1 ended to avoid unnecessary repositioning
+        if current_y >= (min_y + max_y) / 2:
+            y_positions = _generate_steps(max_y, min_y, -step_size)
+        else:
+            y_positions = _generate_steps(min_y, max_y, step_size)
         
         if current_x <= (min_x + max_x) / 2:
             x_sweep_start = min_x
@@ -358,6 +373,15 @@ def cross_hatch(
             else:
                 points.append(Point(x_target, current_y, "work"))
             current_x = x_target
+        
+        # Phantom step: continue the last X sweep direction (not Y step)
+        # because there's no free space beyond y(min)/y(max)
+        last_sweep_towards_end = (len(y_positions) - 1) % 2 == 0
+        if last_sweep_towards_end:
+            phantom_x_sign = 1 if x_sweep_end > x_sweep_start else -1
+        else:
+            phantom_x_sign = 1 if x_sweep_start > x_sweep_end else -1
+        add_runoff_step(points, "x", phantom_x_sign)
     
     return points
 
@@ -656,6 +680,36 @@ def _generate_steps(start: float, end: float, step: float) -> List[float]:
             values.append(end)
     
     return values
+
+
+def add_runoff_step(
+    points: List[Point],
+    step_axis: Literal["x", "y"],
+    step_sign: int,
+    distance: float = 500,
+    ascend: float = 25,
+) -> None:
+    """
+    Add a phantom step off the worksurface at the end of a pattern.
+    
+    Continues the last stepping direction by 'distance' mm beyond the final
+    point, ascending 'ascend' mm linearly over the step to gently pull
+    the tool off the worksurface.
+    
+    Args:
+        points: List of pattern points to append to (modified in place)
+        step_axis: 'x' or 'y' - which axis to extend along
+        step_sign: +1 or -1 - direction of the step
+        distance: How far to extend beyond the last point (default 500mm)
+        ascend: Height to gain over the phantom step (default 25mm)
+    """
+    if not points:
+        return
+    last = points[-1]
+    if step_axis == "x":
+        points.append(Point(last.x + distance * step_sign, last.y, "work", axis_6=last.axis_6, z_offset=ascend))
+    else:
+        points.append(Point(last.x, last.y + distance * step_sign, "work", axis_6=last.axis_6, z_offset=ascend))
 
 
 def sweep_lift(
